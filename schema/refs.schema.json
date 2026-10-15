@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schema/refs.schema.json",
+  "title": "refs.json",
+  "description": "统一 CG 演出回放库 · 事件引用表 v1.0（与 docs/02_数据模型与包格式规范.md 同源）",
+  "type": "object",
+  "required": ["format_version", "game_id", "hash_algo", "events", "union"],
+  "additionalProperties": false,
+  "properties": {
+    "format_version": { "const": "1.0" },
+    "game_id": { "type": "string", "minLength": 1 },
+    "hash_algo": { "const": "blake3" },
+    "events": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/RefEntry" }
+      }
+    },
+    "union": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/RefEntry" }
+    }
+  },
+  "$defs": {
+    "RefEntry": {
+      "type": "object",
+      "required": ["hash", "role", "orig_path"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "role": {
+          "enum": ["background", "stand", "cg", "voice", "bgm", "se", "movie", "text_asset", "unrecognized"]
+        },
+        "orig_path": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

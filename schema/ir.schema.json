@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schema/ir.schema.json",
+  "title": "IR (Unified Performance Intermediate Representation)",
+  "description": "统一 CG 演出回放库 · IR 规范 v1.0（与 docs/03_IR规范.md 同源）",
+  "type": "object",
+  "required": ["ir_version", "game_id", "engine_id", "fidelity", "meta", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "ir_version": { "const": "1.0" },
+    "game_id": { "type": "string", "minLength": 1 },
+    "engine_id": { "type": "string", "minLength": 1 },
+    "fidelity": { "enum": ["generic", "tuned", "exclusive"] },
+    "meta": {
+      "type": "object",
+      "required": ["generated_by"],
+      "additionalProperties": true,
+      "properties": {
+        "script_encoding": { "type": ["string", "null"] },
+        "generated_by": { "type": "string", "minLength": 1 },
+        "generated_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Event" }
+    }
+  },
+  "$defs": {
+    "AssetRef": {
+      "type": "object",
+      "required": ["hash", "orig_path", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "orig_path": { "type": "string", "minLength": 1 },
+        "role": {
+          "enum": ["background", "stand", "cg", "voice", "bgm", "se", "movie", "text_asset", "unrecognized"]
+        },
+        "duration_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Layer": {
+      "type": "object",
+      "required": ["layer_id", "kind", "z", "visible"],
+      "additionalProperties": false,
+      "properties": {
+        "layer_id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["background", "stand", "cg", "mask", "movie", "text", "effect"] },
+        "asset": { "oneOf": [{ "$ref": "#/$defs/AssetRef" }, { "type": "null" }] },
+        "z": { "type": "integer" },
+        "visible": { "type": "boolean" },
+        "transform": { "$ref": "#/$defs/Transform" },
+        "blend": { "enum": ["normal", "add", "multiply"], "default": "normal" }
+      }
+    },
+    "Transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "scale": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation": { "type": "number" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "anchor": { "enum": ["top-left", "center"] }
+      }
+    },
+    "TimelineOp": {
+      "type": "object",
+      "required": ["t_ms", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "t_ms": { "type": "integer", "minimum": 0 },
+        "op": {
+          "enum": [
+            "bgm_play", "bgm_stop", "se_play", "voice_play", "voice_stop",
+            "layer_show", "layer_hide", "layer_set", "layer_move", "layer_fade",
+            "layer_scale", "layer_rotate",
+            "transition_begin", "transition_end",
+            "text_show", "text_hide",
+            "movie_play", "movie_stop",
+            "quake", "wait", "label", "unrecognized"
+          ]
+        },
+        "target": { "type": "string" },
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "text_show" } }, "required": ["op"] },
+          "then": { "required": ["target"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "layer_show" } }, "required": ["op"] },
+          "then": { "required": ["target"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "layer_hide" } }, "required": ["op"] },
+          "then": { "required": ["target"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "layer_move" } }, "required": ["op"] },
+          "then": { "required": ["target"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "layer_fade" } }, "required": ["op"] },
+          "then": { "required": ["target"] }
+        }
+      ]
+    },
+    "TextLine": {
+      "type": "object",
+      "required": ["line_id", "t_ms", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "line_id": { "type": "string", "minLength": 1 },
+        "t_ms": { "type": "integer", "minimum": 0 },
+        "speaker": { "type": "string" },
+        "text": { "type": "string" },
+        "voice": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["hash", "orig_path"],
+              "additionalProperties": false,
+              "properties": {
+                "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "orig_path": { "type": "string", "minLength": 1 },
+                "duration_ms": { "type": "integer", "minimum": 0 }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "font_hint": { "type": "string" },
+            "size_px": { "type": "integer", "minimum": 1 },
+            "position": { "enum": ["bottom", "center", "top"] },
+            "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "name_box": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "Voice": {
+      "type": "object",
+      "required": ["line_id", "asset"],
+      "additionalProperties": false,
+      "properties": {
+        "line_id": { "type": "string", "minLength": 1 },
+        "asset": { "$ref": "#/$defs/AssetRef" },
+        "duration_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Transition": {
+      "type": "object",
+      "required": ["transition_id", "impl", "duration_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "transition_id": { "type": "string", "minLength": 1 },
+        "impl": { "type": "string", "minLength": 1 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "params": { "type": "object" },
+        "fallback": { "type": "boolean", "default": false }
+      }
+    },
+    "Branch": {
+      "type": "object",
+      "required": ["branch_id", "t_ms", "type", "default_target"],
+      "additionalProperties": false,
+      "properties": {
+        "branch_id": { "type": "string", "minLength": 1 },
+        "t_ms": { "type": "integer", "minimum": 0 },
+        "type": { "enum": ["choice", "flag", "jump"] },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text", "target_event"],
+            "additionalProperties": false,
+            "properties": {
+              "text": { "type": "string" },
+              "target_event": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "default_target": { "type": "string", "minLength": 1 },
+        "chosen": { "type": ["integer", "null"] }
+      }
+    },
+    "Unrecognized": {
+      "type": "object",
+      "required": ["node_path", "raw", "reason", "kept_assets"],
+      "additionalProperties": false,
+      "properties": {
+        "node_path": { "type": "string", "minLength": 1 },
+        "raw": { "type": "string" },
+        "reason": { "type": "string", "minLength": 1 },
+        "kept_assets": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "Event": {
+      "type": "object",
+      "required": [
+        "event_id", "kind", "ord", "layers", "timeline",
+        "texts", "voices", "transitions", "branches", "unrecognized", "assets"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "event_id": { "type": "string", "pattern": "^evt_[0-9]{6,}$" },
+        "kind": { "enum": ["still_cg", "event_video", "scene", "other"] },
+        "title": { "type": "string" },
+        "ord": { "type": "integer", "minimum": 0 },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 0 },
+        "characters": { "type": "array", "items": { "type": "string" } },
+        "layers": { "type": "array", "items": { "$ref": "#/$defs/Layer" } },
+        "timeline": { "type": "array", "items": { "$ref": "#/$defs/TimelineOp" } },
+        "texts": { "type": "array", "items": { "$ref": "#/$defs/TextLine" } },
+        "voices": { "type": "array", "items": { "$ref": "#/$defs/Voice" } },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/Transition" } },
+        "branches": { "type": "array", "items": { "$ref": "#/$defs/Branch" } },
+        "unrecognized": { "type": "array", "items": { "$ref": "#/$defs/Unrecognized" } },
+        "assets": { "type": "array", "items": { "$ref": "#/$defs/AssetRef" } }
+      }
+    }
+  }
+}

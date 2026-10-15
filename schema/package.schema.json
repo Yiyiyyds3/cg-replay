@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schema/package.schema.json",
+  "title": "package.json",
+  "description": "统一 CG 演出回放库 · 包元数据 v1.0（与 docs/02_数据模型与包格式规范.md 同源）",
+  "type": "object",
+  "required": [
+    "format_version", "game_id", "title", "engine_id", "fidelity",
+    "hash_algo", "core_version", "has_emote", "created_at", "updated_at",
+    "source", "stats"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format_version": { "const": "1.0" },
+    "game_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "original_title": { "type": "string" },
+    "engine_id": { "type": "string", "minLength": 1 },
+    "engine_version": { "type": "string" },
+    "brand": { "type": "string" },
+    "release_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "fidelity": { "enum": ["generic", "tuned", "exclusive"], "default": "generic" },
+    "hash_algo": { "const": "blake3" },
+    "core_version": { "type": "string", "minLength": 1 },
+    "has_emote": { "type": "boolean" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": { "type": "string" },
+        "archive_entries": { "type": "integer", "minimum": 0 },
+        "archive_bytes": { "type": "integer", "minimum": 0 },
+        "unpacked_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "required": ["events", "scripts", "assets", "asset_bytes", "text_lines", "unrecognized"],
+      "additionalProperties": false,
+      "properties": {
+        "events": { "type": "integer", "minimum": 0 },
+        "scripts": { "type": "integer", "minimum": 0 },
+        "assets": { "type": "integer", "minimum": 0 },
+        "asset_bytes": { "type": "integer", "minimum": 0 },
+        "text_lines": { "type": "integer", "minimum": 0 },
+        "unrecognized": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
