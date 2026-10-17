@@ -17,13 +17,13 @@ import (
 type Category string
 
 const (
-	CatImage   Category = "图片"             // tlg/png/jpg/hg3/sgcg/bip 等
-	CatAudio   Category = "音频"             // ogg/wav/mp3
-	CatScript  Category = "脚本"             // ks/tjs/ast/cst/lua/bs/hcb/scn
+	CatImage   Category = "图片"         // tlg/png/jpg/hg3/sgcg/bip 等
+	CatAudio   Category = "音频"         // ogg/wav/mp3
+	CatScript  Category = "脚本"         // ks/tjs/ast/cst/lua/bs/hcb/scn
 	CatAnim    Category = "动画/动态立绘/口型" // anm/psb/psz/lpb/amv/sli
-	CatVideo   Category = "视频"             // mpg/avi/webm/wmv/ogv/mp4
-	CatFont    Category = "字体"             // ttf/ttc/otf
-	CatArchive Category = "归档"             // xp3/pfs/int/arc/nsa/alf/afs/pac/npa
+	CatVideo   Category = "视频"         // mpg/avi/webm/wmv/ogv/mp4
+	CatFont    Category = "字体"         // ttf/ttc/otf
+	CatArchive Category = "归档"         // xp3/pfs/int/arc/nsa/alf/afs/pac/npa
 	CatOther   Category = "其它/系统"
 )
 
@@ -77,10 +77,10 @@ type Stat struct {
 
 // Result 一次盘点的结果。
 type Result struct {
-	Root       string             `json:"root"`
-	Total      Stat               `json:"total"`
-	Categories map[Category]Stat  `json:"categories"`
-	Errors     int64              `json:"errors"` // stat 失败计数
+	Root       string            `json:"root"`
+	Total      Stat              `json:"total"`
+	Categories map[Category]Stat `json:"categories"`
+	Errors     int64             `json:"errors"` // stat 失败计数
 }
 
 // NewResult 构造空结果。

@@ -16,9 +16,9 @@ import (
 type Compression string
 
 const (
-	CompNone  Compression = "none"
-	CompZlib  Compression = "zlib"
-	CompLzss  Compression = "lzss"
+	CompNone Compression = "none"
+	CompZlib Compression = "zlib"
+	CompLzss Compression = "lzss"
 )
 
 // ArchiveEntry 归档内一个条目（不解压内容）。
@@ -41,9 +41,9 @@ type ScriptCtx struct {
 
 // BuildCtx IR 构建上下文。
 type BuildCtx struct {
-	GameID    string            `json:"game_id"`
-	Config    map[string]string `json:"config,omitempty"`
-	Log       func(format string, args ...interface{})
+	GameID             string            `json:"game_id"`
+	Config             map[string]string `json:"config,omitempty"`
+	Log                func(format string, args ...interface{})
 	RecordUnrecognized func(u ir.Unrecognized)
 	// Resolver 把资源引用解析为带内容哈希的 AssetRef（调用方注入：
 	// 匹配资源池 + 计算哈希）。不注入时 BuildIR 只能产出无哈希的骨架。

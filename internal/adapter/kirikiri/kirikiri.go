@@ -78,7 +78,8 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 		}
 		return "", nil
 	}
-	// 目录：存在 *.xp3 即判 KiriKiri（配合 exe/dll 线索更稳，此处从简）
+	// 目录：根层存在 *.xp3，或树内含 *.ks（已解包脚本树）即判 KiriKiri。
+	// （配合 exe/dll 线索更稳，此处从简。）
 	ents, err := os.ReadDir(archiveOrDir)
 	if err != nil {
 		return "", err
@@ -88,7 +89,43 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 			return "kirikiri", nil
 		}
 	}
+	// 已解包目录（无 .xp3）：靠 .ks 脚本判定，避免“纯解包树”识别失败。
+	if hasExtWithin(archiveOrDir, ".ks", dirProbeMaxDepth) {
+		return "kirikiri", nil
+	}
 	return "", nil
+}
+
+// dirProbeMaxDepth 目录探测最大深度（避免在大树上做全量遍历）。
+const dirProbeMaxDepth = 3
+
+// hasExtWithin 在 root 树下（深度 < maxDepth，跳过副本树）寻找指定扩展名的文件。
+func hasExtWithin(root, ext string, maxDepth int) bool {
+	found := false
+	base := strings.Count(filepath.Clean(root), string(os.PathSeparator))
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			if d.Name() == "解包输出" || d.Name() == "_分类" {
+				return filepath.SkipDir
+			}
+			if strings.Count(filepath.Clean(p), string(os.PathSeparator))-base >= maxDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.EqualFold(filepath.Ext(p), ext) {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 // ParseArchive 解析 XP3 索引，返回全部条目。

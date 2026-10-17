@@ -70,7 +70,7 @@ func roleOf(ref string) string {
 // eventRange 一个事件在 ast.Seq 上的区间 [Start, End)。
 type eventRange struct {
 	Start, End int
-	CGRef      string       // 触发事件的 CG 引用（空 = scene 保底事件）
+	CGRef      string // 触发事件的 CG 引用（空 = scene 保底事件）
 	Kind       ir.EventKind
 }
 

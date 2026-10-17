@@ -48,21 +48,21 @@ const (
 
 // Event 一个可重演演出单元。
 type Event struct {
-	EventID       string          `json:"event_id"`
-	Kind          EventKind       `json:"kind"`
-	Title         string          `json:"title,omitempty"`
-	Ord           int             `json:"ord"`
-	StartMs       int64           `json:"start_ms,omitempty"`
-	EndMs         int64           `json:"end_ms,omitempty"`
-	Characters    []string        `json:"characters,omitempty"`
-	Layers        []Layer         `json:"layers"`
-	Timeline      []TimelineOp    `json:"timeline"`
-	Texts         []TextLine      `json:"texts"`
-	Voices        []Voice         `json:"voices"`
-	Transitions   []Transition    `json:"transitions"`
-	Branches      []Branch        `json:"branches"`
-	Unrecognized  []Unrecognized  `json:"unrecognized"`
-	Assets        []AssetRef      `json:"assets"`
+	EventID      string         `json:"event_id"`
+	Kind         EventKind      `json:"kind"`
+	Title        string         `json:"title,omitempty"`
+	Ord          int            `json:"ord"`
+	StartMs      int64          `json:"start_ms,omitempty"`
+	EndMs        int64          `json:"end_ms,omitempty"`
+	Characters   []string       `json:"characters,omitempty"`
+	Layers       []Layer        `json:"layers"`
+	Timeline     []TimelineOp   `json:"timeline"`
+	Texts        []TextLine     `json:"texts"`
+	Voices       []Voice        `json:"voices"`
+	Transitions  []Transition   `json:"transitions"`
+	Branches     []Branch       `json:"branches"`
+	Unrecognized []Unrecognized `json:"unrecognized"`
+	Assets       []AssetRef     `json:"assets"`
 }
 
 // LayerKind 图层类型。
@@ -80,13 +80,13 @@ const (
 
 // Layer 图层定义。
 type Layer struct {
-	LayerID   string    `json:"layer_id"`
-	Kind      LayerKind `json:"kind"`
-	Asset     *AssetRef `json:"asset,omitempty"`
-	Z         int       `json:"z"`
-	Visible   bool      `json:"visible"`
+	LayerID   string     `json:"layer_id"`
+	Kind      LayerKind  `json:"kind"`
+	Asset     *AssetRef  `json:"asset,omitempty"`
+	Z         int        `json:"z"`
+	Visible   bool       `json:"visible"`
 	Transform *Transform `json:"transform,omitempty"`
-	Blend     string    `json:"blend,omitempty"` // normal|add|multiply
+	Blend     string     `json:"blend,omitempty"` // normal|add|multiply
 }
 
 // Transform 几何/透明度变换（各字段可缺省，缺省=单位值）。
@@ -109,12 +109,12 @@ type TimelineOp struct {
 
 // TextLine 台词。
 type TextLine struct {
-	LineID  string      `json:"line_id"`
-	TMs     int64       `json:"t_ms"`
-	Speaker string      `json:"speaker,omitempty"`
-	Text    string      `json:"text"`
-	Voice   *AssetRef   `json:"voice,omitempty"`
-	Style   *TextStyle  `json:"style,omitempty"`
+	LineID  string     `json:"line_id"`
+	TMs     int64      `json:"t_ms"`
+	Speaker string     `json:"speaker,omitempty"`
+	Text    string     `json:"text"`
+	Voice   *AssetRef  `json:"voice,omitempty"`
+	Style   *TextStyle `json:"style,omitempty"`
 }
 
 // TextStyle 排版近似提示（§9：文字排版只能近似）。
@@ -144,34 +144,34 @@ type Transition struct {
 
 // Branch 分支点。回放是重演非重玩：默认沿 DefaultTarget 走。
 type Branch struct {
-	BranchID      string       `json:"branch_id"`
-	TMs           int64        `json:"t_ms"`
-	Type          string       `json:"type"` // choice|flag|jump
-	Options       []BranchOpt  `json:"options,omitempty"`
-	DefaultTarget string       `json:"default_target"`
-	Chosen        *int         `json:"chosen,omitempty"`
+	BranchID      string      `json:"branch_id"`
+	TMs           int64       `json:"t_ms"`
+	Type          string      `json:"type"` // choice|flag|jump
+	Options       []BranchOpt `json:"options,omitempty"`
+	DefaultTarget string      `json:"default_target"`
+	Chosen        *int        `json:"chosen,omitempty"`
 }
 
 // BranchOpt 分支选项。
 type BranchOpt struct {
-	Text         string `json:"text"`
-	TargetEvent  string `json:"target_event"`
+	Text        string `json:"text"`
+	TargetEvent string `json:"target_event"`
 }
 
 // Unrecognized 未识别指令登记（裁剪安全原则：宁多勿缺）。
 type Unrecognized struct {
-	NodePath    string   `json:"node_path"`
-	Raw         string   `json:"raw"`
-	Reason      string   `json:"reason"`
-	KeptAssets  []string `json:"kept_assets"`
+	NodePath   string   `json:"node_path"`
+	Raw        string   `json:"raw"`
+	Reason     string   `json:"reason"`
+	KeptAssets []string `json:"kept_assets"`
 }
 
 // AssetRef 资源引用。
 type AssetRef struct {
-	Hash     string `json:"hash"`
-	OrigPath string `json:"orig_path"`
-	Role     string `json:"role"`
-	DurationMs int64 `json:"duration_ms,omitempty"`
+	Hash       string `json:"hash"`
+	OrigPath   string `json:"orig_path"`
+	Role       string `json:"role"`
+	DurationMs int64  `json:"duration_ms,omitempty"`
 }
 
 // ValidFidelity 报告 fidelity 是否合法。
