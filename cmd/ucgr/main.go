@@ -10,7 +10,7 @@
 //	ucgr probe <归档文件>          解析归档索引，输出条目概况
 //	ucgr refs  <目录> <脚本...>    提取脚本资源引用并匹配解包池
 //	ucgr prune <目录> <脚本...>    引用裁剪：保留集复制到目标目录
-//	ucgr decode <图片>           按需解码资产（TLG5 → PNG）
+//	ucgr decode <图片>           按需解码资产（TLG5/JPEG → PNG）
 //	ucgr unpack <归档>           解包归档（CatSystem2 KIF：.int/.kif）
 //	ucgr engines                 列出已注册引擎适配器
 package main
@@ -85,7 +85,7 @@ func usage() {
   ucgr prune <解包目录> <脚本…> [--out 目录]  裁剪保留集
   ucgr ir    <解包目录> <脚本> [--out file.json]  构建 IR（匹配+哈希+校验）
   ucgr replay <ir.json>          文本回放（按时间轴打印演出）
-  ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5→PNG）
+  ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
 
@@ -666,6 +666,7 @@ func fmtBytes(n int64) string {
 
 // 用法：ucgr decode <图片文件> [--out out.png] [--raw out.bin]
 // --raw 写出裸 BGRA 字节，供与参考实现逐字节比对。
+// JPEG 若是「整文件单字节 XOR 掩码」变种（KiriKiri 系常见），自动还原后再解，见 internal/decode/jpeg.go。
 func cmdDecode(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("用法: ucgr decode <图片文件> [--out out.png] [--raw out.bin]")
@@ -695,6 +696,9 @@ func cmdDecode(args []string) error {
 	img, err := decode.Decode(data)
 	if err != nil {
 		return fmt.Errorf("%s: %w", in, err)
+	}
+	if img.Mask != 0 {
+		fmt.Printf("检测到整文件 XOR 掩码 0x%02X，已还原后再解码\n", img.Mask)
 	}
 	fmt.Printf("解码 %s → %dx%d（%d 通道，字节序 BGRA）\n", in, img.Width, img.Height, img.Colors)
 	if raw != "" {

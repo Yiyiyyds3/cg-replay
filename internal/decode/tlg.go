@@ -4,7 +4,9 @@
 // 库内存原始格式（TLG / HG3 / SGCG / OGG…），只有显示时才解码，
 // 禁止有损转码。所以本包只做「原始字节 → 像素」，不改变入库资产本身。
 //
-// 当前支持：KiriKiri TLG5（.tlg，本机 3991 个样本全是它）。
+// 当前支持：KiriKiri TLG5（.tlg，本机 3991 个样本全是它）；
+// JPEG（明文，或「整文件单字节 XOR 掩码」变种 —— 重返蓝鲸岛/海市蜃楼之馆实测 0xA4，
+// 见 jpeg.go；GDI+ 直读掩码 JPEG 会报 Out of memory，所以必须自己解）。
 // 未支持：TLG6 / TLG0 / HG3 —— 一律返回明确错误，不静默失败（对应 P1-7「缺资源告警」）。
 //
 // TLG5 结构（据 GARbro `ArcFormats/KiriKiri/ImageTLG.cs` 的 ReadV5 实现，已用本机样本核对）：
@@ -39,12 +41,15 @@ type Image struct {
 	Height int
 	Colors int // 3 或 4
 	Pixels []byte
+	// Mask 记录的还原掩码（0 = 明文）。JPEG 掩码变种用得上：重新入库或
+	// 与「原样入库」比对时要知道当初 XOR 了多少。
+	Mask byte // 0 = 明文
 }
 
 // Decode 按魔数分派解码。
 func Decode(data []byte) (*Image, error) {
 	if len(data) < 11 {
-		return nil, fmt.Errorf("文件过短（%d 字节），不是 TLG", len(data))
+		return nil, fmt.Errorf("文件过短（%d 字节），不是 TLG/JPEG", len(data))
 	}
 	switch {
 	case bytes.HasPrefix(data, tlgMagic5):
@@ -54,7 +59,11 @@ func Decode(data []byte) (*Image, error) {
 	case bytes.HasPrefix(data, tlgMagic0):
 		return nil, fmt.Errorf("TLG0 暂未实现")
 	}
-	return nil, fmt.Errorf("非 TLG 文件（魔数 %q）", string(data[:11]))
+	// JPEG：明文直接解；掩码变种（整文件单字节 XOR）先还原再解。
+	if b, mask, ok := UnmaskJPEG(data); ok {
+		return decodeJPEG(b, mask)
+	}
+	return nil, fmt.Errorf("非 TLG/JPEG 文件（魔数 %q）", string(data[:11]))
 }
 
 func decodeTLG5(data []byte) (*Image, error) {
