@@ -1,0 +1,401 @@
+// Package prune 引用裁剪器：把脚本引用匹配到解包树真实文件。
+//
+// 对应 docs/05 阶段 C。匹配规则（P0 实测驱动，同 gar_tool/ks_refs.py）：
+//   1. 精确 relpath 命中
+//   2. 补全常见扩展名（tlg/png/ogg/hg3…）
+//   3. basename 唯一命中
+//   4. 同名多版本（基础卷/汉化卷）全部命中
+// 未命中引用走保守候选（dynamic）：剥 ev/e/large_ 前缀取核心 token，
+// 文件名含该 token 的全部保留——宁多勿缺（安全方向）。
+package prune
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"sort"
+	"strings"
+)
+
+// RES_EXTS 常见资源扩展名（KiriKiri + CatSystem2 + Artemis）。
+var RES_EXTS = []string{
+	".tlg", ".png", ".jpg", ".jpeg", ".bmp", ".ogg", ".wav", ".mp3",
+	".mpg", ".mpeg", ".wmv", ".ogv", ".asf", ".avi", ".mp4", ".csv",
+	".txt", ".tjs", ".asd", ".ks", ".ma", ".amv", ".sli", ".func",
+	".scn", ".sinfo", ".pimg", ".fdr", ".psb", ".dat",
+	".hg3", ".hg2", ".fes", ".kcs", ".kx2", ".mot", ".ptcl", ".lpb",
+	".psz", ".zt", ".anm",
+}
+
+// Pool 解包资源池（relpath → 绝对路径 + 大小）。
+type Pool struct {
+	Root string
+	ByRel map[string]PoolFile   // NFKC 归一 relpath → 文件
+	ByName map[string][]string  // basename → relpath 列表
+}
+
+// PoolFile 池内一个文件。
+type PoolFile struct {
+	Rel  string
+	Abs  string
+	Size int64
+}
+
+// BuildPool 遍历 root 建池（排除 .ks 脚本与常见副本目录）。
+func BuildPool(root string) (*Pool, error) {
+	p := &Pool{
+		Root:   root,
+		ByRel:  map[string]PoolFile{},
+		ByName: map[string][]string{},
+	}
+	excludeDir := map[string]bool{"解包输出": true, "_分类": true}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if excludeDir[d.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		if strings.EqualFold(filepath.Ext(path), ".ks") {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		rel := normRel(path, root)
+		p.ByRel[rel] = PoolFile{Rel: rel, Abs: path, Size: info.Size()}
+		base := filepath.Base(rel)
+		p.ByName[base] = append(p.ByName[base], rel)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func normRel(path, root string) string {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		rel = path
+	}
+	return normalize(rel)
+}
+
+func normalize(s string) string {
+	s = strings.ReplaceAll(s, "\\", "/")
+	// 全角/半角归一；保护 ／（合法文件名字符，转成 / 会伪造路径分隔符）
+	s = strings.ReplaceAll(s, "／", "\x00")
+	s = strings.ToLower(nfkc(s))
+	return strings.ReplaceAll(s, "\x00", "／")
+}
+
+func nfkc(s string) string {
+	// 简化归一：全角字母数字 → 半角。完整 NFKC 表过大，此处够用。
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '！': b.WriteRune('!')
+		case '＂': b.WriteRune('"')
+		case '＃': b.WriteRune('#')
+		case '％': b.WriteRune('%')
+		case '＆': b.WriteRune('&')
+		case '＇': b.WriteRune('\'')
+		case '（': b.WriteRune('(')
+		case '）': b.WriteRune(')')
+		case '＋': b.WriteRune('+')
+		case '，': b.WriteRune(',')
+		case '－': b.WriteRune('-')
+		case '．': b.WriteRune('.')
+		case '／': b.WriteRune('/')
+		case '：': b.WriteRune(':')
+		case '；': b.WriteRune(';')
+		case '＜': b.WriteRune('<')
+		case '＝': b.WriteRune('=')
+		case '＞': b.WriteRune('>')
+		case '？': b.WriteRune('?')
+		case '＠': b.WriteRune('@')
+		case '［': b.WriteRune('[')
+		case '］': b.WriteRune(']')
+		case '｛': b.WriteRune('{')
+		case '｝': b.WriteRune('}')
+		case '～': b.WriteRune('~')
+		default:
+			// 全角英数字
+			if r >= 0xFF21 && r <= 0xFF3A {
+				b.WriteRune(r - 0xFF21 + 'A')
+			} else if r >= 0xFF41 && r <= 0xFF5A {
+				b.WriteRune(r - 0xFF41 + 'a')
+			} else if r >= 0xFF10 && r <= 0xFF19 {
+				b.WriteRune(r - 0xFF10 + '0')
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	return b.String()
+}
+
+// Match 单引用匹配：返回命中的 relpath 列表（可能多版本）。
+func (p *Pool) Match(ref string) []string {
+	r := normalize(strings.TrimPrefix(ref, "./"))
+	if r == "" {
+		return nil
+	}
+	if _, ok := p.ByRel[r]; ok {
+		return []string{r}
+	}
+	if filepath.Ext(r) == "" {
+		// 1) relpath + 扩展名
+		for _, ext := range RES_EXTS {
+			if _, ok := p.ByRel[r+ext]; ok {
+				return []string{r + ext}
+			}
+		}
+		// 2) basename + 扩展名（引用是裸名，池键是完整 relpath）
+		for _, ext := range RES_EXTS {
+			if hits := p.ByName[r+ext]; len(hits) > 0 {
+				return hits
+			}
+		}
+		if hits := p.ByName[r]; len(hits) > 0 {
+			return hits
+		}
+	} else {
+		if hits := p.ByName[r]; len(hits) > 0 {
+			return hits
+		}
+	}
+	// 3) 前缀唯一
+	var cand []string
+	for k := range p.ByRel {
+		if strings.HasPrefix(filepath.Base(k), r+".") {
+			cand = append(cand, k)
+		}
+	}
+	if len(cand) == 1 {
+		return cand
+	}
+	return nil
+}
+
+// DynamicCandidates 未命中引用的保守候选（防误裁）。
+func (p *Pool) DynamicCandidates(ref string) []string {
+	r := normalize(ref)
+	tokens := map[string]bool{r: true}
+	for _, pre := range []string{"ev", "e", "large_", "bg_", "cg_"} {
+		if strings.HasPrefix(r, pre) && len(r) > len(pre)+2 {
+			tokens[r[len(pre):]] = true
+		}
+	}
+	if m := regexp.MustCompile(`([0-9]+[a-z][0-9a-z_]*)$`).FindStringSubmatch(r); m != nil {
+		tokens[m[1]] = true
+	}
+	var hits []string
+	for tok := range tokens {
+		if len(tok) < 3 || !hasLetter(tok) {
+			continue
+		}
+		for name, rels := range p.ByName {
+			base := strings.TrimSuffix(name, filepath.Ext(name))
+			if strings.Contains(base, tok) {
+				hits = append(hits, rels...)
+			}
+		}
+	}
+	sort.Strings(hits)
+	return dedup(hits)
+}
+
+func hasLetter(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			return true
+		}
+	}
+	return false
+}
+
+func dedup(ss []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range ss {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// Result 一次裁剪的结果。
+type Result struct {
+	Matched   map[string][]string `json:"matched"`   // relpath → 触发它的引用
+	Dynamic   map[string][]string `json:"dynamic"`   // relpath → 触发它的未命中引用
+	Unmatched []string            `json:"unmatched"` // 未命中且无保守候选的引用
+	PoolBytes int64               `json:"pool_bytes"`
+	KeepBytes int64               `json:"keep_bytes"`
+}
+
+// Prune 对引用列表执行匹配 + 保守保留。
+// DR-16：BGM 全部保留 —— 路径含 "bgm" 的池内文件一律计入保留集。
+func (p *Pool) Prune(refs []string) *Result {
+	res := &Result{
+		Matched: map[string][]string{},
+		Dynamic: map[string][]string{},
+	}
+	seen := map[string]bool{}
+	for _, ref := range refs {
+		if seen[ref] {
+			continue
+		}
+		seen[ref] = true
+		if hits := p.Match(ref); len(hits) > 0 {
+			for _, h := range hits {
+				res.Matched[h] = append(res.Matched[h], ref)
+			}
+		} else if cands := p.DynamicCandidates(ref); len(cands) > 0 {
+			for _, c := range cands {
+				res.Dynamic[c] = append(res.Dynamic[c], ref)
+			}
+		} else {
+			res.Unmatched = append(res.Unmatched, ref)
+		}
+	}
+	// DR-16：BGM 全留
+	for rel := range p.ByRel {
+		if strings.Contains(rel, "bgm") {
+			if _, ok := res.Matched[rel]; !ok {
+				if _, ok := res.Dynamic[rel]; !ok {
+					res.Matched[rel] = append(res.Matched[rel], "<bgm-all>")
+				}
+			}
+		}
+	}
+	for _, f := range p.ByRel {
+		res.PoolBytes += f.Size
+	}
+	for rel := range res.Matched {
+		res.KeepBytes += p.ByRel[rel].Size
+	}
+	for rel := range res.Dynamic {
+		res.KeepBytes += p.ByRel[rel].Size
+	}
+	sort.Strings(res.Unmatched)
+	return res
+}
+
+// KeepRels 返回应保留的全部 relpath（命中 + 保守保留，去重排序）。
+func (r *Result) KeepRels() []string {
+	set := map[string]bool{}
+	for k := range r.Matched {
+		set[k] = true
+	}
+	for k := range r.Dynamic {
+		set[k] = true
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// CopyTo 把保留集合复制到目标目录（保持相对路径）。
+// 单文件失败跳过并继续（如源文件名含 Win32 非法字符），返回总数与失败数。
+func (p *Pool) CopyTo(dst string, rels []string) (int64, int, error) {
+	var total int64
+	failed := 0
+	for _, rel := range rels {
+		f, ok := p.ByRel[rel]
+		if !ok {
+			continue
+		}
+		target := filepath.Join(dst, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			failed++
+			continue
+		}
+		n, err := copyFile(f.Abs, target)
+		if err != nil {
+			failed++
+			continue
+		}
+		total += n
+	}
+	return total, failed, nil
+}
+
+// winPath 为 Windows 扩展长度路径（\\?\ 前缀），
+// 避免源文件名含 ? 等 Win32 非法字符时打不开（NTFS 本身允许这些字符）。
+func winPath(p string) string {
+	if runtime.GOOS != "windows" {
+		return p
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	if strings.HasPrefix(abs, `\\?\`) {
+		return abs
+	}
+	return `\\?\` + abs
+}
+
+func copyFile(src, dst string) (int64, error) {
+	in, err := os.Open(winPath(src))
+	if err != nil {
+		return 0, err
+	}
+	defer in.Close()
+	out, err := os.Create(winPath(dst))
+	if err != nil {
+		return 0, err
+	}
+	defer out.Close()
+	return ioCopy(out, in)
+}
+
+func ioCopy(dst *os.File, src *os.File) (int64, error) {
+	buf := make([]byte, 1<<20)
+	var total int64
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return total, werr
+			}
+			total += int64(n)
+		}
+		if err != nil {
+			if err.Error() == "EOF" {
+				return total, nil
+			}
+			return total, err
+		}
+	}
+}
+
+// HumanBytes 人类可读体积。
+func HumanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
+}
