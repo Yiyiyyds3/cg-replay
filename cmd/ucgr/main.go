@@ -7,15 +7,18 @@
 // 子命令：
 //
 //	ucgr scan  <目录>             S0 体积盘点（按扩展名分类统计）
-//	ucgr probe <xp3>              解析 XP3 索引，输出条目概况
+//	ucgr probe <归档文件>          解析归档索引，输出条目概况
 //	ucgr refs  <目录> <脚本...>    提取脚本资源引用并匹配解包池
 //	ucgr prune <目录> <脚本...>    引用裁剪：保留集复制到目标目录
+//	ucgr decode <图片>           按需解码资产（TLG5 → PNG）
 //	ucgr engines                 列出已注册引擎适配器
 package main
 
 import (
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,13 +26,14 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/decode"
 	"ucgr/internal/hash"
 	"ucgr/internal/ir"
 	"ucgr/internal/prune"
 	"ucgr/internal/scan"
 
-	// 空白导入触发各适配器 init() 注册
-	_ "ucgr/internal/adapter/kirikiri"
+	// 空白导入触发各适配器 init() 注册（新增引擎在此加一行）
+	_ "ucgr/internal/adapter/catsystem2"
 )
 
 func main() {
@@ -38,7 +42,7 @@ func main() {
 		os.Exit(2)
 	}
 	cmd := os.Args[1]
-	args := os.Args[2:]
+	args := stripEngineFlag(os.Args[2:])
 	var err error
 	switch cmd {
 	case "scan":
@@ -53,6 +57,8 @@ func main() {
 		err = cmdIR(args)
 	case "replay":
 		err = cmdReplay(args)
+	case "decode":
+		err = cmdDecode(args)
 	case "engines":
 		cmdEngines()
 	default:
@@ -70,12 +76,16 @@ func usage() {
 
 用法:
   ucgr scan  <目录>             S0 体积盘点
-  ucgr probe <xp3 文件>         解析 XP3 索引概况
+  ucgr probe <归档文件>          解析归档索引概况
   ucgr refs  <解包目录> <脚本…>  提取引用并匹配资源池
   ucgr prune <解包目录> <脚本…> [--out 目录]  裁剪保留集
   ucgr ir    <解包目录> <脚本> [--out file.json]  构建 IR（匹配+哈希+校验）
   ucgr replay <ir.json>          文本回放（按时间轴打印演出）
+  ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5→PNG）
   ucgr engines                 列出已注册引擎
+
+全局参数:
+  --engine <id>                跳过自动识别，直接指定引擎（id 见 ucgr engines）
 `)
 }
 
@@ -93,9 +103,12 @@ func cmdScan(args []string) error {
 
 func cmdProbe(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("用法: ucgr probe <xp3>")
+		return fmt.Errorf("用法: ucgr probe <归档文件>")
 	}
-	var a adapter.EngineAdapter = &kirikiri.Adapter{}
+	a, engineID, err := adapterFor(args[0])
+	if err != nil {
+		return err
+	}
 	ents, err := a.ParseArchive(args[0])
 	if err != nil {
 		return err
@@ -110,7 +123,7 @@ func cmdProbe(args []string) error {
 			enc++
 		}
 	}
-	fmt.Printf("归档: %s\n", args[0])
+	fmt.Printf("归档: %s（引擎 %s）\n", args[0], engineID)
 	fmt.Printf("条目: %d    原始体积: %s    压缩段: %d    加密条目: %d\n",
 		len(ents), prune.HumanBytes(total), comp, enc)
 	// 扩展名分布
@@ -142,7 +155,7 @@ func cmdProbe(args []string) error {
 	return nil
 }
 
-// collectScripts 展开脚本参数：文件直接用；目录则递归找 .ks
+// collectScripts 展开脚本参数：文件直接用；目录则递归找 .ks / .cst
 // （排除 解包输出/_分类 副本树）。
 func collectScripts(args []string) ([]string, error) {
 	var out []string
@@ -165,7 +178,8 @@ func collectScripts(args []string) ([]string, error) {
 				}
 				return nil
 			}
-			if strings.EqualFold(filepath.Ext(p), ".ks") {
+			ext := strings.ToLower(filepath.Ext(p))
+			if ext == ".ks" || ext == ".cst" {
 				out = append(out, p)
 			}
 			return nil
@@ -222,7 +236,10 @@ func cmdRefs(args []string) error {
 	if err != nil {
 		return err
 	}
-	var a adapter.EngineAdapter = &kirikiri.Adapter{}
+	a, _, err := adapterFor(root)
+	if err != nil {
+		return err
+	}
 	var allRefs []string
 	failed := 0
 	dynVoice := false
@@ -233,10 +250,15 @@ func cmdRefs(args []string) error {
 			failed++
 			continue
 		}
-		if ast.(*kirikiri.Ast).DynamicVoice {
+		refs, ok := astRefs(ast)
+		if !ok {
+			failed++ // AST 不支持引用提取 → 按安全原则整游戏保留
+			continue
+		}
+		if kv, ok := ast.(*kirikiri.Ast); ok && kv.DynamicVoice {
 			dynVoice = true
 		}
-		allRefs = append(allRefs, ast.(*kirikiri.Ast).ExtractRefs()...)
+		allRefs = append(allRefs, refs...)
 	}
 	fmt.Printf("脚本: %d 个（解码失败 %d 个）\n", len(scripts), failed)
 	if failed > 0 {
@@ -288,7 +310,10 @@ func cmdPrune(args []string) error {
 	if err != nil {
 		return err
 	}
-	var a adapter.EngineAdapter = &kirikiri.Adapter{}
+	a, _, err := adapterFor(root)
+	if err != nil {
+		return err
+	}
 	var allRefs []string
 	dynVoice := false
 	failed := 0
@@ -299,10 +324,15 @@ func cmdPrune(args []string) error {
 			failed++
 			continue
 		}
-		if ast.(*kirikiri.Ast).DynamicVoice {
+		refs, ok := astRefs(ast)
+		if !ok {
+			failed++ // AST 不支持引用提取 → 按安全原则整游戏保留
+			continue
+		}
+		if kv, ok := ast.(*kirikiri.Ast); ok && kv.DynamicVoice {
 			dynVoice = true
 		}
-		allRefs = append(allRefs, ast.(*kirikiri.Ast).ExtractRefs()...)
+		allRefs = append(allRefs, refs...)
 	}
 	res := pool.Prune(allRefs)
 	if dynVoice {
@@ -353,8 +383,11 @@ func cmdIR(args []string) error {
 	if err != nil {
 		return err
 	}
+	a, _, err := adapterFor(root)
+	if err != nil {
+		return err
+	}
 	data := readScriptMaybeFixed(script, root)
-	var a adapter.EngineAdapter = &kirikiri.Adapter{}
 	ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: script})
 	if err != nil {
 		return err
@@ -516,6 +549,76 @@ func cmdReplay(args []string) error {
 	return nil
 }
 
+// cmdDecode 按需解码资产（当前支持 KiriKiri TLG5）为 PNG，
+// 让回放在没有原播放器时也能「看」静态合成图（P1-3 解码层的最小集）。
+// 用法：ucgr decode <图片文件> [--out out.png] [--raw out.bin]
+// --raw 写出裸 BGRA 字节，供与参考实现逐字节比对。
+func cmdDecode(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("用法: ucgr decode <图片文件> [--out out.png] [--raw out.bin]")
+	}
+	in := args[0]
+	var out, raw string
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--out 缺少参数")
+			}
+			out, i = args[i+1], i+1
+		case "--raw":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--raw 缺少参数")
+			}
+			raw, i = args[i+1], i+1
+		default:
+			return fmt.Errorf("未知参数 %q", args[i])
+		}
+	}
+	data, err := os.ReadFile(in)
+	if err != nil {
+		return err
+	}
+	img, err := decode.Decode(data)
+	if err != nil {
+		return fmt.Errorf("%s: %w", in, err)
+	}
+	fmt.Printf("解码 %s → %dx%d（%d 通道，字节序 BGRA）\n", in, img.Width, img.Height, img.Colors)
+	if raw != "" {
+		if err := os.WriteFile(raw, img.Pixels, 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("已写出裸像素: %s（%d 字节）\n", raw, len(img.Pixels))
+	}
+	if out == "" {
+		out = strings.TrimSuffix(in, filepath.Ext(in)) + ".png"
+	}
+	nrgba := &image.NRGBA{
+		Pix:    make([]byte, len(img.Pixels)),
+		Stride: img.Width * 4,
+		Rect:   image.Rect(0, 0, img.Width, img.Height),
+	}
+	for i := 0; i+3 < len(img.Pixels); i += 4 { // BGRA → RGBA（PNG 用非预乘）
+		nrgba.Pix[i] = img.Pixels[i+2]
+		nrgba.Pix[i+1] = img.Pixels[i+1]
+		nrgba.Pix[i+2] = img.Pixels[i]
+		nrgba.Pix[i+3] = img.Pixels[i+3]
+	}
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	if err := png.Encode(f, nrgba); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	fmt.Printf("已写出 PNG: %s\n", out)
+	return nil
+}
+
 func truncate(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
@@ -528,6 +631,55 @@ func cmdEngines() {
 	for _, id := range adapter.IDs() {
 		fmt.Println(id)
 	}
+}
+
+// engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。
+var engineOverride string
+
+// stripEngineFlag 从参数里摘出全局 --engine <id>
+// （识别不准或存在歧义时可显式指定，不用改代码）。
+func stripEngineFlag(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--engine" && i+1 < len(args) {
+			engineOverride = args[i+1]
+			i++
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return out
+}
+
+// adapterFor 取引擎适配器：有 --engine 时按其指定，否则按路径自动识别
+// （走注册表，新增引擎零改动）。
+func adapterFor(path string) (adapter.EngineAdapter, string, error) {
+	if engineOverride != "" {
+		a, ok := adapter.Get(engineOverride)
+		if !ok {
+			return nil, "", fmt.Errorf("未知引擎 %q（已注册：%s）", engineOverride, strings.Join(adapter.IDs(), ", "))
+		}
+		return a, engineOverride, nil
+	}
+	id, err := adapter.IdentifyPath(path)
+	if err != nil {
+		return nil, "", fmt.Errorf("%w（可用 --engine <id> 显式指定；已注册：%s）", err, strings.Join(adapter.IDs(), ", "))
+	}
+	a, ok := adapter.Get(id)
+	if !ok {
+		return nil, "", fmt.Errorf("引擎 %s 已识别但未注册", id)
+	}
+	return a, id, nil
+}
+
+// astRefs 从引擎专有 AST 提取资源引用。
+// 各适配器的 Ast 都实现 ExtractRefs() []string；未实现返回 ok=false，
+// 调用方须按安全原则整游戏保留。
+func astRefs(ast adapter.ScriptAst) ([]string, bool) {
+	if r, ok := ast.(interface{ ExtractRefs() []string }); ok {
+		return r.ExtractRefs(), true
+	}
+	return nil, false
 }
 
 func keepOf(m map[string][]string, p *prune.Pool) int64 {
