@@ -43,8 +43,16 @@ var layerCmds = map[string]ir.LayerKind{
 
 // roleOf 资源角色分类（IR AssetRef.role，回放器按角色决定叠放与字号）。
 func roleOf(ref string) string {
-	r := strings.ToLower(ref)
+	r := strings.ToLower(filepath.ToSlash(ref))
 	switch {
+	// KiriKiri 解包树的目录约定（比前缀可靠；重返蓝鲸岛实测
+	// `raw/data/fgimage/…`、`raw/data/image/…` 这类路径此前全部落回「其它」）
+	case strings.Contains(r, "/evimage/") || strings.Contains(r, "/event/"):
+		return "CG事件图"
+	case strings.Contains(r, "/fgimage/") || strings.Contains(r, "/chara/") || strings.Contains(r, "/tachie/"):
+		return "立绘差分"
+	case strings.Contains(r, "/bgimage/") || strings.Contains(r, "/background/"):
+		return "背景"
 	case strings.HasPrefix(r, "ev") || strings.Contains(r, "_ev") || strings.Contains(r, "event"):
 		return "CG事件图"
 	case strings.HasPrefix(r, "bg") || strings.Contains(r, "background"):
@@ -61,6 +69,70 @@ func roleOf(ref string) string {
 		return "事件视频"
 	}
 	return "其它"
+}
+
+// layerSlot 由命令的 layer/id 属性推导**规范层 id**：同一层的 [image] 与 [layopt]
+// 必须落到同一个 id，否则「谁在何时显示/隐藏」就对不上（此前 image3 与 layopt3 分裂）。
+func layerSlot(c *Command, tag string) string {
+	if v := strings.TrimSpace(c.Attrs["layer"]); v != "" {
+		return "layer" + v
+	}
+	if v := strings.TrimSpace(c.Attrs["id"]); v != "" {
+		return tag + v
+	}
+	return tag
+}
+
+// layerIndexOf 解析 layer 属性对应的叠放序：KAG 里 layer 号本身即 z 序，
+// base/stage 一类固定层名在最底（0）。
+func layerIndexOf(c *Command) (int, bool) {
+	v := strings.TrimSpace(c.Attrs["layer"])
+	if v == "" {
+		return 0, false
+	}
+	if n, err := strconv.Atoi(v); err == nil {
+		return n, true
+	}
+	switch strings.ToLower(v) {
+	case "base", "stage":
+		return 0, true
+	}
+	return 0, false
+}
+
+// kindForLayer 判定图层类型：layer 名与资源路径优先，命令标签只作兜底
+// （否则 [image] 会把每一层都标成 cg —— 重返蓝鲸岛实测 8 层全错，连立绘层也是 cg）。
+func kindForLayer(tag, layerVal, path string) ir.LayerKind {
+	switch strings.ToLower(strings.TrimSpace(layerVal)) {
+	case "base", "stage", "back", "background":
+		return ir.LayerBackground
+	}
+	p := strings.ToLower(filepath.ToSlash(path))
+	switch {
+	case strings.Contains(p, "/evimage/") || strings.Contains(p, "/event/"):
+		return ir.LayerCG
+	case strings.Contains(p, "/fgimage/") || strings.Contains(p, "/chara/") || strings.Contains(p, "/tachie/"):
+		return ir.LayerStand
+	case strings.Contains(p, "/bgimage/") || strings.Contains(p, "/background/") || strings.Contains(p, "/image/"):
+		return ir.LayerBackground
+	}
+	if k, ok := layerCmds[tag]; ok {
+		return k
+	}
+	return ir.LayerEffect
+}
+
+// setF 把可选数值属性写入 *float64 字段（缺属性/非数字则不动，**不编造 0**）。
+func setF(dst **float64, v string) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return
+	}
+	*dst = &f
 }
 
 // ---------------------------------------------------------------
@@ -196,14 +268,7 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 	textN := 0
 	var pendingVoice *ir.AssetRef
 
-	slotOf := func(c *Command, tag string) string {
-		for _, k := range []string{"layer", "id", "page"} {
-			if v := c.Attrs[k]; v != "" {
-				return tag + v
-			}
-		}
-		return tag
-	}
+	var pendingTrans int64 // 已启动转场中「尚未走完」的时长，由 [wt] 补上
 
 	for _, it := range seq {
 		if it.Kind == "text" {
@@ -230,25 +295,66 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 		tag := strings.ToLower(c.Tag)
 
 		// ① 图片层命令
-		if lkind, isLayer := layerCmds[tag]; isLayer {
+		if _, isLayer := layerCmds[tag]; isLayer {
 			ref := firstResourceRef(c)
 			if ref == "" {
 				continue
 			}
 			ar := b.addAsset(ref)
-			lid := slotOf(c, tag)
+			lid := layerSlot(c, tag)
+			// 层类型：按 layer 名 / 资源路径判（`[image layer=base]` 是背景、fgimage 是立绘），
+			// 标签映射只作兜底 —— 此前 [image] 一律 cg
+			path := ref
+			if ar != nil && ar.OrigPath != "" {
+				path = ar.OrigPath
+			}
+			lkind := kindForLayer(tag, c.Attrs["layer"], path)
+			z := len(layerOrder) + 1
+			if n, ok := layerIndexOf(c); ok {
+				z = n
+			}
 			l, exists := layers[lid]
 			if !exists {
-				l = &ir.Layer{LayerID: lid, Kind: lkind, Z: len(layerOrder) + 1, Visible: true}
+				l = &ir.Layer{LayerID: lid, Kind: lkind, Z: z, Visible: true}
 				layers[lid] = l
 				layerOrder = append(layerOrder, lid)
+				// Asset/Transform 记的是**事件初态**：同一层后续的 show 只进时间轴，
+				// 不再覆盖（此前被最后一次 show 覆盖，8 层退化成 3 个资产）
+				if ar != nil {
+					l.Asset = ar
+				}
+				if c.Attrs["left"] != "" || c.Attrs["top"] != "" || c.Attrs["opacity"] != "" {
+					l.Transform = &ir.Transform{}
+					setF(&l.Transform.X, c.Attrs["left"])
+					setF(&l.Transform.Y, c.Attrs["top"])
+					setF(&l.Transform.Opacity, c.Attrs["opacity"])
+					if l.Transform.X != nil || l.Transform.Y != nil {
+						l.Transform.Anchor = "top-left"
+					}
+				}
 			}
-			if ar != nil {
-				l.Asset = ar
+			params := map[string]interface{}{"ref": ref}
+			// 几何/可见性属性「有才带」（KAG 允许省略 left/top，不能编造 0，
+			// 否则回放会把「继承默认位置」当成原点）
+			for _, k := range []string{"left", "top", "opacity",
+				"clipleft", "cliptop", "clipwidth", "clipheight", "page"} {
+				if v := c.Attrs[k]; v != "" {
+					params[k] = v
+				}
+			}
+			if n, ok := layerIndexOf(c); ok {
+				params["z"] = n
+			}
+			op := "image_show"
+			if strings.EqualFold(c.Attrs["visible"], "false") {
+				op = "image_hide"
+				// Visible 同样只记**事件初态**（之后的变化都在时间轴上）
+				if !exists {
+					l.Visible = false
+				}
 			}
 			ev.Timeline = append(ev.Timeline, ir.TimelineOp{
-				TMs: clock, Op: "image_show", Target: lid,
-				Params: map[string]interface{}{"ref": ref},
+				TMs: clock, Op: op, Target: lid, Params: params,
 			})
 			continue
 		}
@@ -259,6 +365,19 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 				clock += ms
 			} else {
 				clock += 800
+			}
+			continue
+		}
+		// ②' [wt]「等转场结束」：补上转场尚未走完的部分（KAG 里 [trans] 只是启动，
+		// 真正的等待在 [wt]）。此前 wt 落到「未识别」，254 条转场只推进了一半时间轴。
+		if tag == "wt" {
+			if pendingTrans > 0 {
+				clock += pendingTrans
+				pendingTrans = 0
+			} else if ms, ok := attrMs(c, "time"); ok {
+				clock += ms
+			} else {
+				clock += 200
 			}
 			continue
 		}
@@ -283,6 +402,7 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 			}
 			ev.Transitions = append(ev.Transitions, tr)
 			clock += tr.DurationMs / 2
+			pendingTrans = tr.DurationMs - tr.DurationMs/2
 			continue
 		}
 
@@ -299,6 +419,26 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 		// ⑤ 其它音视频引用（se/bgm/movie 等）
 		if ref := firstResourceRef(c); ref != "" && isAudioVideoTag(tag) {
 			b.addAsset(ref)
+			continue
+		}
+
+		// ⑤' 图层显隐：[layopt layer=3 page=back visible=false] 是 KAG 的隐藏机制
+		// （重返蓝鲸岛 77 条，没有 [hide] 标签，故 show→hide 切分在那里无法触发）。
+		// 只对**已登记过的层**发时间轴项（message0 这类文本框层不进，避免破坏 V2/V4）。
+		if tag == "layopt" || tag == "layon" || tag == "layoff" {
+			lid := layerSlot(c, tag)
+			if _, ok := layers[lid]; ok {
+				vis := true
+				if strings.EqualFold(c.Attrs["visible"], "false") || tag == "layoff" {
+					vis = false
+				}
+				// 层自身的 Visible 只记事件初态；这里只发时间轴项
+				op := "image_show"
+				if !vis {
+					op = "image_hide"
+				}
+				ev.Timeline = append(ev.Timeline, ir.TimelineOp{TMs: clock, Op: op, Target: lid})
+			}
 			continue
 		}
 

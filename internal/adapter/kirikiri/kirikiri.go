@@ -452,10 +452,7 @@ func (ast *Ast) emitLine(line string) {
 	// [tag] 与文本段交错
 	pos := 0
 	for _, tm := range tagRe.FindAllStringSubmatchIndex(rest, -1) {
-		if seg := strings.TrimSpace(rest[pos:tm[0]]); seg != "" && !isBareNoise(seg) {
-			ast.Texts = append(ast.Texts, seg)
-			ast.Seq = append(ast.Seq, SeqItem{Kind: "text", Text: seg})
-		}
+		ast.pushText(rest[pos:tm[0]])
 		c := Command{Tag: rest[tm[2]:tm[3]], Attrs: parseAttrs(rest[tm[4]:tm[5]]), Raw: rest[tm[0]:tm[1]]}
 		ast.Commands = append(ast.Commands, c)
 		ast.Seq = append(ast.Seq, SeqItem{Kind: "cmd", Cmd: &ast.Commands[len(ast.Commands)-1]})
@@ -464,10 +461,23 @@ func (ast *Ast) emitLine(line string) {
 		}
 		pos = tm[1]
 	}
-	if seg := strings.TrimSpace(rest[pos:]); seg != "" && !isBareNoise(seg) {
-		ast.Texts = append(ast.Texts, seg)
-		ast.Seq = append(ast.Seq, SeqItem{Kind: "text", Text: seg})
+	ast.pushText(rest[pos:])
+}
+
+// soundMarkRe 匹配 KAG 的内联音效标记：♪ 后紧跟资源路径（含 / 或带扩展名）。
+var soundMarkRe = regexp.MustCompile(`♪\s*[^\s♪\[\]]*(?:[/\\][^\s♪\[\]]*|\.[A-Za-z0-9]{2,5})[^\s♪\[\]]*`)
+
+// pushText 收录一段台词：剥掉 KAG 内联音效标记 ♪path，再去掉空段与裸控制流。
+// 【未实测】重返蓝鲸岛 103 个脚本里 ♪ 出现 0 次；此剥离是给别家 KAG 方言（如
+// 「…♪raw/data/sound/click.ogg」这类写法）做的通用防御，只剥「♪ 紧跟资源路径」的形态，
+// 避免误删台词里真当音符用的 ♪。
+func (ast *Ast) pushText(seg string) {
+	seg = strings.TrimSpace(soundMarkRe.ReplaceAllString(seg, ""))
+	if seg == "" || isBareNoise(seg) {
+		return
 	}
+	ast.Texts = append(ast.Texts, seg)
+	ast.Seq = append(ast.Seq, SeqItem{Kind: "text", Text: seg})
 }
 
 // 标签正则：允许 CJK 标签名（夏空 [暗転]/[主人公の部屋] 等日文宏名，
@@ -604,10 +614,25 @@ func (a *Adapter) ParseScript(data []byte, ctx *adapter.ScriptCtx) (adapter.Scri
 		return nil, fmt.Errorf("脚本解码失败: %s", enc)
 	}
 	ast := &Ast{Encoding: enc}
+	inIScript := false
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimLeft(strings.TrimRight(line, "\r"), " \t")
+		if inIScript {
+			// [iscript]…[endscript] 是 TJS/JS 代码块，不是演出：
+			// 里面的 JS 语句没有 [ 标签，会被逐行误判成台词（重返蓝鲸岛实测）。
+			if strings.Contains(trimmed, "[endscript]") {
+				inIScript = false
+			}
+			continue
+		}
 		if trimmed == "" || strings.HasPrefix(trimmed, ";") {
 			continue // 空行 / 注释行：作者注掉的旧代码，引用不生效
+		}
+		if strings.Contains(trimmed, "[iscript]") {
+			if !strings.Contains(trimmed, "[endscript]") {
+				inIScript = true
+			}
+			continue // 同行的代码段一并丢弃（KAG 惯例是独占一行，此处从简）
 		}
 		ast.emitLine(line)
 	}
