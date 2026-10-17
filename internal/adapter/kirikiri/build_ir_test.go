@@ -209,6 +209,42 @@ func TestBuildIRLayerSemantics(t *testing.T) {
 	}
 }
 
+// TestBuildIRInitialVisibility：事件中途才登场的层不能记成「初态可见」，
+// 否则回放会把它从第 0 帧就画出来（重返蓝鲸岛 layer2 在 12100ms、layer6 在 44000ms 才登场）。
+func TestBuildIRInitialVisibility(t *testing.T) {
+	items := []SeqItem{
+		{Kind: "cmd", Cmd: mkCmd("image", map[string]string{"layer": "base", "storage": "bg01", "page": "fore"})},
+		{Kind: "cmd", Cmd: mkCmd("wait", map[string]string{"time": "2000"})},
+		{Kind: "cmd", Cmd: mkCmd("image", map[string]string{"layer": "2", "storage": "bg02", "page": "back"})},
+		{Kind: "text", Text: "……"},
+	}
+	out := buildTestIR(t, items)
+	ev := out.Events[0]
+	byID := map[string]ir.Layer{}
+	for _, L := range ev.Layers {
+		byID[L.LayerID] = L
+	}
+	if !byID["layerbase"].Visible {
+		t.Errorf("layerbase.Visible = false，期望 true（事件开头就在场）")
+	}
+	late, ok := byID["layer2"]
+	if !ok {
+		t.Fatalf("缺少 layer2（现有层：%v）", keysOf(byID))
+	}
+	if late.Visible {
+		t.Errorf("layer2.Visible = true，期望 false（2000ms 才登场，登场时刻由时间轴给出）")
+	}
+	var tms int64 = -1
+	for _, op := range ev.Timeline {
+		if op.Target == "layer2" && op.Op == "image_show" {
+			tms = op.TMs
+		}
+	}
+	if tms != 2000 {
+		t.Errorf("layer2 的 image_show t_ms = %d，期望 2000", tms)
+	}
+}
+
 func keysOf[T any](m map[string]T) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

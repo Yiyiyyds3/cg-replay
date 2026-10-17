@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"ucgr/internal/adapter"
@@ -32,6 +33,7 @@ import (
 	"ucgr/internal/ir"
 	"ucgr/internal/kif"
 	"ucgr/internal/prune"
+	"ucgr/internal/replay"
 	"ucgr/internal/scan"
 
 	// 空白导入触发各适配器 init() 注册（新增引擎在此加一行）
@@ -84,7 +86,10 @@ func usage() {
   ucgr refs  <解包目录> <脚本…>  提取引用并匹配资源池
   ucgr prune <解包目录> <脚本…> [--out 目录]  裁剪保留集
   ucgr ir    <解包目录> <脚本> [--out file.json]  构建 IR（匹配+哈希+校验）
-  ucgr replay <ir.json>          文本回放（按时间轴打印演出）
+  ucgr replay <ir.json> [--assets 素材根] [--render 目录] [--gif out.gif]
+                [--at ms,ms,…] [--frames N] [--size WxH] [--event N]
+                             回放 IR：默认打印时间轴；给 --assets+--render/--gif
+                             则只从 IR + 素材合成画面（S3「可播放演出」，掩码 JPEG 自动还原）
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
@@ -199,18 +204,19 @@ func collectScripts(args []string) ([]string, error) {
 // readScriptMaybeFixed 读脚本；解码失败时回退到 <游戏目录>_脚本修复/ 的修复副本
 // （ks_fix9.py 的产出：前人解密不完整的脚本已修好放在那里）。
 // 查找顺序：精确 relpath → 去掉首段 → 全树 basename glob（与 Python 版一致）。
-func readScriptMaybeFixed(script, gameDir string) []byte {
+func readScriptMaybeFixed(script, gameDir string) ([]byte, error) {
 	data, err := os.ReadFile(script)
 	if err != nil {
-		return nil
+		// 找不到就明确报错，别把空 data 交给解析器（会以越界 panic 收场）。
+		return nil, fmt.Errorf("读不到脚本 %s：%w", script, err)
 	}
 	fixRoot := gameDir + "_脚本修复"
 	if _, err := os.Stat(fixRoot); err != nil {
-		return data
+		return data, nil
 	}
 	rel, err := filepath.Rel(gameDir, script)
 	if err != nil {
-		return data
+		return data, nil
 	}
 	cands := []string{filepath.Join(fixRoot, rel)}
 	parts := strings.Split(rel, string(os.PathSeparator))
@@ -222,10 +228,10 @@ func readScriptMaybeFixed(script, gameDir string) []byte {
 	}
 	for _, c := range cands {
 		if fixed, err := os.ReadFile(c); err == nil {
-			return fixed
+			return fixed, nil
 		}
 	}
-	return data
+	return data, nil
 }
 
 func cmdRefs(args []string) error {
@@ -249,7 +255,12 @@ func cmdRefs(args []string) error {
 	failed := 0
 	dynVoice := false
 	for _, sp := range scripts {
-		data := readScriptMaybeFixed(sp, root)
+		data, rerr := readScriptMaybeFixed(sp, root)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️ %v\n", rerr)
+			failed++
+			continue
+		}
 		ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: sp})
 		if err != nil {
 			failed++
@@ -323,7 +334,12 @@ func cmdPrune(args []string) error {
 	dynVoice := false
 	failed := 0
 	for _, sp := range scripts {
-		data := readScriptMaybeFixed(sp, root)
+		data, rerr := readScriptMaybeFixed(sp, root)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️ %v\n", rerr)
+			failed++
+			continue
+		}
 		ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: sp})
 		if err != nil {
 			failed++
@@ -392,7 +408,10 @@ func cmdIR(args []string) error {
 	if err != nil {
 		return err
 	}
-	data := readScriptMaybeFixed(script, root)
+	data, rerr := readScriptMaybeFixed(script, root)
+	if rerr != nil {
+		return rerr
+	}
 	ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: script})
 	if err != nil {
 		return err
@@ -477,13 +496,76 @@ func cmdIR(args []string) error {
 	return nil
 }
 
-// cmdReplay 文本回放：按 IR 时间轴顺序打印演出过程（§7.5.5 方式 A）。
-// 用法：ucgr replay <ir.json>
+// cmdReplay 回放。默认按 IR 时间轴打印演出过程（§7.5.5 方式 A）；
+// 给了 --render / --gif 就把 IR 合成成真正的画面（§0.5 S3「可播放演出」）——
+// 素材解码全走 internal/decode，掩码 JPEG 不需要外部工具。
+//
+// 用法：ucgr replay <ir.json> [--text]
+//
+//	[--assets 素材根] [--render 输出目录] [--gif out.gif]
+//	[--at 0,2100,12000] [--frames N] [--size 1600x1200] [--event N]
 func cmdReplay(args []string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("用法: ucgr replay <ir.json>")
+	var (
+		irPath                             string
+		assets, renderDir, gifPath, atSpec string
+		sizeSpec                           string
+		evSel, frames, delayCs             int
+		forceText                          bool
+		err                                error
+	)
+	frames = 12
+	delayCs = 40
+	for i := 0; i < len(args); i++ {
+		take := func() (string, error) {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("%s 缺少取值", args[i])
+			}
+			i++
+			return args[i], nil
+		}
+		switch a := args[i]; a {
+		case "--assets":
+			assets, err = take()
+		case "--render":
+			renderDir, err = take()
+		case "--gif":
+			gifPath, err = take()
+		case "--at":
+			atSpec, err = take()
+		case "--size":
+			sizeSpec, err = take()
+		case "--frames":
+			var v string
+			if v, err = take(); err == nil {
+				frames, err = strconv.Atoi(v)
+			}
+		case "--delay":
+			var v string
+			if v, err = take(); err == nil {
+				delayCs, err = strconv.Atoi(v)
+			}
+		case "--event":
+			var v string
+			if v, err = take(); err == nil {
+				evSel, err = strconv.Atoi(v)
+			}
+		case "--text":
+			forceText = true
+		default:
+			if irPath == "" {
+				irPath = a
+			} else {
+				err = fmt.Errorf("多余参数: %s", a)
+			}
+		}
+		if err != nil {
+			return err
+		}
 	}
-	b, err := os.ReadFile(args[0])
+	if irPath == "" {
+		return fmt.Errorf("用法: ucgr replay <ir.json> [--assets 素材根] [--render 目录] [--gif out.gif] [--at ms,ms,…]")
+	}
+	b, err := os.ReadFile(irPath)
 	if err != nil {
 		return err
 	}
@@ -496,6 +578,128 @@ func cmdReplay(args []string) error {
 	}
 	fmt.Printf("游戏 %s · 引擎 %s · 保真度 %s · 事件 %d 个\n",
 		doc.GameID, doc.EngineID, doc.Fidelity, len(doc.Events))
+
+	// 合成模式：只从 IR + 素材出画面。
+	if renderDir != "" || gifPath != "" {
+		if assets == "" {
+			return fmt.Errorf("合成画面需要 --assets <素材根>（可用 S2 裁剪产物目录）")
+		}
+		if len(doc.Events) == 0 {
+			return fmt.Errorf("IR 里没有事件")
+		}
+		idx := evSel - 1
+		if evSel == 0 {
+			idx = 0
+		}
+		if idx < 0 || idx >= len(doc.Events) {
+			return fmt.Errorf("--event %d 超出范围（共 %d 个事件）", evSel, len(doc.Events))
+		}
+		ev := &doc.Events[idx]
+		load := replay.DirLoader(assets)
+		var times []int64
+		if atSpec != "" {
+			if times, err = parseTimes(atSpec); err != nil {
+				return err
+			}
+		} else {
+			times = replay.SampleTimes(ev, frames)
+		}
+		w, h := parseSize(sizeSpec)
+		fmt.Printf("\n=== 事件 %s（%s）合成：%d 帧，素材根 %s ===\n", ev.EventID, ev.Kind, len(times), assets)
+		fmt.Println("  图层（按 z 升序，z 小者在下）：")
+		layers := append([]ir.Layer(nil), ev.Layers...)
+		sort.SliceStable(layers, func(i, j int) bool { return layers[i].Z < layers[j].Z })
+		for _, l := range layers {
+			name := "-"
+			if l.Asset != nil {
+				name = l.Asset.OrigPath
+			}
+			fmt.Printf("    z=%-3d %-9s %-10s %s\n", l.Z, l.LayerID, l.Kind, name)
+		}
+		canvas := make([]*image.RGBA, 0, len(times))
+		var missing []string
+		for _, t := range times {
+			img, drawn, err := replay.Compose(replay.StatesAt(ev, t), load, w, h)
+			if err != nil {
+				missing = append(missing, err.Error())
+				continue
+			}
+			fmt.Printf("  t=%6dms  可见 %d 层  %s\n", t, len(drawn), strings.Join(drawn, " + "))
+			canvas = append(canvas, img)
+			if renderDir != "" {
+				path := filepath.Join(renderDir, fmt.Sprintf("frame_t%06d.png", t))
+				if err := os.MkdirAll(renderDir, 0o755); err != nil {
+					return err
+				}
+				f, err := os.Create(path)
+				if err != nil {
+					return err
+				}
+				err = png.Encode(f, img)
+				f.Close()
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if len(missing) > 0 {
+			fmt.Printf("⚠️ %d 帧因素材缺失跳过：%s\n", len(missing), strings.Join(missing, "; "))
+		}
+		if renderDir != "" {
+			fmt.Printf("PNG 帧已写入 %s（%d 张）\n", renderDir, len(canvas))
+		}
+		if gifPath != "" {
+			if err := replay.WriteGIF(canvas, gifPath, delayCs); err != nil {
+				return err
+			}
+			fmt.Printf("动图已写入 %s（%d 帧，%d cs/帧）\n", gifPath, len(canvas), delayCs)
+		}
+		if forceText {
+			replayDump(&doc)
+		}
+		return nil
+	}
+
+	replayDump(&doc)
+	return nil
+}
+
+// parseTimes 解析 --at 的毫秒列表（逗号或空格分隔）。
+func parseTimes(spec string) ([]int64, error) {
+	fields := strings.FieldsFunc(spec, func(r rune) bool { return r == ',' || r == ' ' || r == ';' })
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("--at 为空")
+	}
+	out := make([]int64, 0, len(fields))
+	for _, f := range fields {
+		v, err := strconv.ParseInt(f, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("--at 里的 %q 不是毫秒数", f)
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// parseSize 解析 --size WxH；空或非法返回 0,0（交给 Compose 按背景自动定）。
+func parseSize(spec string) (int, int) {
+	if spec == "" {
+		return 0, 0
+	}
+	parts := strings.FieldsFunc(strings.ToLower(spec), func(r rune) bool { return r == 'x' || r == '*' || r == ',' })
+	if len(parts) != 2 {
+		return 0, 0
+	}
+	w, err1 := strconv.Atoi(parts[0])
+	h, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || w <= 0 || h <= 0 {
+		return 0, 0
+	}
+	return w, h
+}
+
+// replayDump 文本回放：图层清单 + 时间轴 + 转场/分支。
+func replayDump(doc *ir.IR) {
 	for _, ev := range doc.Events {
 		fmt.Printf("\n=== 事件 %s（%s）图层 %d 台词 %d ===\n",
 			ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts))
@@ -551,7 +755,6 @@ func cmdReplay(args []string) error {
 			fmt.Printf("  [分支 %s → %s（默认目标 %s）]\n", br.BranchID, br.Type, br.DefaultTarget)
 		}
 	}
-	return nil
 }
 
 // cmdDecode 按需解码资产（当前支持 KiriKiri TLG5）为 PNG，

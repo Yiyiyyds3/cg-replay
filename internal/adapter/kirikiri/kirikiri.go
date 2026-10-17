@@ -495,7 +495,11 @@ var numericRe = regexp.MustCompile(`^[0-9]+$`)
 //  3. UTF-8 / Shift_JIS 明文，按 KAG 结构分择优；坏字符超 5% 的候选出局
 //     （防 SJIS 字节被 UTF-8 解成乱码后凭 ASCII 结构分持平胜出）
 func DecodeScript(data []byte) (string, string) {
-	if len(data) >= 2 && data[0] == 0xFF && data[1] == 0xFE {
+	if len(data) < 2 {
+		// 空/单字节输入没有编码可判，别让调用方拿到越界 panic。
+		return "", "empty"
+	}
+	if data[0] == 0xFF && data[1] == 0xFE {
 		return decodeUTF16LE(data[2:]), "utf16le-bom"
 	}
 	for k := 1; k < 256; k++ {

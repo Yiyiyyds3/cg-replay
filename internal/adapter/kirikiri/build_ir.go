@@ -315,7 +315,10 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 			}
 			l, exists := layers[lid]
 			if !exists {
-				l = &ir.Layer{LayerID: lid, Kind: lkind, Z: z, Visible: true}
+				// Visible 只记**事件初态**：事件开头（t_ms ≤ 0）就登场的层才是「初态可见」。
+				// 中途才登场的层（重返蓝鲸岛 layer2 在 12100ms、layer6 在 44000ms）记 false，
+				// 登场时刻由时间轴给出 —— 否则回放会把它们从第 0 帧就画出来。
+				l = &ir.Layer{LayerID: lid, Kind: lkind, Z: z, Visible: clock == 0}
 				layers[lid] = l
 				layerOrder = append(layerOrder, lid)
 				// Asset/Transform 记的是**事件初态**：同一层后续的 show 只进时间轴，
