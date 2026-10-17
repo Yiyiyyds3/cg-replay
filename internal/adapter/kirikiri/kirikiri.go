@@ -36,7 +36,6 @@ import (
 	"unsafe"
 
 	"ucgr/internal/adapter"
-	"ucgr/internal/ir"
 )
 
 // 块签名（little-endian u32）。
@@ -349,14 +348,92 @@ type Command struct {
 	Raw   string            `json:"raw"`
 }
 
+// SeqItem 脚本顺序项：命令或文本行（BuildIR 按序遍历建时间轴）。
+type SeqItem struct {
+	Kind string   `json:"kind"` // "cmd" | "text"
+	Text string   `json:"text,omitempty"`
+	Cmd  *Command `json:"-"` // Kind=="cmd" 时指向 ast.Commands 中的元素
+}
+
 // Ast KiriKiri 引擎专有 AST（对核心不透明）。
 type Ast struct {
 	Encoding string    `json:"encoding"`
 	Commands []Command `json:"commands"`
 	Texts    []string  `json:"texts,omitempty"`
+	// Seq 保序的 命令/文本 交替流（IR 时间轴的依据）
+	Seq []SeqItem `json:"-"`
+	// DynamicVoice 检测到动态语音引用（voice= 属性 / voiceBase 变量拼名）。
+	// 此时静态解析不到语音文件 → 调用方应按"宁多勿缺"保留全部语音。
+	DynamicVoice bool `json:"-"`
 }
 
-var tagRe = regexp.MustCompile(`[@\[]([A-Za-z_][A-Za-z0-9_]*)((?:\s+[^\]]*?)?)[\]]`)
+// detectDynamicVoice 检查命令是否使用动态语音引用。
+// 夏空实测：`[nm t=… voice=1]` + `[eval exp='f.voiceBase="214"']`，
+// 语音文件名由 voiceBase + 行号在运行时拼接，静态不可解。
+func detectDynamicVoice(c *Command) bool {
+	if v := c.Attrs["voice"]; v != "" {
+		return true
+	}
+	if exp := c.Attrs["exp"]; exp != "" {
+		if strings.Contains(strings.ToLower(exp), "voicebase") ||
+			strings.Contains(strings.ToLower(exp), "voicename") {
+			return true
+		}
+	}
+	return false
+}
+
+// 非台词的裸行首词（标签/变量/控制流）， collected as text 时过滤掉。
+var bareSkipPrefix = []string{"*", "#", "if(", "if ", "else", "endif", "jumpstop", "undo", "return"}
+
+func isBareNoise(s string) bool {
+	for _, p := range bareSkipPrefix {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// emitLine 把一行拆成保序的命令/文本项。
+func (ast *Ast) emitLine(line string) {
+	s := strings.TrimRight(line, "\r")
+	if strings.TrimSpace(s) == "" {
+		return
+	}
+	rest := s
+	// 行首 @宏 调用（忽略前导空白）
+	if m := atCallRe.FindStringSubmatch(strings.TrimLeft(s, " \t")); m != nil {
+		lead := len(s) - len(strings.TrimLeft(s, " \t"))
+		c := Command{Tag: m[1], Attrs: parseAttrs(m[2]), Raw: m[0]}
+		ast.Commands = append(ast.Commands, c)
+		ast.Seq = append(ast.Seq, SeqItem{Kind: "cmd", Cmd: &ast.Commands[len(ast.Commands)-1]})
+		rest = s[lead+len(m[0]):]
+	}
+	// [tag] 与文本段交错
+	pos := 0
+	for _, tm := range tagRe.FindAllStringSubmatchIndex(rest, -1) {
+		if seg := strings.TrimSpace(rest[pos:tm[0]]); seg != "" && !isBareNoise(seg) {
+			ast.Texts = append(ast.Texts, seg)
+			ast.Seq = append(ast.Seq, SeqItem{Kind: "text", Text: seg})
+		}
+		c := Command{Tag: rest[tm[2]:tm[3]], Attrs: parseAttrs(rest[tm[4]:tm[5]]), Raw: rest[tm[0]:tm[1]]}
+		ast.Commands = append(ast.Commands, c)
+		ast.Seq = append(ast.Seq, SeqItem{Kind: "cmd", Cmd: &ast.Commands[len(ast.Commands)-1]})
+		if detectDynamicVoice(&c) {
+			ast.DynamicVoice = true
+		}
+		pos = tm[1]
+	}
+	if seg := strings.TrimSpace(rest[pos:]); seg != "" && !isBareNoise(seg) {
+		ast.Texts = append(ast.Texts, seg)
+		ast.Seq = append(ast.Seq, SeqItem{Kind: "text", Text: seg})
+	}
+}
+
+// 标签正则：允许 CJK 标签名（夏空 [暗転]/[主人公の部屋] 等日文宏名，
+// 只认 ASCII 会把它们整行误判为台词）。
+var tagRe = regexp.MustCompile(`[@\[]([\p{L}_][\p{L}\p{N}_]*)((?:\s+[^\]]*?)?)[\]]`)
 var attrRe = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\s*=\s*("[^"]*"|'[^']*'|[^\s\]@]+)`)
 var atCallRe = regexp.MustCompile(`^@([A-Za-z_][A-Za-z0-9_]*)\s*(.*)$`)
 var tagStartRe = regexp.MustCompile(`[@\[]([A-Za-z])`)
@@ -489,25 +566,11 @@ func (a *Adapter) ParseScript(data []byte, ctx *adapter.ScriptCtx) (adapter.Scri
 	}
 	ast := &Ast{Encoding: enc}
 	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimRight(line, "\r")
-		trimmed := strings.TrimLeft(line, " \t")
-		if strings.HasPrefix(trimmed, ";") {
-			continue // 注释行：作者注掉的旧代码，引用不生效
+		trimmed := strings.TrimLeft(strings.TrimRight(line, "\r"), " \t")
+		if trimmed == "" || strings.HasPrefix(trimmed, ";") {
+			continue // 空行 / 注释行：作者注掉的旧代码，引用不生效
 		}
-		if m := atCallRe.FindStringSubmatch(trimmed); m != nil {
-			ast.Commands = append(ast.Commands, Command{
-				Tag:   m[1],
-				Attrs: parseAttrs(m[2]),
-				Raw:   trimmed,
-			})
-		}
-		for _, tm := range tagRe.FindAllStringSubmatch(line, -1) {
-			ast.Commands = append(ast.Commands, Command{
-				Tag:   tm[1],
-				Attrs: parseAttrs(tm[2]),
-				Raw:   tm[0],
-			})
-		}
+		ast.emitLine(line)
 	}
 	return ast, nil
 }
@@ -526,11 +589,53 @@ var (
 	resourceAttrs = map[string]bool{"storage": true, "file": true, "src": true, "sound": true}
 	scriptTags    = map[string]bool{"jump": true, "call": true, "addsysscript": true, "addsyshook": true}
 	tagExtraAttrs = map[string][]string{
-		"chr":   {"c", "l", "r", "ll", "rr"},
-		"mface": {"name"},
-		"nm":    {"s"},
+		"chr":     {"c", "l", "r", "ll", "rr"},
+		"mface":   {"name"},
+		"nm":      {"s"},
+		"newchar": {"name"},
+		"newlay":  {"file"},
 	}
 )
+
+// 位置参数（非 attr=value）里的常见关键字——不是资源名。
+// 各游戏自定义宏方言不同，此处收集镇锦；漏掉的会变成未命中引用（无害）。
+var posKeywords = map[string]bool{
+	"hide": true, "show": true, "normal": true, "grayscale": true,
+	"resetcolor": true, "msgoff": true, "msgon": true, "stop": true,
+	"clear": true, "sync": true, "wait": true, "time": true, "loop": true,
+	"mode": true, "pos": true, "blend": true, "fade": true, "left": true,
+	"right": true, "center": true, "true": true, "false": true,
+	"beginskip": true, "endskip": true, "begintrans": true, "endtrans": true,
+	"initscene": true, "initbase": true, "history": true, "save": true,
+	"load": true, "quake": true, "se": true, "bgm": true, "vo": true,
+	"trans": true, "rule": true, "layer": true, "page": true, "fore": true,
+	"back": true, "color": true, "alpha": true, "delay": true, "cond": true,
+	"canskip": true, "notrans": true, "nontrans": true, "keep": true,
+	"nowait": true, "click": true, "auto": true, "fast": true, "slow": true,
+}
+
+// 裸 token：字母/数字/下划线/连字符开头（含 CJK，如「山道1_A」）。
+var bareTokRe = regexp.MustCompile(`[\p{L}\p{N}_][\p{L}\p{N}_\-]*`)
+
+// positionalRefs 提取命令体里的位置参数资源候选。
+// 先剥掉 attr=value 再扫裸 token——各游戏自定义宏（如夏空 [EV EV0220A ...]）
+// 把图片名放在位置参数而不是 storage=，只认属性会整类漏掉（误裁风险）。
+func positionalRefs(c *Command) []string {
+	body := c.Raw
+	body = strings.TrimPrefix(body, "[")
+	body = strings.TrimPrefix(body, "@")
+	body = strings.TrimPrefix(body, c.Tag)
+	body = strings.TrimSuffix(strings.TrimSpace(body), "]")
+	body = attrRe.ReplaceAllString(body, " ")
+	var out []string
+	for _, m := range bareTokRe.FindAllString(body, -1) {
+		if len(m) < 3 || posKeywords[strings.ToLower(m)] {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
 
 // ExtractRefs 从 Ast 提取资源引用（噪声过滤同 ks_refs.parse_refs）。
 func (ast *Ast) ExtractRefs() []string {
@@ -571,19 +676,15 @@ func (ast *Ast) ExtractRefs() []string {
 			}
 			refs = append(refs, strings.ReplaceAll(v, "\\", "/"))
 		}
+		// 位置参数候选（[EV EV0220A ...] 这类方言；由匹配层过滤真假）
+		for _, p := range positionalRefs(&c) {
+			if numericRe.MatchString(p) {
+				continue
+			}
+			refs = append(refs, strings.ReplaceAll(p, "\\", "/"))
+		}
 	}
 	return refs
-}
-
-// BuildIR 最小实现：把整个脚本作为一个事件（S3 剪枝用）。
-// 完整事件切分（CG/场景边界、图层 z-order、转场）属 P1 范围。
-func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.IR, error) {
-	ast, ok := astObj.(*Ast)
-	if !ok {
-		return nil, fmt.Errorf("AST 类型不匹配: %T", astObj)
-	}
-	_ = ast
-	return nil, fmt.Errorf("BuildIR 尚未实现（P1）")
 }
 
 // Transitions KiriKiri 转场注册表（P0 初版，详见 docs/04 §9.5）。

@@ -14,6 +14,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,8 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/hash"
+	"ucgr/internal/ir"
 	"ucgr/internal/prune"
 	"ucgr/internal/scan"
 
@@ -46,6 +49,10 @@ func main() {
 		err = cmdRefs(args)
 	case "prune":
 		err = cmdPrune(args)
+	case "ir":
+		err = cmdIR(args)
+	case "replay":
+		err = cmdReplay(args)
 	case "engines":
 		cmdEngines()
 	default:
@@ -66,6 +73,8 @@ func usage() {
   ucgr probe <xp3 文件>         解析 XP3 索引概况
   ucgr refs  <解包目录> <脚本…>  提取引用并匹配资源池
   ucgr prune <解包目录> <脚本…> [--out 目录]  裁剪保留集
+  ucgr ir    <解包目录> <脚本> [--out file.json]  构建 IR（匹配+哈希+校验）
+  ucgr replay <ir.json>          文本回放（按时间轴打印演出）
   ucgr engines                 列出已注册引擎
 `)
 }
@@ -216,6 +225,7 @@ func cmdRefs(args []string) error {
 	var a adapter.EngineAdapter = &kirikiri.Adapter{}
 	var allRefs []string
 	failed := 0
+	dynVoice := false
 	for _, sp := range scripts {
 		data := readScriptMaybeFixed(sp, root)
 		ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: sp})
@@ -223,10 +233,21 @@ func cmdRefs(args []string) error {
 			failed++
 			continue
 		}
+		if ast.(*kirikiri.Ast).DynamicVoice {
+			dynVoice = true
+		}
 		allRefs = append(allRefs, ast.(*kirikiri.Ast).ExtractRefs()...)
 	}
 	fmt.Printf("脚本: %d 个（解码失败 %d 个）\n", len(scripts), failed)
+	if failed > 0 {
+		fmt.Printf("⚠️ %d 个脚本解不动 → 按安全原则整游戏保守保留，下列数字仅为下界\n", failed)
+	}
 	res := pool.Prune(allRefs)
+	if dynVoice {
+		if n := res.GuardCategory(pool, "voice"); n > 0 {
+			fmt.Printf("🔒 动态语音守卫：+%d 个语音文件（脚本用 voiceBase 动态拼名，静态不可解）\n", n)
+		}
+	}
 	fmt.Printf("池: %d 个文件 / %s\n", len(pool.ByRel), prune.HumanBytes(res.PoolBytes))
 	fmt.Printf("命中: %d 个文件 / %s\n", len(res.Matched), prune.HumanBytes(keepOf(res.Matched, pool)))
 	fmt.Printf("保守保留: %d 个文件 / %s\n", len(res.Dynamic), prune.HumanBytes(keepOf(res.Dynamic, pool)))
@@ -269,16 +290,37 @@ func cmdPrune(args []string) error {
 	}
 	var a adapter.EngineAdapter = &kirikiri.Adapter{}
 	var allRefs []string
+	dynVoice := false
+	failed := 0
 	for _, sp := range scripts {
 		data := readScriptMaybeFixed(sp, root)
 		ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: sp})
 		if err != nil {
+			failed++
 			continue
+		}
+		if ast.(*kirikiri.Ast).DynamicVoice {
+			dynVoice = true
 		}
 		allRefs = append(allRefs, ast.(*kirikiri.Ast).ExtractRefs()...)
 	}
 	res := pool.Prune(allRefs)
+	if dynVoice {
+		if n := res.GuardCategory(pool, "voice"); n > 0 {
+			fmt.Printf("🔒 动态语音守卫：+%d 个语音文件\n", n)
+		}
+	}
 	rels := res.KeepRels()
+	if failed > 0 {
+		// 安全原则：有脚本解不动 → 整游戏保留（不做部分裁剪）
+		rels = make([]string, 0, len(pool.ByRel))
+		for rel := range pool.ByRel {
+			rels = append(rels, rel)
+		}
+		sort.Strings(rels)
+		fmt.Printf("🔒 %d 个脚本解码失败 → 按安全原则保留【整个池】%d 个文件\n",
+			failed, len(rels))
+	}
 	n, failed, err := pool.CopyTo(outDir, rels)
 	if err != nil {
 		return err
@@ -289,6 +331,191 @@ func cmdPrune(args []string) error {
 		prune.HumanBytes(res.PoolBytes-res.KeepBytes),
 		100-pct(res.KeepBytes, res.PoolBytes))
 	return nil
+}
+
+// cmdIR 构建 IR：解析脚本 → 匹配资源池 + 哈希 → BuildIR → 校验 → 写 JSON。
+// 用法：ucgr ir <解包目录> <脚本> [--out file.json]
+func cmdIR(args []string) error {
+	outPath := ""
+	rest := args
+	for i := 0; i < len(rest)-1; i++ {
+		if rest[i] == "--out" {
+			outPath = rest[i+1]
+			rest = append(rest[:i], rest[i+2:]...)
+			break
+		}
+	}
+	if len(rest) < 2 {
+		return fmt.Errorf("用法: ucgr ir <解包目录> <脚本> [--out file.json]")
+	}
+	root, script := rest[0], rest[1]
+	pool, err := prune.BuildPool(root)
+	if err != nil {
+		return err
+	}
+	data := readScriptMaybeFixed(script, root)
+	var a adapter.EngineAdapter = &kirikiri.Adapter{}
+	ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: script})
+	if err != nil {
+		return err
+	}
+	hashCache := map[string]string{}
+	resolver := func(ref string) (*ir.AssetRef, bool) {
+		rel := ""
+		if hits := pool.Match(ref); len(hits) > 0 {
+			rel = hits[0]
+		} else if cands := pool.DynamicCandidates(ref); len(cands) > 0 {
+			rel = cands[0] // 保守：取第一个候选（已在 ④ 保留集内）
+		} else {
+			return nil, false
+		}
+		h, ok := hashCache[rel]
+		if !ok {
+			if h, err = hash.FileSHA256(pool.ByRel[rel].Abs); err != nil {
+				return nil, false
+			}
+			hashCache[rel] = h
+		}
+		return &ir.AssetRef{Hash: h, OrigPath: rel, Role: "其它"}, true
+	}
+	var unrecognized []ir.Unrecognized
+	out, err := a.BuildIR(ast, &adapter.BuildCtx{
+		GameID:             filepath.Base(root),
+		Config:             map[string]string{"script_name": script},
+		RecordUnrecognized: func(u ir.Unrecognized) { unrecognized = append(unrecognized, u) },
+		Resolver:           resolver,
+	})
+	if err != nil {
+		return err
+	}
+	// 校验：V1 需要包内哈希集合 = 全部已解析资产
+	pkgHashes := map[string]bool{}
+	for _, ev := range out.Events {
+		for _, as := range ev.Assets {
+			pkgHashes[as.Hash] = true
+		}
+	}
+	errs := ir.Validate(out)
+	errs = append(errs, ir.CheckAssetRefs(out, pkgHashes)...)
+	if len(errs) > 0 {
+		fmt.Printf("⚠️ IR 校验未过（%d 条）：\n", len(errs))
+		for i, e := range errs {
+			if i >= 8 {
+				fmt.Printf("   …另 %d 条\n", len(errs)-8)
+				break
+			}
+			fmt.Println("   -", e)
+		}
+	} else {
+		fmt.Println("✅ IR 校验通过（V1~V8）")
+	}
+	// 摘要
+	ev := out.Events[0]
+	nVoice := 0
+	for _, t := range ev.Texts {
+		if t.Voice != nil {
+			nVoice++
+		}
+	}
+	fmt.Printf("事件 %s：图层 %d / 时间轴 %d / 台词 %d（含语音 %d）/ 转场 %d / 资产 %d / 未识别 %d\n",
+		ev.EventID, len(ev.Layers), len(ev.Timeline), len(ev.Texts), nVoice,
+		len(ev.Transitions), len(ev.Assets), len(unrecognized))
+	if outPath != "" {
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(outPath, b, 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("IR 已写入 %s（%d 字节）\n", outPath, len(b))
+	}
+	return nil
+}
+
+// cmdReplay 文本回放：按 IR 时间轴顺序打印演出过程（§7.5.5 方式 A）。
+// 用法：ucgr replay <ir.json>
+func cmdReplay(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("用法: ucgr replay <ir.json>")
+	}
+	b, err := os.ReadFile(args[0])
+	if err != nil {
+		return err
+	}
+	var doc ir.IR
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return fmt.Errorf("IR 解析失败: %w", err)
+	}
+	if errs := ir.Validate(&doc); len(errs) > 0 {
+		fmt.Printf("⚠️ IR 校验未过（%d 条），仍尝试回放\n", len(errs))
+	}
+	fmt.Printf("游戏 %s · 引擎 %s · 保真度 %s · 事件 %d 个\n",
+		doc.GameID, doc.EngineID, doc.Fidelity, len(doc.Events))
+	for _, ev := range doc.Events {
+		fmt.Printf("\n=== 事件 %s（%s）图层 %d 台词 %d ===\n",
+			ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts))
+		// 图层清单
+		for _, l := range ev.Layers {
+			name := "-"
+			if l.Asset != nil {
+				name = l.Asset.OrigPath
+			}
+			fmt.Printf("  [图层 %-6s %-10s z=%d %s]\n", l.LayerID, l.Kind, l.Z, name)
+		}
+		// 时间轴 + 台词合并打印
+		textByID := map[string]ir.TextLine{}
+		for _, t := range ev.Texts {
+			textByID[t.LineID] = t
+		}
+		fmt.Println("  --- 时间轴 ---")
+		for _, op := range ev.Timeline {
+			switch op.Op {
+			case "text_show":
+				t := textByID[op.Target]
+				spk := t.Speaker
+				if spk == "" {
+					spk = "?"
+				}
+				voice := ""
+				if t.Voice != nil {
+					voice = " ♪" + t.Voice.OrigPath
+				}
+				fmt.Printf("  %6dms 【%s】%s%s\n", op.TMs, spk, truncate(t.Text, 50), voice)
+			case "image_show":
+				ref := ""
+				if p, ok := op.Params.(map[string]interface{}); ok {
+					if r, ok := p["ref"].(string); ok {
+						ref = r
+					}
+				}
+				fmt.Printf("  %6dms 🖼 图层 %s ← %s\n", op.TMs, op.Target, ref)
+			case "voice_play":
+				fmt.Printf("  %6dms 🔊 %s\n", op.TMs, op.Target)
+			default:
+				fmt.Printf("  %6dms · %s %s\n", op.TMs, op.Op, op.Target)
+			}
+		}
+		for _, tr := range ev.Transitions {
+			fb := ""
+			if tr.Fallback {
+				fb = "（L0 近似）"
+			}
+			fmt.Printf("  [转场 %s → %s %dms%s]\n", tr.TransitionID, tr.Impl, tr.DurationMs, fb)
+		}
+		for _, br := range ev.Branches {
+			fmt.Printf("  [分支 %s → %s（默认目标 %s）]\n", br.BranchID, br.Type, br.DefaultTarget)
+		}
+	}
+	return nil
+}
+
+func truncate(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
 }
 
 func cmdEngines() {

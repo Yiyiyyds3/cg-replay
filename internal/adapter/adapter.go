@@ -45,6 +45,9 @@ type BuildCtx struct {
 	Config    map[string]string `json:"config,omitempty"`
 	Log       func(format string, args ...interface{})
 	RecordUnrecognized func(u ir.Unrecognized)
+	// Resolver 把资源引用解析为带内容哈希的 AssetRef（调用方注入：
+	// 匹配资源池 + 计算哈希）。不注入时 BuildIR 只能产出无哈希的骨架。
+	Resolver func(ref string) (*ir.AssetRef, bool)
 }
 
 // ScriptAst 引擎专有 AST。对核心不透明：只有产出它的适配器能解释。

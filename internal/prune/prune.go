@@ -294,6 +294,30 @@ func (p *Pool) Prune(refs []string) *Result {
 	return res
 }
 
+// GuardCategory 动态引用守卫：把路径含 key 的全部池内文件加入保留集。
+//
+// 用途：脚本用动态方式引用某类资源时（如夏空语音文件名由 voiceBase 运行时
+// 拼接，静态解析不到任何语音文件），按"宁多勿缺"整类保留，防止误裁。
+// 返回新增的文件数。
+func (r *Result) GuardCategory(p *Pool, key string) int {
+	n := 0
+	for rel := range p.ByRel {
+		if !strings.Contains(rel, key) {
+			continue
+		}
+		if _, ok := r.Matched[rel]; ok {
+			continue
+		}
+		if _, ok := r.Dynamic[rel]; ok {
+			continue
+		}
+		r.Matched[rel] = []string{"<guard:" + key + ">"}
+		r.KeepBytes += p.ByRel[rel].Size
+		n++
+	}
+	return n
+}
+
 // KeepRels 返回应保留的全部 relpath（命中 + 保守保留，去重排序）。
 func (r *Result) KeepRels() []string {
 	set := map[string]bool{}
