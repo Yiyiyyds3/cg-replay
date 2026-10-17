@@ -97,9 +97,11 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 }
 
 // dirProbeMaxDepth 目录探测最大深度（避免在大树上做全量遍历）。
-const dirProbeMaxDepth = 3
+// KiriKiri 解包树的常见布局 raw\data\scenario\*.ks 已是第 4 层，
+// 故上限取 5（即能发现路径深度 ≤5 的 .ks），再深就不再遍历。
+const dirProbeMaxDepth = 5
 
-// hasExtWithin 在 root 树下（深度 < maxDepth，跳过副本树）寻找指定扩展名的文件。
+// hasExtWithin 在 root 树下（路径深度 ≤ maxDepth，跳过副本树）寻找指定扩展名的文件。
 func hasExtWithin(root, ext string, maxDepth int) bool {
 	found := false
 	base := strings.Count(filepath.Clean(root), string(os.PathSeparator))
