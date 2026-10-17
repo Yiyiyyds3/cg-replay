@@ -1,0 +1,18 @@
+{
+  "$schema": "https://wails.io/schemas/wails.v3.json",
+  "name": "统一 CG 演出回放库",
+  "outputDirectory": "./build/bin",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Yiyiyyds3"
+  },
+  "info": {
+    "companyName": "personal",
+    "productName": "统一 CG 演出回放库",
+    "productVersion": "0.1.0",
+    "comments": "CG 演出重温 · 空间裁剪（Wails v3 + Go core）"
+  }
+}
