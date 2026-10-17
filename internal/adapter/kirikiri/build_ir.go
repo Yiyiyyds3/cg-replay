@@ -1,13 +1,15 @@
 package kirikiri
 
-// build_ir.go —— KiriKiri 脚本 → IR 构建（P1 第一步，S3 剪枝用）。
+// build_ir.go —— KiriKiri 脚本 → IR 构建（P1：事件自动切分）。
 //
-// 当前范围（2026-10-17，最小剪枝 §7.5.5 方式 A）：
-//   - 一个脚本 = 一个事件（event_id 取脚本名）；自动事件切分留待后续
-//   - 图层/时间轴/台词/语音/转场按命令流保序构建
+// 当前范围（2026-10-17，最小剪枝 §7.5.5 方式 A 之后的自然延伸）：
+//   - 事件切分：以 CG 显示/隐藏为边界（show → hide 配对），
+//     无 CG 的脚本退化为单个 scene 事件（保底可回放）
+//   - 每个事件内按命令流保序构建 图层/时间轴/台词/语音/转场/分支/资产
 //   - 资源引用经 ctx.Resolver 解析为带哈希的 AssetRef（未注入则哈希为空，
 //     ir.Validate 的 V1 会报缺，属预期）
-//   - 未识别命令 → RecordUnrecognized 登记（裁剪安全原则：宁多勿缺）
+//   - 未识别命令 → ev.Unrecognized 登记（裁剪安全原则：宁多勿缺）
+//   - 同一 CG 多次显示 → 事件 ID 加 #N 后缀（回想模式可定位每次演出）
 
 import (
 	"fmt"
@@ -61,52 +63,140 @@ func roleOf(ref string) string {
 	return "其它"
 }
 
-// BuildIR 从 Ast 构建 IR（单事件版）。
-func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.IR, error) {
-	ast, ok := astObj.(*Ast)
+// ---------------------------------------------------------------
+// 事件切分
+// ---------------------------------------------------------------
+
+// eventRange 一个事件在 ast.Seq 上的区间 [Start, End)。
+type eventRange struct {
+	Start, End int
+	CGRef      string       // 触发事件的 CG 引用（空 = scene 保底事件）
+	Kind       ir.EventKind
+}
+
+// isCGHide 判断命令是否是「CG 隐藏」（[EV hide resetcolor] / [cgdel ...]）。
+func isCGHide(c *Command) bool {
+	if _, ok := layerCmds[strings.ToLower(c.Tag)]; !ok {
+		return false
+	}
+	if v := c.Attrs["hide"]; v != "" {
+		return true
+	}
+	for _, p := range positionalRefs(c) {
+		if strings.EqualFold(p, "hide") {
+			return true
+		}
+	}
+	return false
+}
+
+// segmentRanges 以 CG show→hide 为边界切分事件。
+// resolve 用于判断引用是否为 CG 类资源（角色分类走 roleOf）。
+func segmentRanges(ast *Ast, resolve func(string) (*ir.AssetRef, bool)) []eventRange {
+	var out []eventRange
+	open := -1 // 当前事件的 Seq 起点（-1 = 无）
+	openCG := ""
+	openKind := ir.KindStillCG
+	closeEvent := func(end int) {
+		if open >= 0 && end > open {
+			out = append(out, eventRange{Start: open, End: end, CGRef: openCG, Kind: openKind})
+		}
+		open = -1
+		openCG = ""
+	}
+	for i, it := range ast.Seq {
+		if it.Kind != "cmd" {
+			continue
+		}
+		c := it.Cmd
+		tag := strings.ToLower(c.Tag)
+		kind, isLayer := layerCmds[tag]
+		if !isLayer {
+			continue
+		}
+		if isCGHide(c) {
+			// 隐藏当前层对应的 CG：收尾已打开的事件
+			closeEvent(i + 1)
+			continue
+		}
+		ref := firstResourceRef(c)
+		if ref == "" {
+			continue
+		}
+		role := roleOf(ref)
+		if resolve != nil {
+			if ar, ok := resolve(ref); ok && ar.Role != "" && ar.Role != "其它" {
+				role = ar.Role
+			}
+		}
+		if role != "CG事件图" && role != "事件视频" {
+			continue // 背景/立绘不算 CG 事件边界
+		}
+		// 新的 CG 显示：同一 CG 重复 show 忽略；否则先收尾上一个再开新事件
+		if open >= 0 && ref == openCG {
+			continue
+		}
+		closeEvent(i)
+		open = i
+		openCG = ref
+		openKind = ir.KindStillCG
+		if role == "事件视频" || kind == ir.LayerMovie {
+			openKind = ir.KindEventVideo
+		}
+	}
+	closeEvent(len(ast.Seq))
+	return out
+}
+
+// ---------------------------------------------------------------
+// 事件构建
+// ---------------------------------------------------------------
+
+// irBuilder 事件构建器（跨事件共享资产去重与解析器）。
+type irBuilder struct {
+	ctx     *adapter.BuildCtx
+	resolve func(string) (*ir.AssetRef, bool)
+	assets  []ir.AssetRef
+	seen    map[string]bool
+	reg     *adapter.TransitionRegistry
+}
+
+func (b *irBuilder) addAsset(ref string) *ir.AssetRef {
+	ar, ok := b.resolve(ref)
 	if !ok {
-		return nil, fmt.Errorf("AST 类型不匹配: %T", astObj)
+		return nil
 	}
-	if ctx == nil {
-		ctx = &adapter.BuildCtx{}
+	if ar.Role == "" || ar.Role == "其它" {
+		ar.Role = roleOf(ref)
 	}
-	resolve := ctx.Resolver
-	if resolve == nil {
-		resolve = func(ref string) (*ir.AssetRef, bool) {
-			return &ir.AssetRef{Hash: "", OrigPath: ref, Role: roleOf(ref)}, true
-		}
+	if !b.seen[ar.OrigPath] {
+		b.seen[ar.OrigPath] = true
+		b.assets = append(b.assets, *ar)
 	}
+	return ar
+}
 
-	ev := &ir.Event{
-		EventID: "script",
-		Kind:    ir.KindScene,
-		Ord:     1,
-		Title:   "",
+// speakerRe 台词前缀的角色名：【壮太】「…」/【男１】「…」。
+var speakerRe = regexp.MustCompile(`^【([^】]{1,12})】\s*(.*)$`)
+
+// splitSpeaker 从台词行提取说话人（无前缀则返回空）。
+func splitSpeaker(s string) (string, string) {
+	if m := speakerRe.FindStringSubmatch(s); m != nil {
+		return m[1], m[2]
 	}
-	layers := map[string]*ir.Layer{} // layerID → 图层（可变状态）
-	var layerOrder []string          // 保持首次出现顺序
-	var assets []ir.AssetRef
-	assetSeen := map[string]bool{}
-	var clock int64 // ms
+	return "", s
+}
+
+// buildEvent 构建单个事件（seq 为 ast.Seq 的子区间）。
+func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *ir.Event {
+	ev := &ir.Event{EventID: evID, Kind: kind, Ord: 1}
+	layers := map[string]*ir.Layer{}
+	var layerOrder []string
+	var clock int64
 	textN := 0
-	lastTextIdx := -1        // 最近一条 TextLine 下标
-	var pendingVoice *ir.AssetRef // 待挂靠语音（KAG 的 [nm s=] 出现在其台词之前）
-	reg := a.Transitions()
-
-	addAsset := func(ref string) *ir.AssetRef {
-		ar, ok := resolve(ref)
-		if !ok {
-			return nil
-		}
-		if !assetSeen[ar.OrigPath] {
-			assetSeen[ar.OrigPath] = true
-			assets = append(assets, *ar)
-		}
-		return ar
-	}
+	var pendingVoice *ir.AssetRef
 
 	slotOf := func(c *Command, tag string) string {
-		// 优先 layer/id 属性，其次 slot（第二参数），最后用 tag 名
 		for _, k := range []string{"layer", "id", "page"} {
 			if v := c.Attrs[k]; v != "" {
 				return tag + v
@@ -115,13 +205,13 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		return tag
 	}
 
-	for _, it := range ast.Seq {
+	for _, it := range seq {
 		if it.Kind == "text" {
 			textN++
 			id := fmt.Sprintf("L%03d", textN)
 			spk, body := splitSpeaker(it.Text)
 			tl := ir.TextLine{LineID: id, TMs: clock, Text: body, Speaker: spk}
-			// 挂靠此前出现的语音（[nm s=…] 在其台词之前）
+			// 挂靠此前出现的语音（KAG 的 [nm s=] 在其台词之前）
 			if pendingVoice != nil {
 				tl.Voice = pendingVoice
 				ev.Voices = append(ev.Voices, ir.Voice{LineID: id, Asset: *pendingVoice})
@@ -134,23 +224,22 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 			ev.Timeline = append(ev.Timeline, ir.TimelineOp{
 				TMs: clock, Op: "text_show", Target: id,
 			})
-			lastTextIdx = len(ev.Texts) - 1
 			continue
 		}
 		c := it.Cmd
 		tag := strings.ToLower(c.Tag)
 
 		// ① 图片层命令
-		if kind, isLayer := layerCmds[tag]; isLayer {
+		if lkind, isLayer := layerCmds[tag]; isLayer {
 			ref := firstResourceRef(c)
 			if ref == "" {
-				continue // stop/clear 等无引用的层操作
+				continue
 			}
-			ar := addAsset(ref)
+			ar := b.addAsset(ref)
 			lid := slotOf(c, tag)
 			l, exists := layers[lid]
 			if !exists {
-				l = &ir.Layer{LayerID: lid, Kind: kind, Z: len(layerOrder) + 1, Visible: true}
+				l = &ir.Layer{LayerID: lid, Kind: lkind, Z: len(layerOrder) + 1, Visible: true}
 				layers[lid] = l
 				layerOrder = append(layerOrder, lid)
 			}
@@ -169,12 +258,12 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 			if ms, ok := attrMs(c, "time"); ok {
 				clock += ms
 			} else {
-				clock += 800 // 默认点击等待
+				clock += 800
 			}
 			continue
 		}
 
-		// ③ 转场：ex/extrans/trans/fade 家族 → 查注册表，未实现回退 L0 fade
+		// ③ 转场：查注册表，未实现回退 L0 fade
 		if isTransitionTag(tag) {
 			nativeID := transitionNativeID(tag)
 			d := int64(800)
@@ -185,36 +274,31 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 				TransitionID: fmt.Sprintf("T%d", len(ev.Transitions)+1),
 				Impl:         "fade", DurationMs: d, Fallback: true,
 			}
-			if impl, ok := reg.Impls[nativeID]; ok {
+			if impl, ok := b.reg.Impls[nativeID]; ok {
 				tr.Impl = impl.ImplKey
 				if _, hasTime := attrMs(c, "time"); !hasTime && impl.DurationMs > 0 {
 					tr.DurationMs = impl.DurationMs
 				}
-				tr.Fallback = false // 引擎原生转场（L0 表内）
+				tr.Fallback = false
 			}
 			ev.Transitions = append(ev.Transitions, tr)
-			clock += tr.DurationMs / 2 // 转场占用半时长（近似）
+			clock += tr.DurationMs / 2
 			continue
 		}
 
-		// ④ 语音：vo / [nm s=] / [playvo] —— KAG 方言里 nm 在其台词之前，
-		// 故记为 pendingVoice，由下一条台词挂靠（见上方 text 分支）。
+		// ④ 语音：vo / [nm s=] / [playvo]（KAG 方言里 nm 在其台词之前）
 		if vr := voiceRef(c); vr != "" {
-			ar := addAsset(vr)
+			ar := b.addAsset(vr)
 			if ar == nil {
 				continue
 			}
 			pendingVoice = ar
-			if lastTextIdx < 0 {
-				// 语音前没有台词（如旁白先声）：仍登记，LineID 留空
-				ev.Voices = append(ev.Voices, ir.Voice{LineID: "", Asset: *ar})
-			}
 			continue
 		}
 
-		// ⑤ 其它资源引用（se/bgm/movie 等）
+		// ⑤ 其它音视频引用（se/bgm/movie 等）
 		if ref := firstResourceRef(c); ref != "" && isAudioVideoTag(tag) {
-			addAsset(ref)
+			b.addAsset(ref)
 			continue
 		}
 
@@ -225,31 +309,56 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 			Reason:   "未实现的命令语义",
 		}
 		ev.Unrecognized = append(ev.Unrecognized, u)
-		if ctx.RecordUnrecognized != nil {
-			ctx.RecordUnrecognized(u)
+		if b.ctx.RecordUnrecognized != nil {
+			b.ctx.RecordUnrecognized(u)
 		}
 	}
 
-	// 汇总图层（保序）
 	for _, lid := range layerOrder {
 		ev.Layers = append(ev.Layers, *layers[lid])
 	}
-	ev.Assets = assets
-
-	// 分支：遇到 jump/call 目标登记 default（重演非重玩：沿默认走）
-	for _, it := range ast.Seq {
+	// 分支：jump/call/next 目标登记 default（重演非重玩：沿默认走）
+	for _, it := range seq {
 		if it.Kind != "cmd" {
 			continue
 		}
 		if t := strings.ToLower(it.Cmd.Tag); t == "jump" || t == "call" || t == "next" {
 			if tgt := it.Cmd.Attrs["storage"]; tgt != "" {
 				ev.Branches = append(ev.Branches, ir.Branch{
-					BranchID: fmt.Sprintf("B%d", len(ev.Branches)+1),
-					TMs:      clock, Type: "jump",
+					BranchID:      fmt.Sprintf("B%d", len(ev.Branches)+1),
+					Type:          "jump",
 					DefaultTarget: tgt,
 				})
 			}
 		}
+	}
+	return ev
+}
+
+// BuildIR 从 Ast 构建 IR（CG 事件自动切分版）。
+func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.IR, error) {
+	ast, ok := astObj.(*Ast)
+	if !ok {
+		return nil, fmt.Errorf("AST 类型不匹配: %T", astObj)
+	}
+	if ctx == nil {
+		ctx = &adapter.BuildCtx{}
+	}
+	resolve := ctx.Resolver
+	if resolve == nil {
+		resolve = func(ref string) (*ir.AssetRef, bool) {
+			return &ir.AssetRef{Hash: "", OrigPath: ref, Role: roleOf(ref)}, true
+		}
+	}
+	b := &irBuilder{
+		ctx: ctx, resolve: resolve,
+		seen: map[string]bool{}, reg: a.Transitions(),
+	}
+
+	ranges := segmentRanges(ast, resolve)
+	if len(ranges) == 0 {
+		// 无 CG 事件：整脚本作为一个 scene 事件（保底，回放仍可看台词）
+		ranges = []eventRange{{Start: 0, End: len(ast.Seq), Kind: ir.KindScene}}
 	}
 
 	out := &ir.IR{
@@ -259,28 +368,39 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		Fidelity:  ir.FidelityGeneric,
 		Meta: ir.Meta{
 			ScriptEncoding: ast.Encoding,
-			GeneratedBy:    "ucgr/kirikiri.BuildIR v1",
+			GeneratedBy:    "ucgr/kirikiri.BuildIR v2 (event-segmented)",
 			GeneratedAt:    time.Now().Format(time.RFC3339),
 		},
-		Events: []ir.Event{*ev},
 	}
-	// 事件标题/ID 用脚本名（ctx.Config["script_name"] 传入）
+	scriptName := ""
 	if n := ctx.Config["script_name"]; n != "" {
-		out.Events[0].EventID = strings.TrimSuffix(filepath.Base(n), filepath.Ext(n))
-		out.Events[0].Title = out.Events[0].EventID
+		scriptName = strings.TrimSuffix(filepath.Base(n), filepath.Ext(n))
+	}
+	cgCount := map[string]int{}
+	for i, r := range ranges {
+		evID := scriptName
+		if evID == "" {
+			evID = fmt.Sprintf("ev%03d", i+1)
+		}
+		title := evID
+		if r.CGRef != "" {
+			cgCount[r.CGRef]++
+			if cgCount[r.CGRef] > 1 {
+				evID = fmt.Sprintf("%s#%d", r.CGRef, cgCount[r.CGRef])
+			} else {
+				evID = r.CGRef
+			}
+			title = r.CGRef
+		} else if len(ranges) > 1 {
+			evID = fmt.Sprintf("%s#%d", scriptName, i+1)
+		}
+		ev := b.buildEvent(ast.Seq[r.Start:r.End], evID, r.Kind)
+		ev.Ord = i + 1
+		ev.Title = title
+		ev.Assets = b.assets // 包级共享汇总（V1 校验按包哈希集合）
+		out.Events = append(out.Events, *ev)
 	}
 	return out, nil
-}
-
-// speakerRe 台词前缀的角色名：【壮太】「…」/【男１】「…」。
-var speakerRe = regexp.MustCompile(`^【([^】]{1,12})】\s*(.*)$`)
-
-// splitSpeaker 从台词行提取说话人（无前缀则返回空）。
-func splitSpeaker(s string) (string, string) {
-	if m := speakerRe.FindStringSubmatch(s); m != nil {
-		return m[1], m[2]
-	}
-	return "", s
 }
 
 // firstResourceRef 取命令中的第一个资源引用值。
@@ -291,7 +411,6 @@ func firstResourceRef(c *Command) string {
 	for _, k := range tagExtraAttrs[c.Tag] {
 		extra[k] = true
 	}
-	// 稳定顺序：先 storage/file/src/sound，再扩展属性
 	for _, k := range []string{"storage", "file", "src", "sound"} {
 		if v := c.Attrs[k]; v != "" && !isDynamic(v) {
 			return v

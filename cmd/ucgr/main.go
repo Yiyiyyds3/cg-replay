@@ -409,17 +409,23 @@ func cmdIR(args []string) error {
 	} else {
 		fmt.Println("✅ IR 校验通过（V1~V8）")
 	}
-	// 摘要
-	ev := out.Events[0]
-	nVoice := 0
-	for _, t := range ev.Texts {
-		if t.Voice != nil {
-			nVoice++
+	// 摘要：逐事件清单
+	fmt.Printf("共 %d 个事件（CG show→hide 切分）：\n", len(out.Events))
+	for i, ev := range out.Events {
+		if i >= 12 {
+			fmt.Printf("  …另 %d 个事件\n", len(out.Events)-12)
+			break
 		}
+		nv := 0
+		for _, t := range ev.Texts {
+			if t.Voice != nil {
+				nv++
+			}
+		}
+		fmt.Printf("  #%-2d %-16s %-10s 图层%d 台词%d(语音%d) 转场%d 资产%d 未识别%d\n",
+			ev.Ord, ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts), nv,
+			len(ev.Transitions), len(ev.Assets), len(ev.Unrecognized))
 	}
-	fmt.Printf("事件 %s：图层 %d / 时间轴 %d / 台词 %d（含语音 %d）/ 转场 %d / 资产 %d / 未识别 %d\n",
-		ev.EventID, len(ev.Layers), len(ev.Timeline), len(ev.Texts), nVoice,
-		len(ev.Transitions), len(ev.Assets), len(unrecognized))
 	if outPath != "" {
 		b, err := json.MarshalIndent(out, "", "  ")
 		if err != nil {
