@@ -11,6 +11,7 @@
 //	ucgr refs  <目录> <脚本...>    提取脚本资源引用并匹配解包池
 //	ucgr prune <目录> <脚本...>    引用裁剪：保留集复制到目标目录
 //	ucgr decode <图片>           按需解码资产（TLG5 → PNG）
+//	ucgr unpack <归档>           解包归档（CatSystem2 KIF：.int/.kif）
 //	ucgr engines                 列出已注册引擎适配器
 package main
 
@@ -29,6 +30,7 @@ import (
 	"ucgr/internal/decode"
 	"ucgr/internal/hash"
 	"ucgr/internal/ir"
+	"ucgr/internal/kif"
 	"ucgr/internal/prune"
 	"ucgr/internal/scan"
 
@@ -59,6 +61,8 @@ func main() {
 		err = cmdReplay(args)
 	case "decode":
 		err = cmdDecode(args)
+	case "unpack":
+		err = cmdUnpack(args)
 	case "engines":
 		cmdEngines()
 	default:
@@ -82,6 +86,7 @@ func usage() {
   ucgr ir    <解包目录> <脚本> [--out file.json]  构建 IR（匹配+哈希+校验）
   ucgr replay <ir.json>          文本回放（按时间轴打印演出）
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5→PNG）
+  ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
 
 全局参数:
@@ -551,6 +556,114 @@ func cmdReplay(args []string) error {
 
 // cmdDecode 按需解码资产（当前支持 KiriKiri TLG5）为 PNG，
 // 让回放在没有原播放器时也能「看」静态合成图（P1-3 解码层的最小集）。
+// 用法：ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]
+//
+// 目前支持 CatSystem2 的 KIF 归档（.int/.kif）。不给 --out 时只列条目；给了就解包写盘。
+// 索引与数据解密都不需要游戏主程序口令，只有**名字的大小写**需要口令才能精确还原。
+func cmdUnpack(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("用法: ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]")
+	}
+	in := args[0]
+	outDir, key := "", ""
+	limit := 0
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--out 缺少参数")
+			}
+			outDir = args[i+1]
+			i++
+		case "--key":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--key 缺少参数")
+			}
+			key = args[i+1]
+			i++
+		case "--limit":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--limit 缺少参数")
+			}
+			if _, err := fmt.Sscanf(args[i+1], "%d", &limit); err != nil {
+				return fmt.Errorf("--limit 需要整数: %v", err)
+			}
+			i++
+		default:
+			return fmt.Errorf("未知参数: %s", args[i])
+		}
+	}
+
+	arc, err := kif.Open(in)
+	if err != nil {
+		return err
+	}
+	defer arc.Close()
+	if key != "" {
+		arc.SetPassphrase(key)
+		fmt.Printf("已按口令 %q 走精确解名\n", key)
+	}
+	fmt.Printf("归档: %s（KIF，条目 %d，越界跳过 %d）\n", in, len(arc.Entries), arc.Skipped)
+	fmt.Printf("名字可信度: %s\n", kindSummary(arc.KindStats()))
+
+	if outDir == "" {
+		for i, e := range arc.Entries {
+			if limit > 0 && i >= limit {
+				fmt.Printf("  …（其余 %d 条省略，--limit 0 取消限制）\n", len(arc.Entries)-limit)
+				break
+			}
+			fmt.Printf("  %-44s %10d  %s\n", e.Name, e.Size, e.NameKind)
+		}
+		return nil
+	}
+
+	var total int64
+	for _, e := range arc.Entries {
+		data, err := arc.Read(e)
+		if err != nil {
+			return fmt.Errorf("读取 %s 失败: %w", e.Name, err)
+		}
+		dest := filepath.Join(outDir, filepath.FromSlash(e.Name))
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dest, data, 0o644); err != nil {
+			return err
+		}
+		total += int64(len(data))
+	}
+	fmt.Printf("已解包 %d 个文件 / %s → %s\n", len(arc.Entries), fmtBytes(total), outDir)
+	return nil
+}
+
+// kindSummary 把名字可信度统计压成一行（固定顺序，便于跨实现比对）。
+func kindSummary(stats map[string]int) string {
+	order := []string{kif.NameExactKind, kif.NameDominantKind, kif.NameAmbiguousKind, kif.NameUnknownKind}
+	parts := make([]string, 0, len(order))
+	for _, k := range order {
+		if v := stats[k]; v > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d", k, v))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+// fmtBytes 人类可读体积。
+func fmtBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	units := []string{"KiB", "MiB", "GiB", "TiB"}
+	v := float64(n)
+	i := -1
+	for v >= unit && i < len(units)-1 {
+		v /= unit
+		i++
+	}
+	return fmt.Sprintf("%.2f %s", v, units[i])
+}
+
 // 用法：ucgr decode <图片文件> [--out out.png] [--raw out.bin]
 // --raw 写出裸 BGRA 字节，供与参考实现逐字节比对。
 func cmdDecode(args []string) error {

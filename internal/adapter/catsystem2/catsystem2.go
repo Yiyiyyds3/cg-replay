@@ -17,8 +17,10 @@
 //	     A_19_sayuki_ex01_022.ogg），提取时同时登记去后缀变体
 //	E-mote（.psb/.psz/.lpb）按硬边界不复刻，由 prune 统一剥出
 //
-// 归档 .int（内部 KIF，Blowfish+MT 加密，口令在 exe PE 资源）的
-// 解密未实现——本适配器面向【已解包目录】（与 Python 原型同口径）。
+// 归档 .int（内部 KIF，Blowfish+MT 加密）的索引与数据解密见 internal/kif：
+// **解包数据不需要游戏主程序口令**，只有名字的**大小写**需要口令才能精确还原
+// （口令在个别游戏的 exe PE 资源 DATA/V_CODE2 里，本机这批游戏没有该资源）。
+// 剧本 .cst 的引用提取面向【已解包目录】（与 Python 原型同口径）。
 package catsystem2
 
 import (
@@ -34,6 +36,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/ir"
+	"ucgr/internal/kif"
 )
 
 // .cst 条目类型。
@@ -103,16 +106,17 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 	return "", nil
 }
 
-// ParseArchive 列出目录内的条目（已解包口径）。
-// .int 归档解密未实现（需 exe 口令），直接报错。
+// ParseArchive 列出归档内的条目。
+//   - 目录 → 已解包口径（跳过剧本，剧本单独走 ParseScript）；
+//   - .int/.kif 文件 → 走 internal/kif 解出 KIF 索引（索引与数据都能解，
+//     不需要游戏主程序口令；未持有口令时名字的**大小写不保证**）。
 func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("CatSystem2 .int(KIF) 归档解密未实现（口令在 exe PE 资源），"+
-			"请先解包再摄入: %s", path)
+		return parseKIFArchive(path)
 	}
 	var out []adapter.ArchiveEntry
 	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
@@ -135,6 +139,31 @@ func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 		return nil, err
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out, nil
+}
+
+// parseKIFArchive 读 CatSystem2 的 KIF 归档（.int/.kif）并列出条目。
+// 名字可信度写进 KeyHint，让上层能区分"名字确定"与"大小写/歧义待定"。
+func parseKIFArchive(path string) ([]adapter.ArchiveEntry, error) {
+	arc, err := kif.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer arc.Close()
+	out := make([]adapter.ArchiveEntry, 0, len(arc.Entries))
+	for _, e := range arc.Entries {
+		hint := "kif/blowfish-mt"
+		if e.NameKind != kif.NameExactKind {
+			hint += ";name-" + e.NameKind
+		}
+		out = append(out, adapter.ArchiveEntry{
+			Path: e.Name, Size: e.Size, Offset: e.Offset,
+			Compression:      adapter.CompNone,
+			UncompressedSize: e.Size,
+			Encrypted:        true,
+			KeyHint:          hint,
+		})
+	}
 	return out, nil
 }
 
