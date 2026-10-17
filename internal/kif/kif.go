@@ -4,7 +4,8 @@
 //
 //	0x00  "KIF\0"
 //	0x04  u32le 条目数 count（含元数据槽）
-//	0x08  "__key__.dat\0" → 加密布局；否则为明文布局（本包暂不支持）
+//	0x08  "__key__.dat\0" → 加密布局；否则为明文布局（名字与数据都不加密，
+//	      名字字段长度按 {0x20, 0x40} 两种候选试，对应 GARbro 的 NameSizes）
 //	0x4c  u32le seed：MersenneTwister(seed) 的首个输出（小端 4 字节）即 Blowfish 密钥
 //	0x48  起每条：0x40 字节混淆名字 + u32le(offset) + u32le(size)，步长 0x48；槽 0 不是文件
 //
@@ -20,7 +21,6 @@ package kif
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -37,6 +37,9 @@ const (
 )
 
 const keyDatMarker = "__key__.dat\x00"
+
+// plainNameSizes 明文 KIF 布局的名字字段长度候选（GARbro NameSizes）。
+var plainNameSizes = []int{0x20, 0x40}
 
 // 名字的可信度分档（**大小写不在其中**：缺 main_key 时大小写恒有双解，见包注释）。
 const (
@@ -62,10 +65,11 @@ type Archive struct {
 	Entries []Entry
 	Skipped int // 越界条目数（数据范围超文件尾，已跳过）
 
-	file *os.File
-	bf   *blowfish
-	idx  []int    // Entries[i] 的名字槽下标 i+1
-	raw  [][]byte // Entries[i] 的原始（混淆）名字字节
+	file  *os.File
+	bf    *blowfish
+	plain bool     // 明文布局：名字与数据都不加密
+	idx   []int    // Entries[i] 的名字槽下标 i+1
+	raw   [][]byte // Entries[i] 的原始（混淆）名字字节
 }
 
 // Open 打开 KIF 归档并解出全部条目名。
@@ -107,14 +111,17 @@ func (a *Archive) readIndex() error {
 	}
 	count := int(binary.LittleEndian.Uint32(head[4:8]))
 	a.Count = count
+	if count <= 0 {
+		return nil
+	}
+	if string(head[8:8+len(keyDatMarker)]) != keyDatMarker {
+		return a.readPlainIndex(count, size)
+	}
 	if count <= 1 {
-		return nil // 空归档（只有元数据槽）
+		return nil // 加密布局里 slot 0 只是元数据槽，故无真实条目
 	}
 	if int64(count)*entryStride+indexStart > size {
 		return fmt.Errorf("条目数 %d 与文件大小 %d 不符（索引越界）", count, size)
-	}
-	if string(head[8:8+len(keyDatMarker)]) != keyDatMarker {
-		return errors.New("明文（未加密）KIF 布局暂未支持")
 	}
 	a.Seed = binary.LittleEndian.Uint32(head[seedOffset:])
 
@@ -157,6 +164,64 @@ func (a *Archive) readIndex() error {
 	return nil
 }
 
+// readPlainIndex 解析明文布局（@8 不是 __key__.dat）：名字明文 CP932、数据不加密。
+// 名字字段长度按 plainNameSizes 逐个试，任一条校验失败就换下一个候选。
+func (a *Archive) readPlainIndex(count int, size int64) error {
+	var lastErr error
+	for _, nameLen := range plainNameSizes {
+		stride := int64(nameLen) + 8
+		need := int64(indexStart) + int64(count)*stride
+		if need > size {
+			lastErr = fmt.Errorf("明文布局（名字字段 %d）：索引需要 %d 字节 > 文件大小 %d", nameLen, need, size)
+			continue
+		}
+		buf := make([]byte, need)
+		if _, err := a.file.ReadAt(buf, 0); err != nil {
+			lastErr = err
+			continue
+		}
+		ents := make([]Entry, 0, count)
+		off := int64(indexStart)
+		for i := 0; i < count; i++ {
+			name := decodeName(trimNul(buf[off : off+int64(nameLen)]))
+			if name == "" {
+				lastErr = fmt.Errorf("明文布局（名字字段 %d）：第 %d 条名字为空", nameLen, i)
+				break
+			}
+			eo := int64(binary.LittleEndian.Uint32(buf[off+int64(nameLen):]))
+			es := int64(binary.LittleEndian.Uint32(buf[off+int64(nameLen)+4:]))
+			if eo <= off+int64(nameLen) || eo+es > size {
+				lastErr = fmt.Errorf("明文布局（名字字段 %d）：第 %d 条 %q 的 offset/size 非法", nameLen, i, name)
+				break
+			}
+			ents = append(ents, Entry{Name: name, Offset: eo, Size: es, NameKind: NameExactKind})
+			off += stride
+		}
+		if len(ents) == count {
+			a.plain = true
+			a.Entries = ents
+			return nil
+		}
+		if lastErr == nil {
+			lastErr = fmt.Errorf("明文布局（名字字段 %d）解析不完整", nameLen)
+		}
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("明文布局不成立（entry_count=%d）", count)
+	}
+	return lastErr
+}
+
+// trimNul 截到第一个 0 字节（不含）。
+func trimNul(b []byte) []byte {
+	for i, c := range b {
+		if c == 0 {
+			return b[:i]
+		}
+	}
+	return b
+}
+
 // sniffExts 读条目数据头部，按魔数给出可能的扩展名（无匹配时返回 nil）。
 func (a *Archive) sniffExts(e *Entry) []string {
 	n := e.Size
@@ -170,7 +235,9 @@ func (a *Archive) sniffExts(e *Entry) []string {
 	if _, err := a.file.ReadAt(buf, e.Offset); err != nil {
 		return nil
 	}
-	a.bf.decipherBytes(buf)
+	if !a.plain {
+		a.bf.decipherBytes(buf)
+	}
 	return magicExts(buf)
 }
 
@@ -183,7 +250,9 @@ func (a *Archive) Read(e Entry) ([]byte, error) {
 	if _, err := a.file.ReadAt(buf, e.Offset); err != nil {
 		return nil, err
 	}
-	a.bf.decipherBytes(buf)
+	if !a.plain {
+		a.bf.decipherBytes(buf)
+	}
 	return buf, nil
 }
 
