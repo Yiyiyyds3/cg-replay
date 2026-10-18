@@ -32,6 +32,7 @@ var layerCmds = map[string]ir.LayerKind{
 	"fw":      ir.LayerStand,
 	"stand":   ir.LayerStand,
 	"image":   ir.LayerCG,
+	"img":     ir.LayerCG, // [img] 是 [image] 的缩写宏（带裁剪矩形）
 	"ev":      ir.LayerCG,
 	"evset":   ir.LayerCG,
 	"chr":     ir.LayerStand,
@@ -460,6 +461,8 @@ func (b *irBuilder) buildEvent(seq []SeqItem, evID string, kind ir.EventKind) *i
 	for _, lid := range layerOrder {
 		ev.Layers = append(ev.Layers, *layers[lid])
 	}
+	// 演出台本（回放用顺序指令流；与上面的扁平时间轴并存，见 ir/show.go）
+	ev.Show = b.buildShow(seq)
 	// 分支：jump/call/next 目标登记 default（重演非重玩：沿默认走）
 	for _, it := range seq {
 		if it.Kind != "cmd" {

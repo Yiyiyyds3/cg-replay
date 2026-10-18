@@ -32,6 +32,8 @@ import (
 	"ucgr/internal/hash"
 	"ucgr/internal/ir"
 	"ucgr/internal/kif"
+	"ucgr/internal/platform/win32"
+	"ucgr/internal/player"
 	"ucgr/internal/prune"
 	"ucgr/internal/replay"
 	"ucgr/internal/scan"
@@ -61,6 +63,8 @@ func main() {
 		err = cmdIR(args)
 	case "replay":
 		err = cmdReplay(args)
+	case "play":
+		err = cmdPlay(args)
 	case "decode":
 		err = cmdDecode(args)
 	case "unpack":
@@ -90,6 +94,11 @@ func usage() {
                 [--at ms,ms,…] [--frames N] [--size WxH] [--event N]
                              回放 IR：默认打印时间轴；给 --assets+--render/--gif
                              则只从 IR + 素材合成画面（S3「可播放演出」，掩码 JPEG 自动还原）
+  ucgr play  <ir.json> --assets <素材根> [--event N] [--speed X] [--char-ms N] [--no-wait]
+                [--shot 目录 [--at ms,ms,…]] [--size WxH] [--font 名字] [--font-file otf]
+                             按原作演出播放事件：图层双缓冲 + 转场 + 抖动 + 对话框文本
+                             带 --at 时离线出 PNG（不弹窗），否则开窗口实时播放
+                             （空格/回车 推进，P 暂停，Tab 加速，S 跳等待，F12 截图，Esc 退出）
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
@@ -662,6 +671,356 @@ func cmdReplay(args []string) error {
 
 	replayDump(&doc)
 	return nil
+}
+
+// cmdPlay 按原作演出播放一个事件。
+//
+// 与 replay 的「按时间戳采样合成」不同，play 是顺序解释器：
+// 图层双缓冲（fore/back）+ [trans] 过渡进度 + [quake] 抖动 +
+// 对话框文本（[台詞]/[l]/[r]/[cm]），台词之间的点击点按阅读时长自动推进。
+//
+// 用法：
+//
+//	ucgr play <ir.json> --assets <素材根> [--event N] [--speed X] [--char-ms N]
+//	          [--no-wait] [--shot 目录 [--at ms,ms,…]] [--size WxH]
+//	          [--font 字体名] [--font-file otf]
+func cmdPlay(args []string) error {
+	var (
+		irPath, assets, shotDir, atSpec, sizeSpec, fontName, fontFile string
+		evSel, charMs                                                 int
+		speed                                                         float64
+		noWait                                                        bool
+		err                                                           error
+	)
+	speed = 1
+	for i := 0; i < len(args); i++ {
+		take := func() (string, error) {
+			if i+1 >= len(args) {
+				return "", fmt.Errorf("%s 缺少取值", args[i])
+			}
+			i++
+			return args[i], nil
+		}
+		switch a := args[i]; a {
+		case "--assets":
+			assets, err = take()
+		case "--event":
+			var v string
+			if v, err = take(); err == nil {
+				evSel, err = strconv.Atoi(v)
+			}
+		case "--speed":
+			var v string
+			if v, err = take(); err == nil {
+				speed, err = strconv.ParseFloat(v, 64)
+			}
+		case "--char-ms":
+			var v string
+			if v, err = take(); err == nil {
+				charMs, err = strconv.Atoi(v)
+			}
+		case "--no-wait":
+			noWait = true
+		case "--shot":
+			shotDir, err = take()
+		case "--at":
+			atSpec, err = take()
+		case "--size":
+			sizeSpec, err = take()
+		case "--font":
+			fontName, err = take()
+		case "--font-file":
+			fontFile, err = take()
+		default:
+			if irPath == "" {
+				irPath = a
+			} else {
+				err = fmt.Errorf("多余参数: %s", a)
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if irPath == "" {
+		return fmt.Errorf("用法: ucgr play <ir.json> --assets <素材根> [--event N] [--shot 目录 --at ms,…]")
+	}
+	if assets == "" {
+		return fmt.Errorf("play 需要 --assets <素材根>（解包目录或 S2 裁剪产物）")
+	}
+	b, err := os.ReadFile(irPath)
+	if err != nil {
+		return err
+	}
+	var doc ir.IR
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return fmt.Errorf("IR 解析失败: %w", err)
+	}
+	if len(doc.Events) == 0 {
+		return fmt.Errorf("IR 里没有事件")
+	}
+	idx := evSel - 1
+	if evSel == 0 {
+		idx = 0
+	}
+	if idx < 0 || idx >= len(doc.Events) {
+		return fmt.Errorf("--event %d 超出范围（共 %d 个事件）", evSel, len(doc.Events))
+	}
+	ev := &doc.Events[idx]
+	if len(ev.Show) == 0 {
+		return fmt.Errorf("事件 %s 没有演出台本（show），无法播放", ev.EventID)
+	}
+	w, h := parseSize(sizeSpec)
+	if w <= 0 || h <= 0 {
+		w, h = 1600, 1200 // Config.tjs：scWidth/scHeight
+	}
+
+	load := player.Cached(playLoader(assets))
+	opt := player.DefaultOptions()
+	if speed > 0 {
+		opt.Speed = speed
+	}
+	if charMs > 0 {
+		opt.CharMs = float64(charMs)
+	}
+	opt.SkipWaits = noWait
+
+	// 字体：优先私有注册本作自带的思源宋体 SC（Config.tjs：global.DefaultFontFace）。
+	face := fontName
+	if face == "" {
+		face = "SourceHanSerifSC-Regular"
+	}
+	ff := fontFile
+	if ff == "" {
+		ff = filepath.Join(assets, "raw", "data", "SourceHanSerifSC-Regular.otf")
+	}
+	if st, serr := os.Stat(ff); serr == nil && !st.IsDir() {
+		if win32.RegisterFont(ff) {
+			fmt.Printf("字体：已私有注册 %s（使用 %s）\n", filepath.Base(ff), face)
+		} else {
+			fmt.Printf("字体：%s 注册失败，退回系统字体 SimSun\n", filepath.Base(ff))
+			face = "SimSun"
+		}
+	} else {
+		fmt.Printf("字体：未找到 %s，使用系统字体 %s\n", ff, face)
+	}
+	td := win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
+	defer td.Free()
+
+	fmt.Printf("游戏 %s · 事件 #%d %s（%s）· 台本 %d 条 · 画布 %dx%d · 字号 %.0fpx · 速度 ×%.2f\n",
+		doc.GameID, idx+1, ev.EventID, ev.Kind, len(ev.Show), w, h, opt.FontSize, opt.Speed)
+
+	p := player.New(ev, opt)
+
+	// 离线出图模式：按 16ms 步进到目标时刻，出「纯图层」与「含文字」两张 PNG。
+	if atSpec != "" {
+		times, terr := parseTimes(atSpec)
+		if terr != nil {
+			return terr
+		}
+		if shotDir == "" {
+			shotDir = "."
+		}
+		if err := os.MkdirAll(shotDir, 0o755); err != nil {
+			return err
+		}
+		var last int64
+		// 先跑一次零步进：把 t=0 的台本指令（背景/对话框几何/首行台词）执行掉，
+		// 否则 t=0 的首帧会是空画布。
+		p.Advance(0, player.Input{})
+		for _, t := range times {
+			if t < last {
+				t = last
+			}
+			for p.Now() < t {
+				if p.Done() && p.Frame().TransProgress == 0 {
+					break // 台本已演完且末段转场已走完，画面定格
+				}
+				p.Advance(16, player.Input{})
+			}
+			last = t
+			f := p.Frame()
+			rgba, drawn, cerr := renderFrame(p, load, w, h)
+			if cerr != nil {
+				fmt.Printf("⚠️ t=%dms 合成失败：%v\n", t, cerr)
+				continue
+			}
+			plain := filepath.Join(shotDir, fmt.Sprintf("play_t%06d.png", t))
+			if err := writePNG(plain, rgba); err != nil {
+				return err
+			}
+			withText := filepath.Join(shotDir, fmt.Sprintf("play_t%06d_text.png", t))
+			if err := writeTextPNG(withText, td, f, rgba, w, h); err != nil {
+				return err
+			}
+			fmt.Printf("  t=%6dms  层 %d（%s）· 文本块 %d · 等待中 %v → %s\n",
+				t, len(drawn), strings.Join(drawn, " + "), len(f.Texts), f.Waiting, filepath.Base(withText))
+			for _, box := range f.Texts {
+				fmt.Printf("      [层 %s] 可见 %v 几何(%.0f,%.0f,%.0f,%.0f) hasGeom=%v frame=%q 底色(%d,%d,%d)@%d 边距(%.0f,%.0f,%.0f,%.0f) 行 %d\n",
+					box.Layer, box.Visible, box.X, box.Y, box.W, box.H, box.HasGeom, box.Frame,
+					box.FrameColor[0], box.FrameColor[1], box.FrameColor[2], box.FrameOpacity,
+					box.MarginL, box.MarginT, box.MarginR, box.MarginB, len(box.Lines))
+			}
+		}
+		fmt.Printf("PNG 已写入 %s\n", shotDir)
+		fmt.Printf("播放器时刻 %dms · 台本读完 %v\n", p.Now(), p.Done())
+		return nil
+	}
+
+	// 窗口实时播放。
+	paused, spd := false, speed
+	if spd <= 0 {
+		spd = 1
+	}
+	opt.Speed = 1 // 倍速在下面按 dt 计算，避免与 Advance 内部乘 Speed 重复
+	shotN := 0
+	return win32.Run(win32.Options{
+		Title:  fmt.Sprintf("ucgr play — %s %s", doc.GameID, ev.EventID),
+		Width:  w,
+		Height: h,
+	}, func(c *win32.Canvas, dtMs int64, in win32.Input) {
+		if in.TogglePause {
+			paused = !paused
+		}
+		if in.ToggleSpeed {
+			if spd >= 4 {
+				spd = 1
+			} else {
+				spd *= 2
+			}
+		}
+		if in.ToggleSkip {
+			noWait = !noWait
+			p.SetSkip(noWait)
+		}
+		if !paused {
+			if in.Advance {
+				p.Advance(0, player.Input{Advance: true})
+			}
+			p.Advance(int64(float64(dtMs)*spd), player.Input{})
+		}
+		f := p.Frame()
+		rgba, _, cerr := renderFrame(p, load, w, h)
+		if cerr != nil {
+			rgba = image.NewRGBA(image.Rect(0, 0, w, h))
+		}
+		c.BlitRGBA(rgba)
+		td.DrawBoxes(c.DC(), f.Texts, 1)
+		if in.RequestShot {
+			if shotDir == "" {
+				shotDir = "."
+			}
+			_ = os.MkdirAll(shotDir, 0o755)
+			path := filepath.Join(shotDir, fmt.Sprintf("shot_%04d_t%06d.png", shotN, f.Now))
+			c.ForceOpaque()
+			if err := writePNG(path, c.Image()); err == nil {
+				fmt.Printf("截图 → %s\n", path)
+			}
+			shotN++
+		}
+	})
+}
+
+// renderFrame 把玩家当前帧合成成 RGBA（图层 + 消息层框图），文字另由 GDI 画。
+func renderFrame(p *player.Player, load player.Loader, w, h int) (*image.RGBA, []string, error) {
+	f := p.Frame()
+	rgba, drawn, err := player.Compose(f, load, w, h)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, box := range f.Texts {
+		if box.Frame == "" || !box.Visible {
+			continue
+		}
+		img, lerr := load(player.ResolveRef(p.Event(), box.Frame))
+		if lerr != nil {
+			continue
+		}
+		player.DrawBoxBackground(rgba, box, img, f.QuakeX, f.QuakeY)
+	}
+	return rgba, drawn, nil
+}
+
+// writePNG 存一张 RGBA 到 PNG。
+func writePNG(path string, img image.Image) error {
+	fh, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+	return png.Encode(fh, img)
+}
+
+// writeTextPNG 先把 RGBA 贴进 GDI 画布、再画文字，最后存 PNG。
+func writeTextPNG(path string, td *win32.TextDrawer, f player.Frame, rgba *image.RGBA, w, h int) error {
+	c, err := win32.NewCanvas(w, h)
+	if err != nil {
+		return err
+	}
+	defer c.Free()
+	c.BlitRGBA(rgba)
+	td.DrawBoxes(c.DC(), f.Texts, 1)
+	c.ForceOpaque() // GDI 不维护 alpha，存图前补成不透明
+	return writePNG(path, c.Image())
+}
+
+// playLoader 在素材根下解析素材名。
+//
+// 事件资产表里记的是脚本引用（storage 名，可能无扩展名），框图/字体等
+// 更是只有文件名，所以这里先按原路径找，再按文件名在常见子目录里找。
+func playLoader(root string) player.Loader {
+	dirs := []string{
+		"",
+		"raw/data/fgimage", "raw/data/image", "raw/data/bgimage", "raw/data/system", "raw/data/rule",
+		"fgimage", "image", "bgimage", "system", "rule",
+	}
+	exts := []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg"}
+	cache := map[string]string{}
+	exists := func(p string) bool {
+		st, err := os.Stat(p)
+		return err == nil && !st.IsDir()
+	}
+	return func(rel string) (image.Image, error) {
+		rel = strings.TrimSpace(rel)
+		if rel == "" {
+			return nil, fmt.Errorf("空素材名")
+		}
+		if p, ok := cache[rel]; ok {
+			if p == "" {
+				return nil, fmt.Errorf("素材未找到: %s", rel)
+			}
+			return readImageFile(p)
+		}
+		slashRel := filepath.FromSlash(rel)
+		base := filepath.Base(slashRel)
+		stem := strings.TrimSuffix(base, filepath.Ext(base))
+		cands := []string{filepath.Join(root, slashRel)}
+		for _, d := range dirs {
+			for _, ext := range exts {
+				if d == "" && ext == "" {
+					continue
+				}
+				cands = append(cands, filepath.Join(root, filepath.FromSlash(d), stem+ext))
+			}
+		}
+		for _, c := range cands {
+			if exists(c) {
+				cache[rel] = c
+				return readImageFile(c)
+			}
+		}
+		cache[rel] = ""
+		return nil, fmt.Errorf("素材未找到: %s", rel)
+	}
+}
+
+// readImageFile 读文件并按需解码（PNG / TLG5 / 明文或掩码 JPEG）。
+func readImageFile(path string) (image.Image, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return replay.DecodeImage(data)
 }
 
 // parseTimes 解析 --at 的毫秒列表（逗号或空格分隔）。

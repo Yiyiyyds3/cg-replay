@@ -57,6 +57,7 @@ type Event struct {
 	Characters   []string       `json:"characters,omitempty"`
 	Layers       []Layer        `json:"layers"`
 	Timeline     []TimelineOp   `json:"timeline"`
+	Show         []ShowOp       `json:"show,omitempty"` // 演出台本（顺序，给播放器；见 show.go）
 	Texts        []TextLine     `json:"texts"`
 	Voices       []Voice        `json:"voices"`
 	Transitions  []Transition   `json:"transitions"`
@@ -284,6 +285,8 @@ func validateEvent(ev *Event) []error {
 	if evFidelityStrict(ev) {
 		// 事件级不存 fidelity，此规则在摄入侧按包级 fidelity 执行
 	}
+	// V9：演出台本（Event.Show）结构
+	errs = append(errs, ValidateShow(ev)...)
 	return errs
 }
 
