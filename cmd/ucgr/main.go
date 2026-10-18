@@ -28,6 +28,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/audio"
 	"ucgr/internal/decode"
 	"ucgr/internal/hash"
 	"ucgr/internal/ir"
@@ -74,6 +75,8 @@ func main() {
 		err = cmdUnpack(args)
 	case "engines":
 		cmdEngines()
+	case "audio":
+		err = cmdAudio(args)
 	default:
 		usage()
 		os.Exit(2)
@@ -111,6 +114,8 @@ func usage() {
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
+  ucgr audio <音频文件> [--out out.pcm]   解码音频并打印格式（Windows 走 Media Foundation，
+                               OGG/Vorbis 依赖系统解码器）；--out 落盘原始 PCM（交错、小端）
 
 全局参数:
   --engine <id>                跳过自动识别，直接指定引擎（id 见 ucgr engines）
@@ -125,6 +130,51 @@ func gameRootOf(script string) string {
 		return p[:i]
 	}
 	return filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(p))))
+}
+
+// cmdAudio 解码一个音频文件并打印格式；--out 时落盘原始 PCM（交错、小端）。
+func cmdAudio(args []string) error {
+	var file, out string
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; a {
+		case "--out":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--out 缺少取值")
+			}
+			i++
+			out = args[i]
+		case "-h", "--help":
+			fmt.Println("用法: ucgr audio <音频文件> [--out out.pcm]")
+			return nil
+		default:
+			if file == "" {
+				file = a
+			} else {
+				return fmt.Errorf("多余的参数: %s", a)
+			}
+		}
+	}
+	if file == "" {
+		return fmt.Errorf("缺少音频文件（用法: ucgr audio <音频文件> [--out out.pcm]）")
+	}
+	fi, err := os.Stat(file)
+	if err != nil {
+		return err
+	}
+	pcm, err := audio.DecodeFile(file)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("音频 %s\n", file)
+	fmt.Printf("  文件 %d 字节\n", fi.Size())
+	fmt.Printf("  解码 %s\n", pcm)
+	if out != "" {
+		if err := os.WriteFile(out, pcm.Data, 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("  已写入 %s\n", out)
+	}
+	return nil
 }
 
 // cmdEvents 扫出「原作自己的事件表」：每个 CG 一个独立事件 + 每个编号剧本一个场景事件。
