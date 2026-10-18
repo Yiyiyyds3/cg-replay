@@ -114,7 +114,7 @@ func usage() {
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
-  ucgr audio <音频文件> [--out out.pcm]   解码音频并打印格式（Windows 走 Media Foundation，
+  ucgr audio <音频文件> [--out out.pcm] [--play-ms N]   解码音频并打印格式（Windows 走 Media Foundation，
                                OGG/Vorbis 依赖系统解码器）；--out 落盘原始 PCM（交错、小端）
 
 全局参数:
@@ -135,6 +135,7 @@ func gameRootOf(script string) string {
 // cmdAudio 解码一个音频文件并打印格式；--out 时落盘原始 PCM（交错、小端）。
 func cmdAudio(args []string) error {
 	var file, out string
+	var playMs int64
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
 		case "--out":
@@ -143,8 +144,18 @@ func cmdAudio(args []string) error {
 			}
 			i++
 			out = args[i]
+		case "--play-ms":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--play-ms 缺少取值")
+			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil {
+				return fmt.Errorf("--play-ms 取值无效: %v", err)
+			}
+			playMs = int64(n)
 		case "-h", "--help":
-			fmt.Println("用法: ucgr audio <音频文件> [--out out.pcm]")
+			fmt.Println("用法: ucgr audio <音频文件> [--out out.pcm] [--play-ms N]")
 			return nil
 		default:
 			if file == "" {
@@ -155,7 +166,7 @@ func cmdAudio(args []string) error {
 		}
 	}
 	if file == "" {
-		return fmt.Errorf("缺少音频文件（用法: ucgr audio <音频文件> [--out out.pcm]）")
+		return fmt.Errorf("缺少音频文件（用法: ucgr audio <音频文件> [--out out.pcm] [--play-ms N]）")
 	}
 	fi, err := os.Stat(file)
 	if err != nil {
@@ -173,6 +184,12 @@ func cmdAudio(args []string) error {
 			return err
 		}
 		fmt.Printf("  已写入 %s\n", out)
+	}
+	if playMs > 0 {
+		fmt.Printf("  播放 %d ms（waveOut 混音）…\n", playMs)
+		if err := audio.PlayOnce(pcm, playMs); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1026,6 +1043,14 @@ func cmdPlay(args []string) error {
 		fmt.Printf("PNG 已写入 %s\n", shotDir)
 		fmt.Printf("播放器时刻 %dms · 台本读完 %v\n", p.Now(), p.Done())
 		return nil
+	}
+
+	// 音频：按 KAG 语义播放 BGM/SE（Media Foundation 解码 + winmm waveOut 混音）。
+	if sys, aerr := audio.NewSystem(assets); aerr == nil {
+		defer sys.Close()
+		p.Audio = sys.Handle
+	} else {
+		fmt.Printf("（音频未启用：%v）\n", aerr)
 	}
 
 	// 窗口实时播放。

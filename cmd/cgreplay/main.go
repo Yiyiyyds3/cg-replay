@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/audio"
 	"ucgr/internal/library"
 	"ucgr/internal/platform/win32"
 	"ucgr/internal/player"
@@ -88,6 +89,9 @@ type app struct {
 	title  string
 	done   bool
 	shotN  int
+
+	audio     *audio.System
+	audioRoot string
 }
 
 func main() {
@@ -126,8 +130,12 @@ func main() {
 		fatal(err)
 	}
 	a.reload(false)
+	a.ensureAudio(a.conf.Root)
 	if err := g.Run(); err != nil {
 		fatal(err)
+	}
+	if a.audio != nil {
+		a.audio.Close()
 	}
 }
 
@@ -269,6 +277,10 @@ func (a *app) play() {
 	opt.FontSize = 48
 	a.ensureDrawer(root, opt)
 	a.p = player.New(ev, opt)
+	a.ensureAudio(root)
+	if a.audio != nil {
+		a.p.Audio = a.audio.Handle
+	}
 	a.load = player.Cached(player.Loader(replay.GameLoader(root)))
 	a.p.Advance(0, player.Input{}) // 先把 t=0 的台本指令执行掉，首帧才不会空
 	a.lastAd = time.Now()
@@ -280,7 +292,7 @@ func (a *app) play() {
 	if a.auto {
 		wait = "自动推进"
 	}
-	a.g.SetStatus(fmt.Sprintf("%s · 台本 %d 条 · %s · 空格/回车/点画面手动推进", a.title, len(ev.Show), wait))
+	a.g.SetStatus(fmt.Sprintf("%s · 台本 %d 条 · %s · 空格/回车/点画面推进 · M 静音", a.title, len(ev.Show), wait))
 }
 
 func (a *app) stop() {
@@ -288,6 +300,7 @@ func (a *app) stop() {
 		return
 	}
 	a.p = nil
+	a.stopAudio()
 	a.g.Focus()
 	a.g.SetStatus("已停止：" + a.title)
 }
@@ -344,6 +357,32 @@ func (a *app) ensureDrawer(root string, opt player.Options) {
 		face = "SimSun"
 	}
 	a.td = win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
+}
+
+// ensureAudio 按当前素材根准备/重建音频系统（KAG 语义的 BGM/SE）。
+func (a *app) ensureAudio(root string) {
+	if a.audio != nil && a.audioRoot == root {
+		return
+	}
+	if a.audio != nil {
+		a.audio.Close()
+		a.audio = nil
+	}
+	a.audioRoot = ""
+	if root == "" {
+		return
+	}
+	if sys, err := audio.NewSystem(root); err == nil {
+		a.audio = sys
+		a.audioRoot = root
+	}
+}
+
+// stopAudio 停止所有 BGM/SE（保留音频设备）。
+func (a *app) stopAudio() {
+	if a.audio != nil {
+		a.audio.StopAll()
+	}
 }
 
 func (a *app) saveShot() {
@@ -452,6 +491,11 @@ func (a *app) onKey(key int) bool {
 		return true
 	case 'B':
 		a.selectDelta(-1)
+		return true
+	case 'M': // 静音开关
+		if a.audio != nil {
+			a.audio.SetMute(!a.audio.Muted())
+		}
 		return true
 	case 0x0D, 0x20: // 回车 / 空格：在播放就当作手动推进，没在播放就播当前选中项
 		if a.p != nil {
