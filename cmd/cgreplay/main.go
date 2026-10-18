@@ -347,14 +347,11 @@ func (a *app) ensureDrawer(root string, opt player.Options) {
 	if a.td != nil {
 		return
 	}
-	face := "SourceHanSerifSC-Regular"
+	// 本作自带思源宋体 SC（OTF/CFF，且被 XOR 混淆）：还原并私有注册到 GDI。
+	face := "SimSun"
 	ff := filepath.Join(root, "raw", "data", "SourceHanSerifSC-Regular.otf")
-	if st, err := os.Stat(ff); err == nil && !st.IsDir() {
-		if !win32.RegisterFont(ff) {
-			face = "SimSun" // GDI 认不了 OTF/CFF 时退回系统字体
-		}
-	} else {
-		face = "SimSun"
+	if n, ok := win32.RegisterFontFile(ff); ok {
+		face = n
 	}
 	a.td = win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
 }

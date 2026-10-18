@@ -963,24 +963,23 @@ func cmdPlay(args []string) error {
 	}
 	opt.SkipWaits = noWait
 
-	// 字体：优先私有注册本作自带的思源宋体 SC（Config.tjs：global.DefaultFontFace）。
+	// 字体：本作自带思源宋体 SC（OTF/CFF，且被单字节 XOR 混淆）。
+	// RegisterFontFile 会还原混淆并私有注册到 GDI，返回可用的家族名。
 	face := fontName
-	if face == "" {
-		face = "SourceHanSerifSC-Regular"
-	}
 	ff := fontFile
 	if ff == "" {
 		ff = filepath.Join(assets, "raw", "data", "SourceHanSerifSC-Regular.otf")
 	}
-	if st, serr := os.Stat(ff); serr == nil && !st.IsDir() {
-		if win32.RegisterFont(ff) {
-			fmt.Printf("字体：已私有注册 %s（使用 %s）\n", filepath.Base(ff), face)
-		} else {
-			fmt.Printf("字体：%s 注册失败，退回系统字体 SimSun\n", filepath.Base(ff))
+	if n, ok := win32.RegisterFontFile(ff); ok {
+		if face == "" {
+			face = n
+		}
+		fmt.Printf("字体：私有注册 %s（家族 %s，使用 %s）\n", filepath.Base(ff), n, face)
+	} else {
+		if face == "" {
 			face = "SimSun"
 		}
-	} else {
-		fmt.Printf("字体：未找到 %s，使用系统字体 %s\n", ff, face)
+		fmt.Printf("字体：%s 加载失败，使用系统字体 %s\n", filepath.Base(ff), face)
 	}
 	td := win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
 	defer td.Free()
