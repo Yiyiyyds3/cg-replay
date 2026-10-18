@@ -32,6 +32,7 @@ import (
 	"ucgr/internal/hash"
 	"ucgr/internal/ir"
 	"ucgr/internal/kif"
+	"ucgr/internal/library"
 	"ucgr/internal/platform/win32"
 	"ucgr/internal/player"
 	"ucgr/internal/prune"
@@ -65,6 +66,8 @@ func main() {
 		err = cmdReplay(args)
 	case "play":
 		err = cmdPlay(args)
+	case "events":
+		err = cmdEvents(args)
 	case "decode":
 		err = cmdDecode(args)
 	case "unpack":
@@ -99,6 +102,12 @@ func usage() {
                              按原作演出播放事件：图层双缓冲 + 转场 + 抖动 + 对话框文本
                              带 --at 时离线出 PNG（不弹窗），否则开窗口实时播放
                              （空格/回车 推进，P 暂停，Tab 加速，S 跳等待，F12 截图，Esc 退出）
+  ucgr play  --script <脚本.ks> [--label cg01] [--assets 素材根] [其余同上]
+                             直接按原作脚本的某个标签段（原作自己的事件单位）播放，
+                             不经过 ir.json —— CG 鉴赏的 *cgNN、场景的整脚本都行
+  ucgr events <解包目录> [--out 库.json]      扫出「原作自己的事件表」：
+                             每个 CG 一个独立事件（cgrai 画廊槽位 + cgrai00.ks 的 *cgNN），
+                             每个编号剧本一个场景事件；--out 落盘给 GUI 用
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
@@ -106,6 +115,73 @@ func usage() {
 全局参数:
   --engine <id>                跳过自动识别，直接指定引擎（id 见 ucgr engines）
 `)
+}
+
+// gameRootOf 从脚本路径反推解包根（<root>\raw\data\scenario\x.ks → <root>）。
+func gameRootOf(script string) string {
+	p := filepath.Clean(script)
+	sep := string(filepath.Separator)
+	if i := strings.Index(strings.ToLower(p), strings.ToLower(sep+"raw"+sep)); i > 0 {
+		return p[:i]
+	}
+	return filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(p))))
+}
+
+// cmdEvents 扫出「原作自己的事件表」：每个 CG 一个独立事件 + 每个编号剧本一个场景事件。
+func cmdEvents(args []string) error {
+	var root, out string
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; a {
+		case "--out":
+			if i+1 >= len(args) {
+				return fmt.Errorf("--out 缺少取值")
+			}
+			i++
+			out = args[i]
+		default:
+			if root == "" {
+				root = a
+			} else {
+				return fmt.Errorf("多余参数: %s", a)
+			}
+		}
+	}
+	if root == "" {
+		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json]")
+	}
+	lib, err := library.Scan(root)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("事件库 %s（%s）\n  CG 事件 %d 个 · 场景事件 %d 个\n",
+		lib.Game, lib.Root, len(lib.CGs), len(lib.Scenes))
+	const showMax = 24
+	for i, c := range lib.CGs {
+		if i >= showMax {
+			fmt.Printf("  …（CG 其余 %d 个略）\n", len(lib.CGs)-i)
+			break
+		}
+		imgs := strings.Join(c.Pages, " → ")
+		if imgs == "" {
+			imgs = "（未解析到图）"
+		}
+		fmt.Printf("  %-7s #%-3d %-4s %s\n", c.ID, c.Index, c.Label, imgs)
+	}
+	const sceneMax = 12
+	for i, s := range lib.Scenes {
+		if i >= sceneMax {
+			fmt.Printf("  …（场景其余 %d 个略）\n", len(lib.Scenes)-i)
+			break
+		}
+		fmt.Printf("  场景 %-14s %s\n", s.ID, s.Script)
+	}
+	if out != "" {
+		if err := lib.Save(out); err != nil {
+			return err
+		}
+		fmt.Printf("已写入 %s\n", out)
+	}
+	return nil
 }
 
 func cmdScan(args []string) error {
@@ -687,6 +763,7 @@ func cmdReplay(args []string) error {
 func cmdPlay(args []string) error {
 	var (
 		irPath, assets, shotDir, atSpec, sizeSpec, fontName, fontFile string
+		scriptPath, label                                             string
 		evSel, charMs                                                 int
 		speed                                                         float64
 		noWait                                                        bool
@@ -721,6 +798,10 @@ func cmdPlay(args []string) error {
 			}
 		case "--no-wait":
 			noWait = true
+		case "--script":
+			scriptPath, err = take()
+		case "--label":
+			label, err = take()
 		case "--shot":
 			shotDir, err = take()
 		case "--at":
@@ -742,33 +823,63 @@ func cmdPlay(args []string) error {
 			return err
 		}
 	}
-	if irPath == "" {
-		return fmt.Errorf("用法: ucgr play <ir.json> --assets <素材根> [--event N] [--shot 目录 --at ms,…]")
+	if irPath == "" && scriptPath == "" {
+		return fmt.Errorf("用法: ucgr play <ir.json> --assets <素材根> [--event N] [--shot 目录 --at ms,…]\n" +
+			"      或: ucgr play --script <脚本.ks> [--label cg01] [--assets 素材根]")
+	}
+	if assets == "" && scriptPath != "" {
+		assets = gameRootOf(scriptPath)
 	}
 	if assets == "" {
 		return fmt.Errorf("play 需要 --assets <素材根>（解包目录或 S2 裁剪产物）")
 	}
-	b, err := os.ReadFile(irPath)
-	if err != nil {
-		return err
-	}
-	var doc ir.IR
-	if err := json.Unmarshal(b, &doc); err != nil {
-		return fmt.Errorf("IR 解析失败: %w", err)
-	}
-	if len(doc.Events) == 0 {
-		return fmt.Errorf("IR 里没有事件")
-	}
-	idx := evSel - 1
-	if evSel == 0 {
-		idx = 0
-	}
-	if idx < 0 || idx >= len(doc.Events) {
-		return fmt.Errorf("--event %d 超出范围（共 %d 个事件）", evSel, len(doc.Events))
-	}
-	ev := &doc.Events[idx]
-	if len(ev.Show) == 0 {
-		return fmt.Errorf("事件 %s 没有演出台本（show），无法播放", ev.EventID)
+
+	var (
+		ev      *ir.Event
+		gameID  string
+		evLabel string
+	)
+	if scriptPath != "" {
+		// 按原作自己的分割单位播放：脚本的某个标签段（CG 鉴赏的 *cgNN / 整脚本）。
+		e, berr := kirikiri.BuildShowSegment(scriptPath, label)
+		if berr != nil {
+			return berr
+		}
+		if len(e.Show) == 0 {
+			return fmt.Errorf("脚本 %s 的标签段 %q 里没有可演的台本", filepath.Base(scriptPath), label)
+		}
+		ev = e
+		gameID = filepath.Base(gameRootOf(scriptPath))
+		if strings.TrimSpace(label) != "" {
+			evLabel = "标签 " + strings.TrimPrefix(label, "*")
+		} else {
+			evLabel = "整脚本 " + filepath.Base(scriptPath)
+		}
+	} else {
+		b, rerr := os.ReadFile(irPath)
+		if rerr != nil {
+			return rerr
+		}
+		var doc ir.IR
+		if uerr := json.Unmarshal(b, &doc); uerr != nil {
+			return fmt.Errorf("IR 解析失败: %w", uerr)
+		}
+		if len(doc.Events) == 0 {
+			return fmt.Errorf("IR 里没有事件")
+		}
+		idx := evSel - 1
+		if evSel == 0 {
+			idx = 0
+		}
+		if idx < 0 || idx >= len(doc.Events) {
+			return fmt.Errorf("--event %d 超出范围（共 %d 个事件）", evSel, len(doc.Events))
+		}
+		ev = &doc.Events[idx]
+		if len(ev.Show) == 0 {
+			return fmt.Errorf("事件 %s 没有演出台本（show），无法播放", ev.EventID)
+		}
+		gameID = doc.GameID
+		evLabel = fmt.Sprintf("#%d %s（%s）", idx+1, ev.EventID, ev.Kind)
 	}
 	w, h := parseSize(sizeSpec)
 	if w <= 0 || h <= 0 {
@@ -807,8 +918,8 @@ func cmdPlay(args []string) error {
 	td := win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
 	defer td.Free()
 
-	fmt.Printf("游戏 %s · 事件 #%d %s（%s）· 台本 %d 条 · 画布 %dx%d · 字号 %.0fpx · 速度 ×%.2f\n",
-		doc.GameID, idx+1, ev.EventID, ev.Kind, len(ev.Show), w, h, opt.FontSize, opt.Speed)
+	fmt.Printf("游戏 %s · 事件 %s · 台本 %d 条 · 画布 %dx%d · 字号 %.0fpx · 速度 ×%.2f\n",
+		gameID, evLabel, len(ev.Show), w, h, opt.FontSize, opt.Speed)
 
 	p := player.New(ev, opt)
 
@@ -875,7 +986,7 @@ func cmdPlay(args []string) error {
 	opt.Speed = 1 // 倍速在下面按 dt 计算，避免与 Advance 内部乘 Speed 重复
 	shotN := 0
 	return win32.Run(win32.Options{
-		Title:  fmt.Sprintf("ucgr play — %s %s", doc.GameID, ev.EventID),
+		Title:  fmt.Sprintf("ucgr play — %s %s", gameID, ev.EventID),
 		Width:  w,
 		Height: h,
 	}, func(c *win32.Canvas, dtMs int64, in win32.Input) {
@@ -922,23 +1033,9 @@ func cmdPlay(args []string) error {
 }
 
 // renderFrame 把玩家当前帧合成成 RGBA（图层 + 消息层框图），文字另由 GDI 画。
+// 实现已提到 internal/player.RenderFrame，CLI 与 GUI 共用同一份。
 func renderFrame(p *player.Player, load player.Loader, w, h int) (*image.RGBA, []string, error) {
-	f := p.Frame()
-	rgba, drawn, err := player.Compose(f, load, w, h)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, box := range f.Texts {
-		if box.Frame == "" || !box.Visible {
-			continue
-		}
-		img, lerr := load(player.ResolveRef(p.Event(), box.Frame))
-		if lerr != nil {
-			continue
-		}
-		player.DrawBoxBackground(rgba, box, img, f.QuakeX, f.QuakeY)
-	}
-	return rgba, drawn, nil
+	return player.RenderFrame(p, load, w, h)
 }
 
 // writePNG 存一张 RGBA 到 PNG。
@@ -964,63 +1061,9 @@ func writeTextPNG(path string, td *win32.TextDrawer, f player.Frame, rgba *image
 	return writePNG(path, c.Image())
 }
 
-// playLoader 在素材根下解析素材名。
-//
-// 事件资产表里记的是脚本引用（storage 名，可能无扩展名），框图/字体等
-// 更是只有文件名，所以这里先按原路径找，再按文件名在常见子目录里找。
+// playLoader 在素材根下解析素材名（实现见 internal/replay.GameLoader，GUI 共用同一份）。
 func playLoader(root string) player.Loader {
-	dirs := []string{
-		"",
-		"raw/data/fgimage", "raw/data/image", "raw/data/bgimage", "raw/data/system", "raw/data/rule",
-		"fgimage", "image", "bgimage", "system", "rule",
-	}
-	exts := []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg"}
-	cache := map[string]string{}
-	exists := func(p string) bool {
-		st, err := os.Stat(p)
-		return err == nil && !st.IsDir()
-	}
-	return func(rel string) (image.Image, error) {
-		rel = strings.TrimSpace(rel)
-		if rel == "" {
-			return nil, fmt.Errorf("空素材名")
-		}
-		if p, ok := cache[rel]; ok {
-			if p == "" {
-				return nil, fmt.Errorf("素材未找到: %s", rel)
-			}
-			return readImageFile(p)
-		}
-		slashRel := filepath.FromSlash(rel)
-		base := filepath.Base(slashRel)
-		stem := strings.TrimSuffix(base, filepath.Ext(base))
-		cands := []string{filepath.Join(root, slashRel)}
-		for _, d := range dirs {
-			for _, ext := range exts {
-				if d == "" && ext == "" {
-					continue
-				}
-				cands = append(cands, filepath.Join(root, filepath.FromSlash(d), stem+ext))
-			}
-		}
-		for _, c := range cands {
-			if exists(c) {
-				cache[rel] = c
-				return readImageFile(c)
-			}
-		}
-		cache[rel] = ""
-		return nil, fmt.Errorf("素材未找到: %s", rel)
-	}
-}
-
-// readImageFile 读文件并按需解码（PNG / TLG5 / 明文或掩码 JPEG）。
-func readImageFile(path string) (image.Image, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return replay.DecodeImage(data)
+	return player.Loader(replay.GameLoader(root))
 }
 
 // parseTimes 解析 --at 的毫秒列表（逗号或空格分隔）。

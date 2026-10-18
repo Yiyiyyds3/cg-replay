@@ -92,8 +92,16 @@ func (b *irBuilder) buildShow(seq []SeqItem) []ir.ShowOp {
 				continue
 			}
 			kind := ir.ShowLayerShow
+			attr := copyAttrs(attrs)
 			if !visibleTrue(attrs["visible"]) {
-				kind = ir.ShowLayerHide
+				// base/背景层的 visible 在 KAG 里无意义（始终绘制）：本作 CG 鉴赏正是
+				// `[image layer=base storage=… page=back visible=false]` + [trans][wt]，
+				// 若照字面隐藏，画廊与 CG 回放会整屏全黑。故对背景层忽略 visible=false。
+				if isBgLayer(c) {
+					attr["visible"] = "true"
+				} else {
+					kind = ir.ShowLayerHide
+				}
 			}
 			page := normPage(attrs["page"])
 			if page == "" && tag == "img" {
@@ -102,7 +110,7 @@ func (b *irBuilder) buildShow(seq []SeqItem) []ir.ShowOp {
 				page = "fore"
 			}
 			add(ir.ShowOp{Kind: kind, Layer: showLayer(c, tag),
-				Page: page, Ref: ref, Attr: copyAttrs(attrs)})
+				Page: page, Ref: ref, Attr: attr})
 
 		// ③ 层几何/透明度（[position layer=message5 …]）
 		case tag == "position":
@@ -242,6 +250,29 @@ func visibleTrue(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "false", "0", "no", "off":
 		return false
+	}
+	return true
+}
+
+// isBgLayer 目标层是否为「背景层」（base/stage/back/background，或 layer=0）。
+// KAG 里背景层始终绘制，其 visible 属性无意义——本作 CG 鉴赏正是靠
+// `[image layer=base storage=… page=back visible=false]` 把 CG 直接铺在背景层上。
+func isBgLayer(c *Command) bool {
+	if c == nil {
+		return false
+	}
+	v := strings.ToLower(strings.TrimSpace(c.Attrs["layer"]))
+	switch v {
+	case "base", "stage", "back", "background":
+		return true
+	}
+	if v == "" {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if v[i] != '0' {
+			return false
+		}
 	}
 	return true
 }

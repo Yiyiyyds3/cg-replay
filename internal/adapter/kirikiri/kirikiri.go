@@ -401,9 +401,19 @@ type Ast struct {
 	Texts    []string  `json:"texts,omitempty"`
 	// Seq 保序的 命令/文本 交替流（IR 时间轴的依据）
 	Seq []SeqItem `json:"-"`
+	// Labels 脚本标签（`*cg01` / `*hajime`）及其在 Seq 中的位置。
+	// 标签行本身不进 Seq（它既不是命令也不是台词），但要靠它把整脚本
+	// 切成「标签段」——原作的 CG 鉴赏 / 场景切换就是以标签为单位。
+	Labels []Label `json:"labels,omitempty"`
 	// DynamicVoice 检测到动态语音引用（voice= 属性 / voiceBase 变量拼名）。
 	// 此时静态解析不到语音文件 → 调用方应按"宁多勿缺"保留全部语音。
 	DynamicVoice bool `json:"-"`
+}
+
+// Label 脚本标签及其在 Seq 中的插入位置（SeqPos = 该标签之后第一项的序号）。
+type Label struct {
+	Name   string `json:"name"`    // 去掉 `*` 与 `|` 的标签名，如 "cg01"
+	SeqPos int    `json:"seq_pos"` // 该标签在 ast.Seq 中的下标
 }
 
 // detectDynamicVoice 检查命令是否使用动态语音引用。
@@ -441,6 +451,10 @@ func (ast *Ast) emitLine(line string) {
 		return
 	}
 	rest := s
+	// 行首标签 `*name`（含 `*name|`）：记录位置，本身不入 Seq
+	if m := labelRe.FindStringSubmatch(strings.TrimLeft(s, " \t")); m != nil {
+		ast.Labels = append(ast.Labels, Label{Name: m[1], SeqPos: len(ast.Seq)})
+	}
 	// 行首 @宏 调用（忽略前导空白）
 	if m := atCallRe.FindStringSubmatch(strings.TrimLeft(s, " \t")); m != nil {
 		lead := len(s) - len(strings.TrimLeft(s, " \t"))
@@ -488,6 +502,9 @@ var atCallRe = regexp.MustCompile(`^@([A-Za-z_][A-Za-z0-9_]*)\s*(.*)$`)
 var tagStartRe = regexp.MustCompile(`[@\[]([A-Za-z])`)
 var kagHintRe = regexp.MustCompile(`\[(macro|endmacro|name|text|storage|eval|end\b|if|else|elsif|endif|jump|return|call|wait|ws|bg|cg|chara|playbgm|stopbgm|vo|movie|trans|sel|graph|position|layer|clearlayers|history|sysmovie|linemode|init)`)
 var numericRe = regexp.MustCompile(`^[0-9]+$`)
+
+// labelRe 匹配行首标签：`*cg01` / `*hajime|` / `*sora`（名字里不含空白、[]、*、|）
+var labelRe = regexp.MustCompile(`^\*([^\s\[\]*|]+)`)
 
 // DecodeScript 编码探测（对应 ks_refs.decode_ks）：
 //  1. UTF-16LE BOM
