@@ -412,8 +412,9 @@ type Ast struct {
 
 // Label 脚本标签及其在 Seq 中的插入位置（SeqPos = 该标签之后第一项的序号）。
 type Label struct {
-	Name   string `json:"name"`    // 去掉 `*` 与 `|` 的标签名，如 "cg01"
-	SeqPos int    `json:"seq_pos"` // 该标签在 ast.Seq 中的下标
+	Name   string `json:"name"`            // 去掉 `*` 与 `|` 的标签名，如 "cg01"
+	Title  string `json:"title,omitempty"` // `|` 之后的显示名（`*label93|水畔` → "水畔"）
+	SeqPos int    `json:"seq_pos"`         // 该标签在 ast.Seq 中的下标
 }
 
 // detectDynamicVoice 检查命令是否使用动态语音引用。
@@ -453,7 +454,7 @@ func (ast *Ast) emitLine(line string) {
 	rest := s
 	// 行首标签 `*name`（含 `*name|`）：记录位置，本身不入 Seq
 	if m := labelRe.FindStringSubmatch(strings.TrimLeft(s, " \t")); m != nil {
-		ast.Labels = append(ast.Labels, Label{Name: m[1], SeqPos: len(ast.Seq)})
+		ast.Labels = append(ast.Labels, Label{Name: m[1], Title: labelTitle(s), SeqPos: len(ast.Seq)})
 	}
 	// 行首 @宏 调用（忽略前导空白）
 	if m := atCallRe.FindStringSubmatch(strings.TrimLeft(s, " \t")); m != nil {
@@ -505,6 +506,18 @@ var numericRe = regexp.MustCompile(`^[0-9]+$`)
 
 // labelRe 匹配行首标签：`*cg01` / `*hajime|` / `*sora`（名字里不含空白、[]、*、|）
 var labelRe = regexp.MustCompile(`^\*([^\s\[\]*|]+)`)
+
+// labelTitleRe 取 `|` 之后的显示名：`*label93|水畔` → "水畔"。
+var labelTitleRe = regexp.MustCompile(`^\*[^\s\[\]*|]+\|(.*)$`)
+
+// labelTitle 返回标签行 `|` 之后的显示名（没有则空串）。
+func labelTitle(line string) string {
+	m := labelTitleRe.FindStringSubmatch(strings.TrimLeft(line, " \t"))
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(m[1])
+}
 
 // DecodeScript 编码探测（对应 ks_refs.decode_ks）：
 //  1. UTF-16LE BOM

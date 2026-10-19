@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -123,6 +124,135 @@ func BuildShowSegment(scriptPath, label string) (*ir.Event, error) {
 		return nil, err
 	}
 	return BuildShowFromAst(ast, label, scriptPath)
+}
+
+// Chapter 一个「演出段落」= 原作自己的章节标记 `*labelNN|显示名` 到同文件下一个章节标记。
+//
+// 与 Section 的区别（这是长场景切段的关键）：
+//   - Section 到「下一个任意标签」就截断，而章节标记之间常夹着普通标签
+//     （重返蓝鲸岛实测 150 处），那样会把一章切碎；
+//   - 章节标记会重号（分支路线同号异名，实测 9 处），所以按出现序号寻址，
+//     不能按名字找。
+type Chapter struct {
+	Index int    `json:"index"` // `label94` → 94
+	Name  string `json:"name"`  // 标签名，如 label94
+	Title string `json:"title"` // `|` 之后的显示名，如「余话-聚餐」
+	// SeqStart/SeqEnd 是 ast.Seq 的下标区间 [start, end)
+	SeqStart int `json:"seq_start"`
+	SeqEnd   int `json:"seq_end"`
+	// LabelPos 是该章节标记在 ast.Labels 中的下标（区分重号用）
+	LabelPos int `json:"label_pos"`
+}
+
+// chapterRe 章节标记的标签名形式：`label93`。
+var chapterRe = regexp.MustCompile(`^label(\d+)$`)
+
+// Chapters 返回脚本内的演出段落（按出现顺序）。只认带 `|显示名` 的 `labelNN`。
+func Chapters(ast *Ast) []Chapter {
+	if ast == nil {
+		return nil
+	}
+	var marks []int // ast.Labels 的下标
+	for i, lb := range ast.Labels {
+		if lb.Title == "" {
+			continue
+		}
+		if !chapterRe.MatchString(lb.Name) {
+			continue
+		}
+		marks = append(marks, i)
+	}
+	out := make([]Chapter, 0, len(marks))
+	for k, li := range marks {
+		lb := ast.Labels[li]
+		start := lb.SeqPos
+		if start < 0 {
+			start = 0
+		}
+		if start > len(ast.Seq) {
+			start = len(ast.Seq)
+		}
+		// 到「下一个章节标记」为止，而不是下一个任意标签
+		end := len(ast.Seq)
+		if k+1 < len(marks) {
+			end = ast.Labels[marks[k+1]].SeqPos
+		}
+		if end < start {
+			end = start
+		}
+		n, _ := strconv.Atoi(chapterRe.FindStringSubmatch(lb.Name)[1])
+		out = append(out, Chapter{
+			Index:    n,
+			Name:     lb.Name,
+			Title:    lb.Title,
+			SeqStart: start,
+			SeqEnd:   end,
+			LabelPos: li,
+		})
+	}
+	return out
+}
+
+// SegmentRange 取 ast.Seq 的 [start,end) 区间（章节切段用）。
+func SegmentRange(ast *Ast, start, end int) []SeqItem {
+	if ast == nil {
+		return nil
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(ast.Seq) {
+		end = len(ast.Seq)
+	}
+	if start > len(ast.Seq) {
+		start = len(ast.Seq)
+	}
+	if end < start {
+		end = start
+	}
+	return ast.Seq[start:end]
+}
+
+// BuildShowChapter 把一个演出段落变成事件（长场景不再是一整块）。
+// id/title 由调用方给（同一文件内章节会重号，id 里带上出现序号才能唯一）。
+func BuildShowChapter(ast *Ast, ch Chapter, scriptPath, id, title string) (*ir.Event, error) {
+	if ast == nil {
+		return nil, fmt.Errorf("脚本 %s 未解析", filepath.Base(scriptPath))
+	}
+	seg := SegmentRange(ast, ch.SeqStart, ch.SeqEnd)
+	if len(seg) == 0 {
+		return nil, fmt.Errorf("脚本 %s 的章节 %s 是空的", filepath.Base(scriptPath), ch.Title)
+	}
+	if id == "" {
+		id = fmt.Sprintf("%s_%s", strings.TrimSuffix(filepath.Base(scriptPath), filepath.Ext(scriptPath)), ch.Name)
+	}
+	if title == "" {
+		title = ch.Title
+	}
+	b := &irBuilder{}
+	return &ir.Event{
+		EventID: id,
+		Kind:    ir.KindScene,
+		Title:   title,
+		Show:    b.buildShow(seg),
+	}, nil
+}
+
+// BuildShowChapterFile 读脚本文件并构建某个演出段落（GUI/CLI 的便捷入口）。
+func BuildShowChapterFile(scriptPath string, labelPos int) (*ir.Event, error) {
+	ast, err := ParseScriptFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, ch := range Chapters(ast) {
+		if ch.LabelPos != labelPos {
+			continue
+		}
+		base := strings.TrimSuffix(filepath.Base(scriptPath), filepath.Ext(scriptPath))
+		id := fmt.Sprintf("%s_%d_%s", base, ch.LabelPos, ch.Name)
+		return BuildShowChapter(ast, ch, scriptPath, id, ch.Title)
+	}
+	return nil, fmt.Errorf("脚本 %s 里没有位于 %d 的演出段落", filepath.Base(scriptPath), labelPos)
 }
 
 // SegmentImages 取标签段里 `[image]/[img]` 依次用到的 storage 名（用于 CG 鉴赏表）。

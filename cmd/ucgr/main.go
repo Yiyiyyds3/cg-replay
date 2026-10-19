@@ -220,8 +220,8 @@ func cmdEvents(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("事件库 %s（%s）\n  CG 事件 %d 个 · 场景事件 %d 个\n",
-		lib.Game, lib.Root, len(lib.CGs), len(lib.Scenes))
+	fmt.Printf("事件库 %s（%s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
+		lib.Game, lib.Root, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
 	const showMax = 24
 	for i, c := range lib.CGs {
 		if i >= showMax {
@@ -241,6 +241,14 @@ func cmdEvents(args []string) error {
 			break
 		}
 		fmt.Printf("  场景 %-14s %s\n", s.ID, s.Script)
+	}
+	const chapMax = 16
+	for i, c := range lib.Chapters {
+		if i >= chapMax {
+			fmt.Printf("  …（演出段落其余 %d 个略）\n", len(lib.Chapters)-i)
+			break
+		}
+		fmt.Printf("  段落 #%-3d %-10s %s\n", c.Index, c.Scene, c.Title)
 	}
 	if out != "" {
 		if err := lib.Save(out); err != nil {
@@ -832,6 +840,8 @@ func cmdPlay(args []string) error {
 		irPath, assets, shotDir, atSpec, sizeSpec, fontName, fontFile string
 		scriptPath, label                                             string
 		evSel, charMs                                                 int
+		chapterPos                                                    int
+		hasChapter                                                    bool
 		speed                                                         float64
 		noWait                                                        bool
 		err                                                           error
@@ -869,6 +879,14 @@ func cmdPlay(args []string) error {
 			scriptPath, err = take()
 		case "--label":
 			label, err = take()
+		case "--chapter":
+			var v string
+			if v, err = take(); err == nil {
+				chapterPos, err = strconv.Atoi(v)
+				if err == nil {
+					hasChapter = true
+				}
+			}
 		case "--shot":
 			shotDir, err = take()
 		case "--at":
@@ -892,7 +910,8 @@ func cmdPlay(args []string) error {
 	}
 	if irPath == "" && scriptPath == "" {
 		return fmt.Errorf("用法: ucgr play <ir.json> --assets <素材根> [--event N] [--shot 目录 --at ms,…]\n" +
-			"      或: ucgr play --script <脚本.ks> [--label cg01] [--assets 素材根]")
+			"      或: ucgr play --script <脚本.ks> [--label cg01] [--assets 素材根]\n" +
+			"      或: ucgr play --script <脚本.ks> --chapter <标签下标> [--assets 素材根]")
 	}
 	if assets == "" && scriptPath != "" {
 		assets = gameRootOf(scriptPath)
@@ -907,19 +926,30 @@ func cmdPlay(args []string) error {
 		evLabel string
 	)
 	if scriptPath != "" {
-		// 按原作自己的分割单位播放：脚本的某个标签段（CG 鉴赏的 *cgNN / 整脚本）。
-		e, berr := kirikiri.BuildShowSegment(scriptPath, label)
-		if berr != nil {
-			return berr
+		// 按原作自己的分割单位播放：章节（*labelNN|显示名）、标签段（*cgNN）或整脚本。
+		var (
+			e   *ir.Event
+			err error
+		)
+		if hasChapter {
+			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
+		} else {
+			e, err = kirikiri.BuildShowSegment(scriptPath, label)
+		}
+		if err != nil {
+			return err
 		}
 		if len(e.Show) == 0 {
 			return fmt.Errorf("脚本 %s 的标签段 %q 里没有可演的台本", filepath.Base(scriptPath), label)
 		}
 		ev = e
 		gameID = filepath.Base(gameRootOf(scriptPath))
-		if strings.TrimSpace(label) != "" {
+		switch {
+		case hasChapter:
+			evLabel = fmt.Sprintf("章节 %s（%s）", e.Title, e.EventID)
+		case strings.TrimSpace(label) != "":
 			evLabel = "标签 " + strings.TrimPrefix(label, "*")
-		} else {
+		default:
 			evLabel = "整脚本 " + filepath.Base(scriptPath)
 		}
 	} else {

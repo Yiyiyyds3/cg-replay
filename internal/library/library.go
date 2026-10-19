@@ -37,13 +37,28 @@ type SceneEvent struct {
 	Script string `json:"script"` // 相对 root 的脚本路径
 }
 
+// ChapterEvent 一个「演出段落」= 原作自己的章节标记 `*labelNN|显示名`。
+//
+// 场景脚本动辄一整块自动播放一小时（71kaigan01.ks），按章节切开才能逐段回放。
+// 章节标记会重号（分支路线同号异名），故用 LabelPos（在脚本标签表里的下标）寻址。
+type ChapterEvent struct {
+	ID       string `json:"id"`        // 唯一 id：<场景id>#<labelPos>
+	Index    int    `json:"index"`     // 章节号（label94 → 94）
+	Title    string `json:"title"`     // `|` 之后的显示名
+	Script   string `json:"script"`    // 相对 root 的脚本路径
+	Scene    string `json:"scene"`     // 所属场景 id
+	LabelPos int    `json:"label_pos"` // 章节标记在脚本标签表里的下标
+	Name     string `json:"name"`      // 标签名（label94）
+}
+
 // Library 事件库清单。
 type Library struct {
-	Root        string       `json:"root"`
-	Game        string       `json:"game,omitempty"`
-	GeneratedAt string       `json:"generated_at"`
-	CGs         []CGEvent    `json:"cgs"`
-	Scenes      []SceneEvent `json:"scenes"`
+	Root        string         `json:"root"`
+	Game        string         `json:"game,omitempty"`
+	GeneratedAt string         `json:"generated_at"`
+	CGs         []CGEvent      `json:"cgs"`
+	Scenes      []SceneEvent   `json:"scenes"`
+	Chapters    []ChapterEvent `json:"chapters,omitempty"`
 }
 
 var (
@@ -159,6 +174,26 @@ func Scan(root string) (*Library, error) {
 			Script: rel(filepath.Join(dir, name)),
 		})
 	}
+
+	// ④ 演出段落：场景脚本里原作自己的章节标记（*labelNN|显示名）。
+	// 一个长脚本常有几十个标签但只有十来个章节标记，按章节切才是「演出段落」。
+	for _, s := range lib.Scenes {
+		ast, err := kirikiri.ParseScriptFile(filepath.Join(root, filepath.FromSlash(s.Script)))
+		if err != nil {
+			continue
+		}
+		for _, ch := range kirikiri.Chapters(ast) {
+			lib.Chapters = append(lib.Chapters, ChapterEvent{
+				ID:       fmt.Sprintf("%s#%d", s.ID, ch.LabelPos),
+				Index:    ch.Index,
+				Title:    ch.Title,
+				Script:   s.Script,
+				Scene:    s.ID,
+				LabelPos: ch.LabelPos,
+				Name:     ch.Name,
+			})
+		}
+	}
 	return lib, nil
 }
 
@@ -211,6 +246,23 @@ func (l *Library) FindScene(id string) *SceneEvent {
 	for i := range l.Scenes {
 		if strings.ToLower(l.Scenes[i].ID) == key {
 			return &l.Scenes[i]
+		}
+	}
+	return nil
+}
+
+// FindChapter 按 id（71kaigan01#27 / 或章节标题）找演出段落。
+func (l *Library) FindChapter(id string) *ChapterEvent {
+	key := strings.ToLower(strings.TrimSpace(id))
+	for i := range l.Chapters {
+		if strings.ToLower(l.Chapters[i].ID) == key {
+			return &l.Chapters[i]
+		}
+	}
+	// 退一步：按章节标题精确匹配（用户可能直接输「水畔」）。
+	for i := range l.Chapters {
+		if strings.ToLower(l.Chapters[i].Title) == key {
+			return &l.Chapters[i]
 		}
 	}
 	return nil

@@ -23,6 +23,7 @@ import (
 
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
+	"ucgr/internal/ir"
 	"ucgr/internal/library"
 	"ucgr/internal/platform/win32"
 	"ucgr/internal/player"
@@ -55,10 +56,11 @@ type conf struct {
 	Auto    bool   `json:"auto"`
 }
 
-// entry 列表行 → 事件（CG 或场景二选一）。
+// entry 列表行 → 事件（CG / 场景 / 演出段落 三选一）。
 type entry struct {
-	cg    *library.CGEvent
-	scene *library.SceneEvent
+	cg      *library.CGEvent
+	scene   *library.SceneEvent
+	chapter *library.ChapterEvent
 }
 
 func (e entry) title() string {
@@ -68,6 +70,8 @@ func (e entry) title() string {
 			return fmt.Sprintf("%s（%d 页）", e.cg.Title, n)
 		}
 		return e.cg.Title
+	case e.chapter != nil:
+		return fmt.Sprintf("  #%d %s", e.chapter.Index, e.chapter.Title)
 	case e.scene != nil:
 		return "[场景] " + e.scene.Title
 	}
@@ -225,15 +229,25 @@ func (a *app) fillList() {
 		g.ListAdd(e.title())
 	}
 	for i := range a.lib.Scenes {
-		e := entry{scene: &a.lib.Scenes[i]}
+		s := &a.lib.Scenes[i]
+		e := entry{scene: s}
 		a.entries = append(a.entries, e)
 		g.ListAdd(e.title())
+		// 场景下面挂它的演出段落（原作自己的章节标记），缩进以示从属。
+		for j := range a.lib.Chapters {
+			if a.lib.Chapters[j].Scene != s.ID {
+				continue
+			}
+			ce := entry{chapter: &a.lib.Chapters[j]}
+			a.entries = append(a.entries, ce)
+			g.ListAdd(ce.title())
+		}
 	}
 	if len(a.entries) > 0 {
 		g.ListSetSel(0)
 	}
-	g.SetStatus(fmt.Sprintf("事件库：CG %d 个 · 场景 %d 个 · 素材根 %s",
-		len(a.lib.CGs), len(a.lib.Scenes), a.conf.Root))
+	g.SetStatus(fmt.Sprintf("事件库：CG %d 个 · 场景 %d 个 · 演出段落 %d 个 · 素材根 %s",
+		len(a.lib.CGs), len(a.lib.Scenes), len(a.lib.Chapters), a.conf.Root))
 }
 
 // ---------------------------------------------------------------
@@ -253,9 +267,12 @@ func (a *app) play() {
 	}
 	e := a.entries[i]
 	var script, label string
+	chapterPos := -1
 	switch {
 	case e.cg != nil:
 		script, label = e.cg.Script, e.cg.Label
+	case e.chapter != nil:
+		script, chapterPos = e.chapter.Script, e.chapter.LabelPos
 	case e.scene != nil:
 		script = e.scene.Script
 	}
@@ -264,7 +281,13 @@ func (a *app) play() {
 		return
 	}
 	sp := filepath.Join(root, filepath.FromSlash(script))
-	ev, err := kirikiri.BuildShowSegment(sp, label)
+	var ev *ir.Event
+	var err error
+	if chapterPos >= 0 {
+		ev, err = kirikiri.BuildShowChapterFile(sp, chapterPos)
+	} else {
+		ev, err = kirikiri.BuildShowSegment(sp, label)
+	}
 	if err != nil {
 		a.g.SetStatus("构建台本失败：" + err.Error())
 		return
@@ -542,22 +565,40 @@ func (a *app) selftest(id string) int {
 		fmt.Println("自检失败：", err)
 		return 2
 	}
-	fmt.Printf("事件库：CG %d · 场景 %d\n", len(lib.CGs), len(lib.Scenes))
-	var cg *library.CGEvent
-	if id != "" {
-		cg = lib.FindCG(id)
-	} else if len(lib.CGs) > 0 {
-		cg = &lib.CGs[0]
-	}
-	if cg == nil {
-		fmt.Println("自检失败：找不到 CG 事件")
-		return 2
-	}
-	sp := filepath.Join(root, filepath.FromSlash(cg.Script))
-	ev, err := kirikiri.BuildShowSegment(sp, cg.Label)
-	if err != nil {
-		fmt.Println("自检失败：", err)
-		return 2
+	fmt.Printf("事件库：CG %d · 场景 %d · 演出段落 %d\n", len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
+
+	// 自检对象可以是 CG、演出段落，或（id 为空时）第一个 CG。
+	var (
+		ev    *ir.Event
+		desc  string
+		extra string
+	)
+	if ch := lib.FindChapter(id); ch != nil {
+		sp := filepath.Join(root, filepath.FromSlash(ch.Script))
+		e, berr := kirikiri.BuildShowChapterFile(sp, ch.LabelPos)
+		if berr != nil {
+			fmt.Println("自检失败：", berr)
+			return 2
+		}
+		ev, desc, extra = e, fmt.Sprintf("章节 #%d %s", ch.Index, ch.Title), ch.ID
+	} else {
+		var cg *library.CGEvent
+		if id != "" {
+			cg = lib.FindCG(id)
+		} else if len(lib.CGs) > 0 {
+			cg = &lib.CGs[0]
+		}
+		if cg == nil {
+			fmt.Println("自检失败：找不到 CG 事件或演出段落")
+			return 2
+		}
+		sp := filepath.Join(root, filepath.FromSlash(cg.Script))
+		e, berr := kirikiri.BuildShowSegment(sp, cg.Label)
+		if berr != nil {
+			fmt.Println("自检失败：", berr)
+			return 2
+		}
+		ev, desc, extra = e, cg.Title, fmt.Sprintf("页 %v", cg.Pages)
 	}
 	p := player.New(ev, player.DefaultOptions())
 	load := player.Cached(player.Loader(replay.GameLoader(root)))
@@ -582,7 +623,7 @@ func (a *app) selftest(id string) int {
 		fmt.Println("自检失败：", err)
 		return 2
 	}
-	fmt.Printf("自检 OK：%s · 台本 %d 条 · 页 %v → %s\n", cg.Title, len(ev.Show), cg.Pages, out)
+	fmt.Printf("自检 OK：%s · 台本 %d 条 · %s → %s\n", desc, len(ev.Show), extra, out)
 	return 0
 }
 
