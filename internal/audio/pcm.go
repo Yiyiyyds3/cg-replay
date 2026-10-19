@@ -1,6 +1,6 @@
-// Package audio 提供 KAG 演出所需的音频能力：解码（Windows 走 Media Foundation）
-// 与播放（Windows 走 winmm waveOut）。本文件不含构建标签，PCM 结构在任意平台可用，
-// 便于纯逻辑单测。
+// Package audio 提供 KAG 演出所需的音频能力：解码（WAV/MP3 在 Windows 走
+// Media Foundation，Ogg Vorbis 走纯 Go）与播放（Windows 走 winmm waveOut）。
+// 本文件不含构建标签，PCM 结构在任意平台可用，便于纯逻辑单测。
 package audio
 
 import "fmt"

@@ -8,9 +8,12 @@ import (
 	"ucgr/internal/ir"
 )
 
-// DecodeFile 在非 Windows 平台不可用。
-func DecodeFile(string) (*PCM, error) {
-	return nil, errors.New("audio: 仅支持 Windows（Media Foundation / waveOut）")
+// DecodeFile 在非 Windows 平台只支持 Ogg Vorbis（纯 Go）。
+func DecodeFile(path string) (*PCM, error) {
+	if isOgg(path) {
+		return decodeOgg(path)
+	}
+	return nil, errors.New("audio: 非 Windows 平台仅支持 Ogg Vorbis")
 }
 
 // System 在非 Windows 平台是空实现，保持与 Windows 侧相同的 API。

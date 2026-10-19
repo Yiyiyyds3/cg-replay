@@ -73,9 +73,14 @@ func toFileURL(path string) string {
 	return string(out)
 }
 
-// DecodeFile 用 Media Foundation Source Reader 把音频文件解码为线性 PCM。
-// OGG/Vorbis 依赖系统解码器（本机由 Microsoft.WebMediaExtensions 提供）。
+// DecodeFile 把音频文件解码为线性 PCM。
+// WAV/MP3 走 Media Foundation Source Reader；Ogg Vorbis 走纯 Go 解码器
+// （普通 win32 进程里 MF 没有 Vorbis MFT）。
 func DecodeFile(path string) (*PCM, error) {
+	// Ogg Vorbis 走纯 Go 解码器（MF 在普通 win32 进程里没有 Vorbis MFT）。
+	if isOgg(path) {
+		return decodeOgg(path)
+	}
 	if err := ensureMF(); err != nil {
 		return nil, err
 	}
