@@ -41,6 +41,7 @@ import (
 	"ucgr/internal/scan"
 
 	// 空白导入触发各适配器 init() 注册（新增引擎在此加一行）
+	_ "ucgr/internal/adapter/artemis"
 	_ "ucgr/internal/adapter/catsystem2"
 )
 
