@@ -10,9 +10,17 @@ import (
 
 // GUIHooks GUI 回调（都在消息循环所在线程里执行）。
 type GUIHooks struct {
-	OnCommand func(id, notify int)       // 子控件通知（按钮点击 / 列表双击）
+	OnCommand func(id, notify int)       // 子控件通知（按钮点击 / 列表双击 / 编辑框 EN_CHANGE）
 	OnTick    func(dtMs int64, in Input) // 每帧
 	OnKey     func(key int) bool         // 主窗口按键（返回 true 表示已处理）
+
+	// OnDrawItem 自绘列表行（LBS_OWNERDRAWFIXED）。hdc 是列表控件 DC，
+	// x/y/w/h 是行矩形（控件坐标）；selected 为该项是否选中。
+	OnDrawItem func(itemID int, hdc uintptr, selected bool, x, y, w, h int)
+	// OnSearchEnter 搜索框里按回车。
+	OnSearchEnter func()
+	// OnSearchNav 搜索框里按上/下方向键（down=true 表示向下）。
+	OnSearchNav func(down bool)
 }
 
 // 子控件通知码。
@@ -26,6 +34,7 @@ const (
 	classListBox = "LISTBOX"
 	classButton  = "BUTTON"
 	classStatic  = "STATIC"
+	classEdit    = "EDIT"
 )
 
 // 控件样式。
@@ -37,17 +46,25 @@ const (
 	wsTabStop      = 0x00010000
 	wsExClientEdge = 0x00000200
 	lbsNotify      = 0x00000001
+	lbsOwnerDraw   = 0x00000010 // LBS_OWNERDRAWFIXED
+	lbsHasStrings  = 0x00000040 // LBS_HASSTRINGS
+	esAutoHScroll  = 0x00000080 // ES_AUTOHSCROLL
 )
 
 // 消息与控件消息。
 const (
 	wmCommand           = 0x0111
 	wmSetFont           = 0x0030
+	wmDrawItem          = 0x002B
+	wmMeasureItem       = 0x002C
 	lbAddString         = 0x0180
 	lbResetContent      = 0x0184
 	lbSetCurSel         = 0x0186
 	lbGetCurSel         = 0x0188
 	lbGetCount          = 0x018B
+	lbSetTopIndex       = 0x0197
+	odtListBox          = 3 // ODT_LISTBOX
+	odsSelected         = 0x0001
 	defaultGUIFont      = 17         // GetStockObject(DEFAULT_GUI_FONT)
 	blackBrush          = 4          // GetStockObject(BLACK_BRUSH)
 	wsOverlappedNoThick = 0x00CB0000 // WS_OVERLAPPEDWINDOW 去掉 WS_THICKFRAME（固定大小）
@@ -64,21 +81,69 @@ var (
 	procInvalidateRect = user32.NewProc("InvalidateRect")
 	procGetStockObject = syscall.NewLazyDLL("gdi32.dll").NewProc("GetStockObject")
 
+	procGetWindowTextW       = user32.NewProc("GetWindowTextW")
+	procGetWindowTextLengthW = user32.NewProc("GetWindowTextLengthW")
+	procSetWindowLongPtrW    = user32.NewProc("SetWindowLongPtrW")
+	procCallWindowProcW      = user32.NewProc("CallWindowProcW")
+
 	shell32            = syscall.NewLazyDLL("shell32.dll")
 	procBrowseFolder   = shell32.NewProc("SHBrowseForFolderW")
 	procPathFromIDList = shell32.NewProc("SHGetPathFromIDListW")
 	procCoInitialize   = syscall.NewLazyDLL("ole32.dll").NewProc("CoInitialize")
 )
 
+// gwlWndProc = GWLP_WNDPROC(-4)，以无符号形式传给 SetWindowLongPtrW。
+var gwlWndProc = ^uintptr(3)
+
+// 编辑框子类化用：原窗口过程与回调。
+var (
+	editOldProc     uintptr
+	editSubclassRef = syscall.NewCallback(editSubclass)
+)
+
 // App 一个带子控件的窗口（画布 + 列表 + 按钮 + 状态栏）。
 type App struct {
-	hwnd     uintptr
-	canvas   *Canvas
-	hooks    GUIHooks
-	controls map[int]uintptr
-	play     uintptr
-	gameW    int
-	gameH    int
+	hwnd      uintptr
+	canvas    *Canvas
+	hooks     GUIHooks
+	controls  map[int]uintptr
+	play      uintptr
+	gameW     int
+	gameH     int
+	listItemH int // 自绘列表的行高（WM_MEASUREITEM 用）
+}
+
+// drawItemStruct 对应 Win32 DRAWITEMSTRUCT（64 位布局）。
+type drawItemStruct struct {
+	ctlType    uint32
+	ctlID      uint32
+	itemID     uint32
+	itemAction uint32
+	itemState  uint32
+	_          uint32 // 对齐填充（64 位下 uintptr 需要 8 字节对齐）
+	hwndItem   uintptr
+	hDC        uintptr
+	rcItem     rect
+	itemData   uintptr
+}
+
+// measureItemStruct 对应 Win32 MEASUREITEMSTRUCT（64 位布局）。
+type measureItemStruct struct {
+	ctlType    uint32
+	ctlID      uint32
+	itemID     uint32
+	itemWidth  uint32
+	itemHeight uint32
+	_          uint32 // 对齐填充
+	itemData   uintptr
+}
+
+// ptrFromLParam 把窗口消息的 lparam 转成 typed 指针。
+//
+// 本进程里 lparam 就是有效地址；直接写 (*T)(unsafe.Pointer(lparam)) 会被
+// go vet 的 unsafeptr 检查判为误用，这里用等价的 unsafe.Add 表达以保持 vet 干净。
+func ptrFromLParam[T any](lparam uintptr) *T {
+	return (*T)(unsafe.Add(unsafe.Pointer(nil), lparam))
 }
 
 var (
@@ -193,6 +258,48 @@ func (a *App) addControl(id int, class, text string, style uint32, x, y, w, h in
 func (a *App) AddList(id, x, y, w, h int) error {
 	return a.addControl(id, classListBox, "", wsChild|wsVisible|wsVScroll|wsBorder|wsTabStop|lbsNotify, x, y, w, h)
 }
+
+// AddOwnerDrawList 建自绘列表（行高固定 itemH 像素，行内容由 hooks.OnDrawItem 画）。
+func (a *App) AddOwnerDrawList(id, x, y, w, h, itemH int) error {
+	a.listItemH = itemH // 建窗口时列表就会发 WM_MEASUREITEM，必须先赋值
+	return a.addControl(id, classListBox, "",
+		wsChild|wsVisible|wsVScroll|wsBorder|wsTabStop|lbsNotify|lbsOwnerDraw|lbsHasStrings, x, y, w, h)
+}
+
+// AddEdit 建单行编辑框（搜索框用）。
+func (a *App) AddEdit(id int, text string, x, y, w, h int) error {
+	return a.addControl(id, classEdit, text, wsChild|wsVisible|wsTabStop|wsBorder|esAutoHScroll, x, y, w, h)
+}
+
+// EditText 读编辑框当前文本。
+func (a *App) EditText(id int) string {
+	h := a.control(id)
+	if h == 0 {
+		return ""
+	}
+	n, _, _ := procGetWindowTextLengthW.Call(h)
+	if n == 0 {
+		return ""
+	}
+	buf := make([]uint16, int(n)+1)
+	procGetWindowTextW.Call(h, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	return syscall.UTF16ToString(buf)
+}
+
+// SubclassEdit 给编辑框装一个子类过程，接管回车 / 上下方向键 / Esc。
+func (a *App) SubclassEdit(id int) {
+	h := a.control(id)
+	if h == 0 {
+		return
+	}
+	old, _, _ := procSetWindowLongPtrW.Call(h, gwlWndProc, editSubclassRef)
+	if old != 0 {
+		editOldProc = old
+	}
+}
+
+// ListTop 把第 i 项滚到列表顶端（键盘导航时用）。
+func (a *App) ListTop(i int) { a.listMsg(lbSetTopIndex, uintptr(i), 0) }
 
 // AddButton 建按钮。
 func (a *App) AddButton(id int, text string, x, y, w, h int) error {
@@ -367,6 +474,24 @@ func guiWndProc(hwnd uintptr, m uint32, wparam, lparam uintptr) uintptr {
 			guiApp.hooks.OnCommand(int(wparam&0xFFFF), int((wparam>>16)&0xFFFF))
 		}
 		return 0
+	case wmMeasureItem:
+		if guiApp != nil && guiApp.listItemH > 0 {
+			mi := ptrFromLParam[measureItemStruct](lparam)
+			if mi.ctlType == odtListBox {
+				mi.itemHeight = uint32(guiApp.listItemH)
+			}
+		}
+		return 1
+	case wmDrawItem:
+		if guiApp != nil && guiApp.hooks.OnDrawItem != nil {
+			di := ptrFromLParam[drawItemStruct](lparam)
+			if di.ctlType == odtListBox && di.itemID != ^uint32(0) {
+				guiApp.hooks.OnDrawItem(int(di.itemID), di.hDC, di.itemState&odsSelected != 0,
+					int(di.rcItem.left), int(di.rcItem.top),
+					int(di.rcItem.right-di.rcItem.left), int(di.rcItem.bottom-di.rcItem.top))
+			}
+		}
+		return 1
 	case wmKeyDown, wmSysKeyDown:
 		key := int(wparam & 0xFF)
 		switch key {
@@ -465,4 +590,34 @@ func (a *App) BrowseFolder(title string) (string, error) {
 		return "", nil
 	}
 	return syscall.UTF16ToString(out), nil
+}
+
+// ---------------------------------------------------------------
+// 搜索框子类过程
+// ---------------------------------------------------------------
+
+// editSubclass 接管搜索框的回车 / 上下方向键 / Esc，其余交给原窗口过程。
+func editSubclass(hwnd uintptr, m uint32, wparam, lparam uintptr) uintptr {
+	switch m {
+	case wmKeyDown, wmSysKeyDown:
+		switch int(wparam & 0xFF) {
+		case 0x0D: // 回车：播放当前选中项
+			if guiApp != nil && guiApp.hooks.OnSearchEnter != nil {
+				guiApp.hooks.OnSearchEnter()
+				return 0
+			}
+		case 0x1B: // Esc：焦点还给主窗口（再按一次退出）
+			if guiApp != nil {
+				procSetFocus.Call(guiApp.hwnd)
+				return 0
+			}
+		case 0x28, 0x26: // 下 / 上：移动列表选择，不失焦搜索框
+			if guiApp != nil && guiApp.hooks.OnSearchNav != nil {
+				guiApp.hooks.OnSearchNav(wparam&0xFF == 0x28)
+				return 0
+			}
+		}
+	}
+	r, _, _ := procCallWindowProcW.Call(editOldProc, hwnd, uintptr(m), wparam, lparam)
+	return r
 }

@@ -15,9 +15,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image"
+	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,13 +43,23 @@ const (
 	idNext   = 1008
 	idAuto   = 1009
 	idShot   = 1010
+	idSearch = 1011
+	idHint   = 1012
 )
 
-// 窗口与画布尺寸。
+// 编辑框通知码（WM_COMMAND 的高位字）。
+const (
+	enChange        = 0x0300 // EN_CHANGE
+	idEnterFallback = 1      // 单行编辑框回车：有些系统按 IDOK(1) 上报
+)
+
+// 窗口与画布尺寸；列表行高与行内缩略图边长。
 const (
 	clientW, clientH = 1520, 960
 	gameW, gameH     = 1600, 1200
 	autoWaitMs       = 2500
+	listRowH         = 44
+	listThumb        = 40
 )
 
 // conf 记忆上次的选择（存 exe 同目录），双击启动就能直接进。
@@ -83,16 +96,21 @@ type app struct {
 	conf     conf
 	confPath string
 	lib      *library.Library
-	entries  []entry
+	all      []entry // 全部事件（未过滤）
+	entries  []entry // 当前列表显示（已过滤）
 
-	p      *player.Player
-	load   player.Loader
-	td     *win32.TextDrawer
-	auto   bool
-	lastAd time.Time
-	title  string
-	done   bool
-	shotN  int
+	p        *player.Player
+	load     player.Loader
+	loadRoot string
+	td       *win32.TextDrawer
+	listTD   *win32.TextDrawer
+	thumbs   map[string]*win32.Canvas
+	filter   string
+	auto     bool
+	lastAd   time.Time
+	title    string
+	done     bool
+	shotN    int
 
 	audio     *audio.System
 	audioRoot string
@@ -121,9 +139,12 @@ func main() {
 	}
 
 	g, err := win32.NewApp("CG 演出回放器 — 重返蓝鲸岛", clientW, clientH, gameW, gameH, win32.GUIHooks{
-		OnCommand: a.onCommand,
-		OnTick:    a.onTick,
-		OnKey:     a.onKey,
+		OnCommand:     a.onCommand,
+		OnTick:        a.onTick,
+		OnKey:         a.onKey,
+		OnDrawItem:    a.drawItem,
+		OnSearchEnter: a.play,
+		OnSearchNav:   a.searchNav,
 	})
 	if err != nil {
 		fatal(err)
@@ -149,9 +170,17 @@ func main() {
 
 func (a *app) buildUI() error {
 	g := a.g
-	if err := g.AddList(win32.IDList, 8, 8, 430, 880); err != nil {
+	if err := g.AddEdit(idSearch, "", 8, 8, 300, 24); err != nil {
 		return err
 	}
+	if err := g.AddStatic(idHint, "输入名字过滤（回车播放，↑/↓ 选择）", 316, 12, 240, 18); err != nil {
+		return err
+	}
+	if err := g.AddOwnerDrawList(win32.IDList, 8, 40, 430, 848, listRowH); err != nil {
+		return err
+	}
+	g.SubclassEdit(idSearch)
+	a.listTD = win32.NewTextDrawer(win32.ListTextStyle("SimSun", 15))
 	if err := g.AddPlayArea(446, 8, 1066, 880); err != nil {
 		return err
 	}
@@ -197,6 +226,7 @@ func (a *app) reload(force bool) {
 			if lib.Root != "" {
 				a.conf.Root = lib.Root
 			}
+			a.ensureLoader(a.conf.Root)
 			a.fillList()
 			return
 		}
@@ -216,38 +246,92 @@ func (a *app) reload(force bool) {
 		a.conf.Library = lp
 	}
 	a.saveConf()
+	a.ensureLoader(root)
 	a.fillList()
 }
 
+// ensureLoader 按素材根准备/重建素材加载器（列表缩略图与回放共用）。
+func (a *app) ensureLoader(root string) {
+	if root == "" || (a.load != nil && a.loadRoot == root) {
+		return
+	}
+	for _, cv := range a.thumbs {
+		if cv != nil {
+			cv.Free()
+		}
+	}
+	a.thumbs = map[string]*win32.Canvas{}
+	a.load = player.Cached(player.Loader(replay.GameLoader(root)))
+	a.loadRoot = root
+}
+
 func (a *app) fillList() {
-	g := a.g
-	g.ListClear()
-	a.entries = a.entries[:0]
+	a.all = a.all[:0]
 	for i := range a.lib.CGs {
-		e := entry{cg: &a.lib.CGs[i]}
-		a.entries = append(a.entries, e)
-		g.ListAdd(e.title())
+		a.all = append(a.all, entry{cg: &a.lib.CGs[i]})
 	}
 	for i := range a.lib.Scenes {
 		s := &a.lib.Scenes[i]
-		e := entry{scene: s}
-		a.entries = append(a.entries, e)
-		g.ListAdd(e.title())
+		a.all = append(a.all, entry{scene: s})
 		// 场景下面挂它的演出段落（原作自己的章节标记），缩进以示从属。
 		for j := range a.lib.Chapters {
-			if a.lib.Chapters[j].Scene != s.ID {
-				continue
+			if a.lib.Chapters[j].Scene == s.ID {
+				a.all = append(a.all, entry{chapter: &a.lib.Chapters[j]})
 			}
-			ce := entry{chapter: &a.lib.Chapters[j]}
-			a.entries = append(a.entries, ce)
-			g.ListAdd(ce.title())
 		}
+	}
+	a.applyFilter()
+}
+
+// applyFilter 按搜索框内容重建列表（空查询 = 全部）。
+func (a *app) applyFilter() {
+	g := a.g
+	g.ListClear()
+	a.entries = a.entries[:0]
+	q := strings.ToLower(strings.TrimSpace(a.filter))
+	for _, e := range a.all {
+		if q != "" && !entryMatches(e, q) {
+			continue
+		}
+		a.entries = append(a.entries, e)
+		g.ListAdd(e.title())
 	}
 	if len(a.entries) > 0 {
 		g.ListSetSel(0)
 	}
-	g.SetStatus(fmt.Sprintf("事件库：CG %d 个 · 场景 %d 个 · 演出段落 %d 个 · 素材根 %s",
-		len(a.lib.CGs), len(a.lib.Scenes), len(a.lib.Chapters), a.conf.Root))
+	a.g.SetStatus(fmt.Sprintf("事件库：CG %d 个 · 场景 %d 个 · 演出段落 %d 个 · 列表 %d 项%s · 素材根 %s",
+		len(a.lib.CGs), len(a.lib.Scenes), len(a.lib.Chapters), len(a.entries),
+		filterNote(q), a.conf.Root))
+}
+
+func filterNote(q string) string {
+	if q == "" {
+		return ""
+	}
+	return fmt.Sprintf("（过滤「%s」）", q)
+}
+
+// entryMatches 判断事件是否命中查询串（大小写不敏感；CG 还认 17 / cg17 等写法）。
+func entryMatches(e entry, q string) bool {
+	var fields []string
+	switch {
+	case e.cg != nil:
+		fields = append(fields, e.cg.ID, e.cg.Label, e.cg.Title)
+		fields = append(fields, e.cg.Pages...)
+		if n, err := strconv.Atoi(strings.TrimPrefix(strings.TrimPrefix(q, "cg"), "0")); err == nil && n == e.cg.Index {
+			return true
+		}
+	case e.chapter != nil:
+		fields = append(fields, e.chapter.Title, e.chapter.Name, e.chapter.ID, e.chapter.Scene)
+	case e.scene != nil:
+		fields = append(fields, e.scene.ID, e.scene.Title)
+	}
+	for _, f := range fields {
+		if f != "" && strings.Contains(strings.ToLower(f), q) {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------
@@ -304,7 +388,7 @@ func (a *app) play() {
 	if a.audio != nil {
 		a.p.Audio = a.audio.Handle
 	}
-	a.load = player.Cached(player.Loader(replay.GameLoader(root)))
+	a.ensureLoader(root)
 	a.p.Advance(0, player.Input{}) // 先把 t=0 的台本指令执行掉，首帧才不会空
 	a.lastAd = time.Now()
 	a.title = e.title()
@@ -347,6 +431,109 @@ func (a *app) selectDelta(d int) {
 	}
 	a.g.ListSetSel(i)
 	a.play()
+}
+
+// searchNav 搜索框里上/下移动列表选择（不立即播放，回车才播）。
+func (a *app) searchNav(down bool) {
+	n := a.g.ListCount()
+	if n == 0 {
+		return
+	}
+	i := a.g.ListSel()
+	if i < 0 {
+		i = 0
+	} else if down {
+		i++
+	} else {
+		i--
+	}
+	if i < 0 {
+		i = 0
+	}
+	if i >= n {
+		i = n - 1
+	}
+	a.g.ListSetSel(i)
+	a.g.ListTop(i)
+}
+
+// drawItem 自绘列表行：选中底色 + CG 缩略图 + 标题。
+func (a *app) drawItem(itemID int, hdc uintptr, sel bool, x, y, w, h int) {
+	if itemID < 0 || itemID >= len(a.entries) {
+		return
+	}
+	e := a.entries[itemID]
+	bg := [3]uint8{255, 255, 255}
+	if sel {
+		bg = [3]uint8{205, 225, 255}
+	}
+	win32.FillRect(hdc, x, y, w, h, bg, 255)
+	tx := x + 6
+	if cv := a.thumbFor(e); cv != nil {
+		win32.Stretch(hdc, cv, x+4, y+(h-cv.H)/2, cv.W, cv.H)
+		tx = x + 4 + cv.W + 8
+	}
+	if a.listTD != nil {
+		st := a.listTD.TextStyle()
+		a.listTD.Draw(hdc, e.title(), tx, y, x+w-tx-6, h, *st)
+	}
+}
+
+// thumbFor 取事件的方形缩略图（CG 用画廊图最左一格；场景/段落无图）。
+//
+// 画廊按钮图是 840×210 的横排（同一张 CG 的几个按钮状态），取最左一格方形即可。
+func (a *app) thumbFor(e entry) *win32.Canvas {
+	if e.cg == nil || a.load == nil || a.thumbs == nil {
+		return nil
+	}
+	key := strings.TrimSpace(e.cg.Thumb)
+	if key == "" {
+		return nil
+	}
+	if cv, ok := a.thumbs[key]; ok {
+		return cv // 成功的是画布，失败的记 nil，避免反复读盘
+	}
+	a.thumbs[key] = nil
+	img, err := a.load(key)
+	if err != nil {
+		return nil
+	}
+	b := img.Bounds()
+	side := b.Dy()
+	if b.Dx() < side {
+		side = b.Dx()
+	}
+	if side <= 0 {
+		return nil
+	}
+	sq := image.NewRGBA(image.Rect(0, 0, side, side))
+	draw.Draw(sq, sq.Bounds(), img, image.Pt(b.Min.X, b.Min.Y), draw.Src)
+	cv, err := win32.NewCanvas(listThumb, listThumb)
+	if err != nil {
+		return nil
+	}
+	cv.BlitRGBA(fitSquare(sq, listThumb))
+	a.thumbs[key] = cv
+	return cv
+}
+
+// fitSquare 最近邻缩放到 size×size（缩略图很小，够用且快）。
+func fitSquare(src *image.RGBA, size int) *image.RGBA {
+	out := image.NewRGBA(image.Rect(0, 0, size, size))
+	sb := src.Bounds()
+	if sb.Dx() <= 0 || sb.Dy() <= 0 {
+		return out
+	}
+	for y := 0; y < size; y++ {
+		sy := sb.Min.Y + y*sb.Dy()/size
+		for x := 0; x < size; x++ {
+			sx := sb.Min.X + x*sb.Dx()/size
+			si := src.PixOffset(sx, sy)
+			di := out.PixOffset(x, y)
+			copy(out.Pix[di:di+4], src.Pix[si:si+4])
+		}
+	}
+	return out
 }
 
 // present 合成当前帧并贴到画布（文字用 GDI 另画在图层之上）。
@@ -470,6 +657,11 @@ func (a *app) onCommand(id, notify int) {
 		a.g.SetStatus(a.autoText() + "（关时靠空格/回车/点画面推进）")
 	case id == idShot:
 		a.saveShot()
+	case id == idSearch && notify == enChange:
+		a.filter = a.g.EditText(idSearch)
+		a.applyFilter()
+	case id == idEnterFallback && a.p == nil: // 单行编辑框回车在有些系统上按 IDOK 上报
+		a.play()
 	}
 }
 
@@ -566,6 +758,38 @@ func (a *app) selftest(id string) int {
 		return 2
 	}
 	fmt.Printf("事件库：CG %d · 场景 %d · 演出段落 %d\n", len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
+
+	// ① 按名过滤自检：cg17 应命中 cg017 这一条。
+	hit, hitID := 0, ""
+	for i := range lib.CGs {
+		if entryMatches(entry{cg: &lib.CGs[i]}, "cg17") {
+			hit++
+			hitID = lib.CGs[i].ID
+		}
+	}
+	fmt.Printf("按名过滤「cg17」命中 %d 个（%s）\n", hit, hitID)
+
+	// ② 缩略图自检：解码第一个 CG 的画廊图，裁剪最左一格方形缩略图并落盘。
+	if len(lib.CGs) > 0 {
+		load := player.Cached(player.Loader(replay.GameLoader(root)))
+		if img, lerr := load(lib.CGs[0].Thumb); lerr == nil {
+			b := img.Bounds()
+			side := b.Dy()
+			if b.Dx() < side {
+				side = b.Dx()
+			}
+			if side > 0 {
+				sq := image.NewRGBA(image.Rect(0, 0, side, side))
+				draw.Draw(sq, sq.Bounds(), img, image.Pt(b.Min.X, b.Min.Y), draw.Src)
+				tp := filepath.Join(exeDir(), "selftest-thumb.png")
+				if fh, cerr := os.Create(tp); cerr == nil {
+					png.Encode(fh, fitSquare(sq, 210))
+					fh.Close()
+				}
+				fmt.Printf("缩略图 %s：%d×%d → %s\n", lib.CGs[0].Thumb, b.Dx(), b.Dy(), tp)
+			}
+		}
+	}
 
 	// 自检对象可以是 CG、演出段落，或（id 为空时）第一个 CG。
 	var (

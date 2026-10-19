@@ -218,14 +218,24 @@ func DefaultTextStyle(face string, sizePx float64) TextStyle {
 }
 
 const (
-	dtLeft       = 0x00000000
-	dtCenter     = 0x00000001
-	dtRight      = 0x00000002
-	dtVCenter    = 0x00000004
-	dtWordBreak  = 0x00000010
-	dtSingleLine = 0x00000020
-	dtNoPrefix   = 0x00000800
+	dtLeft        = 0x00000000
+	dtCenter      = 0x00000001
+	dtRight       = 0x00000002
+	dtVCenter     = 0x00000004
+	dtWordBreak   = 0x00000010
+	dtSingleLine  = 0x00000020
+	dtNoPrefix    = 0x00000800
+	dtEndEllipsis = 0x00008000
 )
+
+// ListTextStyle 自绘列表行的文字样式（深灰、无阴影、单行、垂直居中、超长省略）。
+func ListTextStyle(face string, sizePx float64) TextStyle {
+	return TextStyle{
+		Face: face, SizePx: sizePx,
+		Color: [3]uint8{30, 30, 30}, Shadow: [3]uint8{0, 0, 0},
+		Align: dtVCenter | dtSingleLine | dtEndEllipsis,
+	}
+}
 
 // TextDrawer 复用字体句柄（一次播放只建一次）。
 type TextDrawer struct {
