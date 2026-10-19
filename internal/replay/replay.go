@@ -224,12 +224,19 @@ func DecodeImage(data []byte) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &bgraImage{w: im.Width, h: im.Height, pix: im.Pixels}, nil
+	// HG3 的 24 位图只有 3 字节/像素（Colors==3），不能按 4 字节取。
+	ps := 4
+	if im.Colors == 3 {
+		ps = 3
+	}
+	return &bgraImage{w: im.Width, h: im.Height, ps: ps, pix: im.Pixels}, nil
 }
 
-// bgraImage 把 decode.Image 的 B、G、R、A 字节序适配成 image.Image。
+// bgraImage 把 decode.Image 的 B、G、R[、A] 字节序适配成 image.Image。
+// ps 为每像素字节数（3 = BGR 无 alpha，4 = BGRA）。
 type bgraImage struct {
 	w, h int
+	ps   int
 	pix  []byte
 }
 
@@ -240,7 +247,13 @@ func (b *bgraImage) At(x, y int) color.Color {
 	if x < 0 || y < 0 || x >= b.w || y >= b.h {
 		return color.RGBA{}
 	}
-	i := (y*b.w + x) * 4
+	i := (y*b.w + x) * b.ps
+	if i+b.ps > len(b.pix) {
+		return color.RGBA{}
+	}
+	if b.ps == 3 {
+		return color.RGBA{R: b.pix[i+2], G: b.pix[i+1], B: b.pix[i], A: 0xFF}
+	}
 	return color.RGBA{R: b.pix[i+2], G: b.pix[i+1], B: b.pix[i], A: b.pix[i+3]}
 }
 

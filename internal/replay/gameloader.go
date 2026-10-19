@@ -15,8 +15,8 @@ var assetDirs = []string{
 	"fgimage", "image", "bgimage", "system", "rule",
 }
 
-// assetExts 候选扩展名（storage 名常常不带扩展名）。
-var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg"}
+// assetExts 候选扩展名（storage 名常常不带扩展名；.hg3 是 CatSystem2 侧，见 decode/hg3.go）。
+var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3"}
 
 // GameLoader 在解包目录下按「storage 名」找图并解码。
 //

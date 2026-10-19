@@ -6,8 +6,10 @@
 //
 // 当前支持：KiriKiri TLG5（.tlg，本机 3991 个样本全是它）；
 // JPEG（明文，或「整文件单字节 XOR 掩码」变种 —— 重返蓝鲸岛/海市蜃楼之馆实测 0xA4，
-// 见 jpeg.go；GDI+ 直读掩码 JPEG 会报 Out of memory，所以必须自己解）。
-// 未支持：TLG6 / TLG0 / HG3 —— 一律返回明确错误，不静默失败（对应 P1-7「缺资源告警」）。
+// 见 jpeg.go；GDI+ 直读掩码 JPEG 会报 Out of memory，所以必须自己解）；
+// CatSystem2 HG3 的 img0000 变种（.hg3，见 hg3.go，《甜蜜女友2+》4645 个样本全是它）。
+// 未支持：TLG6 / TLG0、HG3 的 img_jpg / img_wbp 变种 —— 一律返回明确错误，
+// 不静默失败（对应 P1-7「缺资源告警」）。
 //
 // TLG5 结构（据 GARbro `ArcFormats/KiriKiri/ImageTLG.cs` 的 ReadV5 实现，已用本机样本核对）：
 //
@@ -49,7 +51,7 @@ type Image struct {
 // Decode 按魔数分派解码。
 func Decode(data []byte) (*Image, error) {
 	if len(data) < 11 {
-		return nil, fmt.Errorf("文件过短（%d 字节），不是 TLG/JPEG", len(data))
+		return nil, fmt.Errorf("文件过短（%d 字节），不是 TLG/JPEG/HG3", len(data))
 	}
 	switch {
 	case bytes.HasPrefix(data, tlgMagic5):
@@ -58,12 +60,14 @@ func Decode(data []byte) (*Image, error) {
 		return nil, fmt.Errorf("TLG6 暂未实现（需 Golomb 熵解码 + MED/AVG 滤镜）")
 	case bytes.HasPrefix(data, tlgMagic0):
 		return nil, fmt.Errorf("TLG0 暂未实现")
+	case bytes.HasPrefix(data, hg3Magic):
+		return DecodeHG3(data, 0)
 	}
 	// JPEG：明文直接解；掩码变种（整文件单字节 XOR）先还原再解。
 	if b, mask, ok := UnmaskJPEG(data); ok {
 		return decodeJPEG(b, mask)
 	}
-	return nil, fmt.Errorf("非 TLG/JPEG 文件（魔数 %q）", string(data[:11]))
+	return nil, fmt.Errorf("非 TLG/JPEG/HG3 文件（魔数 %q）", string(data[:11]))
 }
 
 func decodeTLG5(data []byte) (*Image, error) {

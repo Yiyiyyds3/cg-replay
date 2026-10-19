@@ -1419,17 +1419,7 @@ func cmdDecode(args []string) error {
 	if out == "" {
 		out = strings.TrimSuffix(in, filepath.Ext(in)) + ".png"
 	}
-	nrgba := &image.NRGBA{
-		Pix:    make([]byte, len(img.Pixels)),
-		Stride: img.Width * 4,
-		Rect:   image.Rect(0, 0, img.Width, img.Height),
-	}
-	for i := 0; i+3 < len(img.Pixels); i += 4 { // BGRA → RGBA（PNG 用非预乘）
-		nrgba.Pix[i] = img.Pixels[i+2]
-		nrgba.Pix[i+1] = img.Pixels[i+1]
-		nrgba.Pix[i+2] = img.Pixels[i]
-		nrgba.Pix[i+3] = img.Pixels[i+3]
-	}
+	nrgba := imageToNRGBA(img)
 	f, err := os.Create(out)
 	if err != nil {
 		return err
@@ -1443,6 +1433,27 @@ func cmdDecode(args []string) error {
 	}
 	fmt.Printf("已写出 PNG: %s\n", out)
 	return nil
+}
+
+// imageToNRGBA 把解码结果（B、G、R[、A] 字节序）转成 PNG 用的非预乘 NRGBA。
+// 24 位图（Colors==3）每像素 3 字节，alpha 一律补 255；不补的话 24 位图会被
+// 按 4 字节错位读出（越界、颜色全乱），所以这里必须分流。
+func imageToNRGBA(img *decode.Image) *image.NRGBA {
+	ps := 4
+	if img.Colors == 3 {
+		ps = 3
+	}
+	n := image.NewNRGBA(image.Rect(0, 0, img.Width, img.Height))
+	for i := 0; i < img.Width*img.Height && (i+1)*ps <= len(img.Pixels); i++ {
+		n.Pix[i*4+0] = img.Pixels[i*ps+2] // B → R
+		n.Pix[i*4+1] = img.Pixels[i*ps+1] // G
+		n.Pix[i*4+2] = img.Pixels[i*ps+0] // R → B
+		n.Pix[i*4+3] = 0xFF
+		if ps == 4 {
+			n.Pix[i*4+3] = img.Pixels[i*ps+3]
+		}
+	}
+	return n
 }
 
 func truncate(s string, n int) string {
