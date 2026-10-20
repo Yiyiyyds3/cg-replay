@@ -4,6 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>重返蓝鲸岛 · CG 演出回放</title>
+    <script>
+      // 全局未捕获异常兜底：任何渲染/异步错误都写进 errors.log（FR-12 不静默）。
+      // 绑定桥可能尚未注入，等 window.go.main.App 可用后再上报。
+      (function () {
+        var pending = [];
+        var hookedTimer = null;
+        var hooked = false;
+
+        function push(kind, msg) {
+          pending.push(kind + " " + msg);
+          if (hooked) flush();
+        }
+        function flush() {
+          if (!hooked || pending.length === 0) return;
+          var lines = pending.splice(0);
+          try {
+            window.go.main.App.ReportClientError(lines.join("\n"));
+          } catch (e) {
+            hooked = false;
+          }
+        }
+        hookedTimer = setInterval(function () {
+          if (window.go && window.go.main && window.go.main.App) {
+            hooked = true;
+            clearInterval(hookedTimer);
+            flush();
+          }
+        }, 50);
+        setTimeout(function () { clearInterval(hookedTimer); }, 10000);
+
+        window.addEventListener("error", function (e) {
+          push("error:", (e && e.message) || String(e));
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e && e.reason;
+          var m = r && r.message ? r.message : String(r);
+          var st = r && r.stack ? "\n" + r.stack : "";
+          push("reject:", m + st);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

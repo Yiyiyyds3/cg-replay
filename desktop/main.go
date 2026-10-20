@@ -13,8 +13,10 @@ package main
 import (
 	"context"
 	"embed"
-	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -41,7 +43,20 @@ func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
 // Version 绑定桥自检：前端启动时调用，验证 window.go 通路。
 func (a *App) Version() string {
-	return fmt.Sprintf("ucgr replay-ui 0.2.0-m1 · wails v2 · go core ready")
+	return "ucgr replay-ui 0.2.0-m2 · wails v2 · go core ready"
+}
+
+// ReportClientError 前端未捕获异常上报（落到 exe 同目录 errors.log）。
+// 诊断用；保留常驻——黑屏比红横幅更糟（FR-12 不静默的兜底）。
+func (a *App) ReportClientError(msg string) error {
+	f, err := os.OpenFile(filepath.Join(exeDir(), "errors.log"),
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(time.Now().Format("15:04:05") + " " + msg + "\n")
+	return err
 }
 
 // ScanDirectory 对目录执行 S0 体积盘点（设置页/选目录用，示例绑定保留）。
