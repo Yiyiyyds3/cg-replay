@@ -401,15 +401,15 @@ func cmdRefs(args []string) error {
 		return fmt.Errorf("用法: ucgr refs <解包目录> <脚本|目录…>")
 	}
 	root := args[0]
-	pool, err := prune.BuildPool(root)
+	a, engineID, err := adapterFor(root)
+	if err != nil {
+		return err
+	}
+	pool, err := poolFor(root, engineID)
 	if err != nil {
 		return err
 	}
 	scripts, err := collectScripts(args[1:])
-	if err != nil {
-		return err
-	}
-	a, _, err := adapterFor(root)
 	if err != nil {
 		return err
 	}
@@ -480,15 +480,15 @@ func cmdPrune(args []string) error {
 		return fmt.Errorf("必须指定 --out <目录>")
 	}
 	root := rest[0]
-	pool, err := prune.BuildPool(root)
+	a, engineID, err := adapterFor(root)
+	if err != nil {
+		return err
+	}
+	pool, err := poolFor(root, engineID)
 	if err != nil {
 		return err
 	}
 	scripts, err := collectScripts(rest[1:])
-	if err != nil {
-		return err
-	}
-	a, _, err := adapterFor(root)
 	if err != nil {
 		return err
 	}
@@ -562,11 +562,11 @@ func cmdIR(args []string) error {
 		return fmt.Errorf("用法: ucgr ir <解包目录> <脚本> [--out file.json]")
 	}
 	root, script := rest[0], rest[1]
-	pool, err := prune.BuildPool(root)
+	a, engineID, err := adapterFor(root)
 	if err != nil {
 		return err
 	}
-	a, _, err := adapterFor(root)
+	pool, err := poolFor(root, engineID)
 	if err != nil {
 		return err
 	}
@@ -1519,6 +1519,28 @@ func adapterFor(path string) (adapter.EngineAdapter, string, error) {
 // astRefs 从引擎专有 AST 提取资源引用。
 // 各适配器的 Ast 都实现 ExtractRefs() []string；未实现返回 ok=false，
 // 调用方须按安全原则整游戏保留。
+// poolFor 建素材池；CatSystem2 会把游戏根/解包根旁边的音频目录一起挂进来。
+// 语音（pcm）通常在 原始归档解包/../音频 下，不挂进来就会全部变成未命中。
+func poolFor(root, engineID string) (*prune.Pool, error) {
+	var extras []string
+	if engineID == "catsystem2" {
+		seen := map[string]bool{}
+		for _, name := range []string{"音频", "语音", "voice", "sound", "audio"} {
+			for _, base := range []string{root, filepath.Dir(root)} {
+				p := filepath.Join(base, name)
+				if p == root || seen[p] {
+					continue
+				}
+				if st, err := os.Stat(p); err == nil && st.IsDir() {
+					seen[p] = true
+					extras = append(extras, p)
+				}
+			}
+		}
+	}
+	return prune.BuildPoolWithExtra(root, extras...)
+}
+
 func astRefs(ast adapter.ScriptAst) ([]string, bool) {
 	if r, ok := ast.(interface{ ExtractRefs() []string }); ok {
 		return r.ExtractRefs(), true

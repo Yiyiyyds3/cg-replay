@@ -52,6 +52,12 @@ var groupRe = regexp.MustCompile(`^(.*)_\d+$`)
 // 剧本按 DR-25 全留，不进资产池（与 Python 原型 ks_refs.build_pool /
 // cst_refs.build_pool_cs2 同口径）；否则 prune 会把剧本本身当“未命中”裁掉。
 func BuildPool(root string) (*Pool, error) {
+	return BuildPoolWithExtra(root)
+}
+
+// BuildPoolWithExtra 在 root 之外再挂若干素材根（例如 CS2 的 ../音频）。
+// 外部根的 rel 会写成 ../音频/...，回放时按同一个 root 仍能解析。
+func BuildPoolWithExtra(root string, extras ...string) (*Pool, error) {
 	p := &Pool{
 		Root:    root,
 		ByRel:   map[string]PoolFile{},
@@ -59,42 +65,58 @@ func BuildPool(root string) (*Pool, error) {
 		ByGroup: map[string][]string{},
 	}
 	excludeDir := map[string]bool{"解包输出": true, "_分类": true}
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if excludeDir[d.Name()] {
-				return filepath.SkipDir
+	addRoot := func(base string) error {
+		return filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				if excludeDir[d.Name()] {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !d.Type().IsRegular() {
+				return nil
+			}
+			switch strings.ToLower(filepath.Ext(path)) {
+			case ".ks", ".cst":
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return nil
+			}
+			rel := normRel(path, root)
+			if _, exists := p.ByRel[rel]; exists {
+				return nil
+			}
+			p.ByRel[rel] = PoolFile{Rel: rel, Abs: path, Size: info.Size()}
+			base := filepath.Base(rel)
+			p.ByName[base] = append(p.ByName[base], rel)
+			// 多图层组索引：Tama01f_0001 → 组 "tama01f"
+			noext := strings.TrimSuffix(base, filepath.Ext(base))
+			if m := groupRe.FindStringSubmatch(noext); m != nil {
+				p.ByGroup[m[1]] = append(p.ByGroup[m[1]], rel)
+			} else {
+				p.ByGroup[noext] = append(p.ByGroup[noext], rel)
 			}
 			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		switch strings.ToLower(filepath.Ext(path)) {
-		case ".ks", ".cst":
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		rel := normRel(path, root)
-		p.ByRel[rel] = PoolFile{Rel: rel, Abs: path, Size: info.Size()}
-		base := filepath.Base(rel)
-		p.ByName[base] = append(p.ByName[base], rel)
-		// 多图层组索引：Tama01f_0001 → 组 "tama01f"
-		noext := strings.TrimSuffix(base, filepath.Ext(base))
-		if m := groupRe.FindStringSubmatch(noext); m != nil {
-			p.ByGroup[m[1]] = append(p.ByGroup[m[1]], rel)
-		} else {
-			p.ByGroup[noext] = append(p.ByGroup[noext], rel)
-		}
-		return nil
-	})
-	if err != nil {
+		})
+	}
+	if err := addRoot(root); err != nil {
 		return nil, err
+	}
+	for _, extra := range extras {
+		if extra == "" {
+			continue
+		}
+		if _, err := os.Stat(extra); err != nil {
+			return nil, err
+		}
+		if err := addRoot(extra); err != nil {
+			return nil, err
+		}
 	}
 	return p, nil
 }
