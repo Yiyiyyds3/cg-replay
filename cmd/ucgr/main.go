@@ -767,6 +767,11 @@ func cmdReplay(args []string) error {
 			times = replay.SampleTimes(ev, frames)
 		}
 		w, h := parseSize(sizeSpec)
+		if w <= 0 || h <= 0 {
+			if doc.CanvasW > 0 && doc.CanvasH > 0 {
+				w, h = doc.CanvasW, doc.CanvasH
+			}
+		}
 		fmt.Printf("\n=== 事件 %s（%s）合成：%d 帧，素材根 %s ===\n", ev.EventID, ev.Kind, len(times), assets)
 		fmt.Println("  图层（按 z 升序，z 小者在下）：")
 		layers := append([]ir.Layer(nil), ev.Layers...)

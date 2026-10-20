@@ -17,6 +17,7 @@ import (
 	"image/draw"
 	"image/gif"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -34,6 +35,7 @@ type LayerState struct {
 	Visible bool
 	X, Y    float64
 	HasPos  bool // 是否明确给过 left/top（KAG 允许省略 → 继承原位置）
+	Scale   float64
 	Opacity float64
 	Z       int
 }
@@ -49,7 +51,7 @@ func StatesAt(ev *ir.Event, tMs int64) []LayerState {
 		if s, ok := st[id]; ok {
 			return s
 		}
-		s := &LayerState{LayerID: id, Opacity: 1}
+		s := &LayerState{LayerID: id, Scale: 1, Opacity: 1}
 		st[id] = s
 		order = append(order, id)
 		return s
@@ -72,6 +74,9 @@ func StatesAt(ev *ir.Event, tMs int64) []LayerState {
 				s.Y = *l.Transform.Y
 				s.HasPos = true
 			}
+			if l.Transform.Scale != nil {
+				s.Scale = *l.Transform.Scale
+			}
 			if l.Transform.Opacity != nil {
 				s.Opacity = *l.Transform.Opacity
 			}
@@ -89,25 +94,33 @@ func StatesAt(ev *ir.Event, tMs int64) []LayerState {
 		}
 		p, _ := op.Params.(map[string]interface{})
 		switch op.Op {
-		case "image_show":
+		case "image_show", "layer_show":
 			s.Visible = true
 			if r, ok := p["ref"].(string); ok && r != "" {
 				s.Ref = resolveRef(ev, r)
 			}
-			if v, ok := numParam(p, "left"); ok {
-				s.X, s.HasPos = v, true
-			}
-			if v, ok := numParam(p, "top"); ok {
-				s.Y, s.HasPos = v, true
-			}
-			if v, ok := numParam(p, "opacity"); ok {
-				s.Opacity = v
-			}
-			if v, ok := numParam(p, "z"); ok {
-				s.Z = int(v)
-			}
-		case "image_hide":
+			applyStateParams(s, p)
+		case "image_hide", "layer_hide":
 			s.Visible = false
+		case "layer_set", "layer_move", "layer_scale":
+			applyStateParams(s, p)
+		case "layer_fade":
+			applyStateParams(s, p)
+			from, okFrom := numParam(p, "from")
+			to, okTo := numParam(p, "to")
+			dur, okDur := numParam(p, "duration_ms")
+			if okFrom && okTo && okDur && dur > 0 {
+				ratio := float64(tMs-op.TMs) / dur
+				if ratio < 0 {
+					ratio = 0
+				}
+				if ratio > 1 {
+					ratio = 1
+				}
+				s.Opacity = from + (to-from)*easeInOutQuad(ratio)
+			} else if okTo {
+				s.Opacity = to
+			}
 		}
 	}
 
@@ -116,6 +129,35 @@ func StatesAt(ev *ir.Event, tMs int64) []LayerState {
 		out = append(out, *st[id])
 	}
 	return out
+}
+
+// applyStateParams 把 image_show / layer_set 等指令里的状态字段写进 LayerState。
+// 同时接受 left/top 与 x/y 两套命名（KAG 用前者，CS2 的 layer_set 用后者）。
+func applyStateParams(s *LayerState, p map[string]interface{}) {
+	if s == nil || p == nil {
+		return
+	}
+	if v, ok := numParam(p, "left"); ok {
+		s.X, s.HasPos = v, true
+	} else if v, ok := numParam(p, "x"); ok {
+		s.X, s.HasPos = v, true
+	}
+	if v, ok := numParam(p, "top"); ok {
+		s.Y, s.HasPos = v, true
+	} else if v, ok := numParam(p, "y"); ok {
+		s.Y, s.HasPos = v, true
+	}
+	if v, ok := numParam(p, "scale"); ok && v > 0 {
+		s.Scale = v
+	}
+	if v, ok := numParam(p, "opacity"); ok {
+		s.Opacity = v
+	} else if v, ok := numParam(p, "to"); ok {
+		s.Opacity = v
+	}
+	if v, ok := numParam(p, "z"); ok {
+		s.Z = int(v)
+	}
 }
 
 // resolveRef 把 KAG 的 storage 名对到事件资产表里的相对路径。
@@ -184,6 +226,14 @@ func numParam(p map[string]interface{}, key string) (float64, bool) {
 		return f, true
 	}
 	return 0, false
+}
+
+// easeInOutQuad 与 FelineSystem2 Image::fade 的缓动一致：x<0.5 ? 2x² : 1-(-2x+2)²/2。
+func easeInOutQuad(x float64) float64 {
+	if x < 0.5 {
+		return 2 * x * x
+	}
+	return 1 - (-2*x+2)*(-2*x+2)/2
 }
 
 // Loader 把 IR 里的相对路径读成像素。
@@ -307,7 +357,11 @@ func Compose(sts []LayerState, load Loader, canvasW, canvasH int) (*image.RGBA, 
 		if err != nil {
 			return nil, drawn, err
 		}
-		blend(dst, img, int(s.X), int(s.Y), s.Opacity)
+		if s.Scale > 0 && s.Scale != 1 {
+			blendScaled(dst, img, s.X, s.Y, s.Scale, s.Opacity)
+		} else {
+			blend(dst, img, int(s.X), int(s.Y), s.Opacity)
+		}
 		drawn = append(drawn, fmt.Sprintf("%s←%s", s.LayerID, s.Ref))
 	}
 	return dst, drawn, nil
@@ -368,6 +422,100 @@ func blend(dst *image.RGBA, src image.Image, x0, y0 int, opacity float64) {
 
 // SampleTimes 采样时刻（毫秒）：0 … 事件最后一刻，均分 n 帧。
 // 事件长度取 timeline/texts 里的最大 t_ms（IR 的 end_ms 多数适配器不填）。
+// blendScaled 把 src 按 scale 双线性放大/缩小后 alpha-over 到 dst。
+// 坐标以源图左上角为 (x0,y0)，与 blend 的未缩放路径保持同一套定位语义。
+func blendScaled(dst *image.RGBA, src image.Image, x0, y0, scale, opacity float64) {
+	if opacity <= 0 || scale <= 0 {
+		return
+	}
+	if opacity > 1 {
+		opacity = 1
+	}
+	sb := src.Bounds()
+	db := dst.Bounds()
+	if sb.Empty() || db.Empty() {
+		return
+	}
+
+	x1 := x0 + float64(sb.Dx())*scale
+	y1 := y0 + float64(sb.Dy())*scale
+	left, right := int(math.Floor(x0)), int(math.Ceil(x1))
+	top, bottom := int(math.Floor(y0)), int(math.Ceil(y1))
+	if left < db.Min.X {
+		left = db.Min.X
+	}
+	if right > db.Max.X {
+		right = db.Max.X
+	}
+	if top < db.Min.Y {
+		top = db.Min.Y
+	}
+	if bottom > db.Max.Y {
+		bottom = db.Max.Y
+	}
+
+	sample := func(x, y int) (r, g, b, a float64) {
+		if !image.Pt(x, y).In(sb) {
+			return 0, 0, 0, 0
+		}
+		r16, g16, b16, a16 := src.At(x, y).RGBA()
+		if a16 == 0 {
+			return 0, 0, 0, 0
+		}
+		return float64(r16) / 65535, float64(g16) / 65535, float64(b16) / 65535, float64(a16) / 65535
+	}
+
+	for dy := top; dy < bottom; dy++ {
+		sy := (float64(dy)+0.5-y0)/scale + float64(sb.Min.Y) - 0.5
+		sy0 := int(math.Floor(sy))
+		fy := sy - float64(sy0)
+		for dx := left; dx < right; dx++ {
+			sx := (float64(dx)+0.5-x0)/scale + float64(sb.Min.X) - 0.5
+			sx0 := int(math.Floor(sx))
+			fx := sx - float64(sx0)
+
+			r00, g00, b00, a00 := sample(sx0, sy0)
+			r10, g10, b10, a10 := sample(sx0+1, sy0)
+			r01, g01, b01, a01 := sample(sx0, sy0+1)
+			r11, g11, b11, a11 := sample(sx0+1, sy0+1)
+
+			w00 := (1 - fx) * (1 - fy)
+			w10 := fx * (1 - fy)
+			w01 := (1 - fx) * fy
+			w11 := fx * fy
+
+			// RGBA() 返回的是预乘 alpha；先按预乘插值，再还原成直通颜色，
+			// 否则透明边缘会被当成黑色，缩放后出现黑边。
+			pa := a00*w00 + a10*w10 + a01*w01 + a11*w11
+			if pa <= 0 {
+				continue
+			}
+			pr := r00*a00*w00 + r10*a10*w10 + r01*a01*w01 + r11*a11*w11
+			pg := g00*a00*w00 + g10*a10*w10 + g01*a01*w01 + g11*a11*w11
+			pb := b00*a00*w00 + b10*a10*w10 + b01*a01*w01 + b11*a11*w11
+			r, g, b := pr/pa, pg/pa, pb/pa
+
+			sa := pa * opacity
+			if sa <= 0 {
+				continue
+			}
+			i := dst.PixOffset(dx, dy)
+			if sa >= 1 {
+				dst.Pix[i+0] = byte(math.Round(r * 255))
+				dst.Pix[i+1] = byte(math.Round(g * 255))
+				dst.Pix[i+2] = byte(math.Round(b * 255))
+				dst.Pix[i+3] = 0xFF
+				continue
+			}
+			inv := 1 - sa
+			dst.Pix[i+0] = byte(math.Round(r*255*sa + float64(dst.Pix[i+0])*inv))
+			dst.Pix[i+1] = byte(math.Round(g*255*sa + float64(dst.Pix[i+1])*inv))
+			dst.Pix[i+2] = byte(math.Round(b*255*sa + float64(dst.Pix[i+2])*inv))
+			dst.Pix[i+3] = byte(math.Round(255*sa + float64(dst.Pix[i+3])*inv))
+		}
+	}
+}
+
 func SampleTimes(ev *ir.Event, n int) []int64 {
 	if n < 1 {
 		n = 1

@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -665,6 +666,7 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 	}
 	ev := &ir.Event{EventID: "script", Kind: ir.KindScene, Ord: 1}
 	layers := map[string]*ir.Layer{}
+	states := map[string]*layerState{}
 	var order []string
 	var clock int64
 	var assets []ir.AssetRef
@@ -693,46 +695,64 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		tag := strings.ToLower(c.Tag)
 		switch tag {
 		case "bg", "cg", "fg", "eg":
-			// 只有第三 token 是图片名时才是换图；`bg 0 scale 63% 63%`、
-			// `bg 0 pos -80 -410` 这类是对已有图层的变换，不能当资源。
+			// 图层命令有两种形态：
+			//   bg 0 bg03_smr_b             换图（第三 token 是图片名）
+			//   bg 0 scale 63% 63% / pos …  对已有槽位做变换（不是新资源）
+			// 变换必须按槽位累计，并在 image_show / layer_set 里带给回放器；
+			// 否则 2560×1440 的原图会按 100% 画到 1600×900 舞台上。
 			ref := layerRef(c)
-			if ref == "" {
-				continue
-			}
-			ar := add(ref)
+			lid := layerID(tag, c)
 			kind := ir.LayerCG
 			if tag == "bg" {
 				kind = ir.LayerBackground
 			} else if tag == "fg" || tag == "eg" {
 				kind = ir.LayerStand
 			}
-			// 槽位是并存的图层：bg 0 / bg 1 / eg 1 不能互相覆盖。
-			lid := tag
-			if len(c.Args) > 0 && isAllDigits(c.Args[0]) {
-				lid = tag + c.Args[0]
-			}
-			if v := c.Attrs["id"]; v != "" {
-				lid = tag + v
-			}
 			l, ex := layers[lid]
 			if !ex {
 				// 事件初态为空：真正的画面由 t=0 之后的 image_show 给出。
-				// 若沿用「最后一张图」做初态，脚本中途才出现的槽位会在开头
+				// 若沿用「最后一张图」做初态，脚本中途才出现的槽位会在开场
 				// 就露出来（CS2 一个脚本只切一个事件，这种错误尤其明显）。
 				l = &ir.Layer{LayerID: lid, Kind: kind, Z: len(order) + 1, Visible: false}
 				layers[lid] = l
 				order = append(order, lid)
 			}
-			if ar != nil {
-				l.Asset = ar
+			st := states[lid]
+			if st == nil {
+				st = &layerState{scale: 1, opacity: 1}
+				states[lid] = st
 			}
-			ev.Timeline = append(ev.Timeline, ir.TimelineOp{
-				TMs: clock, Op: "image_show", Target: lid,
-				Params: map[string]interface{}{"ref": ref},
-			})
+			if ref != "" {
+				ar := add(ref)
+				if ar != nil {
+					l.Asset = ar
+				}
+				params := st.params()
+				params["ref"] = ref
+				ev.Timeline = append(ev.Timeline, ir.TimelineOp{
+					TMs: clock, Op: "image_show", Target: lid, Params: params,
+				})
+				continue
+			}
+			delta, reason := applyLayerTransform(c, st)
+			if len(delta) > 0 {
+				op := "layer_set"
+				if _, ok := delta["duration_ms"]; ok {
+					op = "layer_fade"
+				}
+				ev.Timeline = append(ev.Timeline, ir.TimelineOp{
+					TMs: clock, Op: op, Target: lid, Params: delta,
+				})
+				continue
+			}
+			if reason != "" {
+				ev.Unrecognized = append(ev.Unrecognized, ir.Unrecognized{
+					NodePath: "cmd[" + tag + "]", Raw: c.Raw, Reason: reason,
+				})
+			}
 		case "fw", "mpl", "chr":
-			// E-mote/动态立绘：需要 .psz + .pfl/.dif/.inc 才能还原，
-			// 按 docs 的硬边界不复刻；不要把它的 HG3 部件当静态立绘。
+			// E-mote/动态立绘：需要 .psz + .pfl/.dif/.inc 才能还原。
+			// 按 docs 的硬边界不复刻；不要把 HG3 部件当静态立绘。
 			ev.Unrecognized = append(ev.Unrecognized, ir.Unrecognized{
 				NodePath: "cmd[" + tag + "]", Raw: c.Raw,
 				Reason: "E-mote/动态立绘（不复刻）",
@@ -773,7 +793,7 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 			}
 		case "se", "bgm", "movie", "sysmovie":
 			for _, a := range c.Args {
-				if !isAllDigits(a) {
+				if !isAllDigits(a) && !isCSCmdWord(a) {
 					add(a)
 					break
 				}
@@ -788,16 +808,191 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		ev.Layers = append(ev.Layers, *layers[lid])
 	}
 	ev.Assets = assets
+	canvasW, canvasH := 1600, 900 // 甜蜜女友2+ m2config/m2view.cnf #wndsize
+	if v, err := strconv.Atoi(ctx.Config["canvas_w"]); err == nil && v > 0 {
+		canvasW = v
+	}
+	if v, err := strconv.Atoi(ctx.Config["canvas_h"]); err == nil && v > 0 {
+		canvasH = v
+	}
 	out := &ir.IR{
 		IRVersion: ir.IRVersion, GameID: ctx.GameID, EngineID: "catsystem2",
 		Fidelity: ir.FidelityGeneric,
-		Meta:     ir.Meta{ScriptEncoding: ast.Encoding, GeneratedBy: "ucgr/catsystem2.BuildIR v1"},
-		Events:   []ir.Event{*ev},
+		CanvasW:  canvasW, CanvasH: canvasH,
+		Meta:   ir.Meta{ScriptEncoding: ast.Encoding, GeneratedBy: "ucgr/catsystem2.BuildIR v2"},
+		Events: []ir.Event{*ev},
 	}
 	if n := ctx.Config["script_name"]; n != "" {
 		out.Events[0].EventID = strings.TrimSuffix(filepath.Base(n), filepath.Ext(n))
 	}
 	return out, nil
+}
+
+// layerState 是 CS2 单个槽位的累计变换。CS2 的 scale/pos/blend 可以出现在
+// 换图之前，也可以出现在换图之后；只在命令流里按槽位累计，才能把
+// `bg 0 scale 63%` -> `bg 0 bg11_smr_b` -> `bg 0 pos -80 -410`
+// 还原成「图片以 63% 缩放并偏移」而不是三条互不相关的命令。
+type layerState struct {
+	x, y           float64
+	hasX, hasY     bool
+	scale, opacity float64
+}
+
+func (st *layerState) params() map[string]interface{} {
+	p := map[string]interface{}{}
+	if st.hasX {
+		p["left"] = st.x
+	}
+	if st.hasY {
+		p["top"] = st.y
+	}
+	if st.scale != 1 {
+		p["scale"] = st.scale
+	}
+	if st.opacity != 1 {
+		p["opacity"] = st.opacity
+	}
+	return p
+}
+
+func layerID(tag string, c *Command) string {
+	lid := tag
+	if len(c.Args) > 0 && isAllDigits(c.Args[0]) {
+		lid = tag + c.Args[0]
+	}
+	if v := c.Attrs["id"]; v != "" {
+		lid = tag + v
+	}
+	return lid
+}
+
+// applyLayerTransform 解析 CS2 的槽位属性命令，返回需要写进 layer_set 的
+// 增量。解析不了（变量表达式/颜色命令等）时返回 reason，交给 unrecognized。
+func applyLayerTransform(c *Command, st *layerState) (map[string]interface{}, string) {
+	if c == nil || len(c.Args) < 2 {
+		return nil, ""
+	}
+	key := strings.ToLower(c.Args[1])
+	args := c.Args[2:]
+	switch key {
+	case "scale":
+		if len(args) == 0 {
+			return nil, "scale 缺参数"
+		}
+		v, ok := parseScale(args[0])
+		if !ok || v <= 0 {
+			return nil, "scale 表达式不可解析"
+		}
+		st.scale = v
+		return map[string]interface{}{"scale": v}, ""
+	case "pos":
+		if len(args) == 0 {
+			return nil, "pos 缺参数"
+		}
+		x, ok := parseCoord(args[0])
+		if !ok {
+			return nil, "pos 表达式不可解析"
+		}
+		st.x, st.hasX = x, true
+		delta := map[string]interface{}{"left": x}
+		if len(args) >= 2 {
+			y, ok := parseCoord(args[1])
+			if !ok {
+				return nil, "pos 表达式不可解析"
+			}
+			st.y, st.hasY = y, true
+			delta["top"] = y
+		}
+		return delta, ""
+	case "blend":
+		if len(args) == 0 {
+			return nil, "blend 缺参数"
+		}
+		v, ok := parseAlpha(args[0])
+		if !ok {
+			return nil, "blend 表达式不可解析"
+		}
+		st.opacity = v
+		return map[string]interface{}{"opacity": v}, ""
+	case "fade":
+		// fade <帧数> <起始 alpha> <目标 alpha>；引擎按 1 帧 = 16ms 推进，
+		// 并用 easeInOutQuad 插值（FelineSystem2 Image::fade）。
+		if len(args) < 3 {
+			return nil, ""
+		}
+		frames, err := strconv.Atoi(strings.TrimSpace(args[0]))
+		if err != nil || frames < 0 {
+			return nil, "fade 帧数不可解析"
+		}
+		from, ok := parseAlpha(args[1])
+		if !ok {
+			return nil, "fade 起始透明度不可解析"
+		}
+		to, ok := parseAlpha(args[2])
+		if !ok {
+			return nil, "fade 目标透明度不可解析"
+		}
+		st.opacity = to
+		return map[string]interface{}{
+			"from": from, "to": to, "opacity": to,
+			"duration_ms": frames * 16,
+		}, ""
+	case "tone", "mode", "blur":
+		return nil, "CS2 视觉属性（静态回放未映射）"
+	}
+	return nil, ""
+}
+
+func parseScale(s string) (float64, bool) {
+	s = strings.Trim(strings.TrimSpace(s), `"'`)
+	if strings.HasSuffix(s, "%") {
+		f, err := strconv.ParseFloat(strings.TrimSuffix(s, "%"), 64)
+		if err != nil || f <= 0 {
+			return 0, false
+		}
+		return f / 100, true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || f <= 0 {
+		return 0, false
+	}
+	if f > 10 { // 兼容不带 % 的 63 这种写法
+		f /= 100
+	}
+	return f, true
+}
+
+func parseAlpha(s string) (float64, bool) {
+	s = strings.Trim(strings.TrimSpace(s), `"'`)
+	percent := strings.HasSuffix(s, "%")
+	if percent {
+		s = strings.TrimSuffix(s, "%")
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || f < 0 {
+		return 0, false
+	}
+	if percent {
+		f /= 100
+	} else if f > 1 {
+		f /= 255
+	}
+	if f > 1 {
+		f = 1
+	}
+	return f, true
+}
+
+func parseCoord(s string) (float64, bool) {
+	s = strings.Trim(strings.TrimSpace(s), `"'`)
+	if s == "" || strings.ContainsAny(s, "#@()[]$%") {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
 }
 
 // firstRef 命令的第一个资源引用（属性优先，其次位置参数）。

@@ -278,6 +278,29 @@ func TestComposeOpacityAndAutoCanvas(t *testing.T) {
 	}
 }
 
+func TestStatesAtLayerFade(t *testing.T) {
+	ev := &ir.Event{
+		EventID: "EV5",
+		Layers: []ir.Layer{
+			{LayerID: "bg0", Kind: ir.LayerBackground, Z: 1, Visible: true,
+				Asset: &ir.AssetRef{OrigPath: "image00/bg.hg3"}},
+		},
+		Timeline: []ir.TimelineOp{
+			{TMs: 1000, Op: "layer_fade", Target: "bg0",
+				Params: map[string]interface{}{"from": 0.0, "to": 1.0, "duration_ms": 768}},
+		},
+	}
+	for _, tc := range []struct {
+		tMs  int64
+		want float64
+	}{{1000, 0}, {1384, 0.5}, {1768, 1}} {
+		got := StatesAt(ev, tc.tMs)[0].Opacity
+		if got < tc.want-1e-9 || got > tc.want+1e-9 {
+			t.Fatalf("t=%d opacity = %v, want %v", tc.tMs, got, tc.want)
+		}
+	}
+}
+
 func TestDecodeImagePNG(t *testing.T) {
 	data := solidPNG(t, 4, 3, color.RGBA{R: 10, G: 20, B: 30, A: 255})
 	img, err := DecodeImage(data)

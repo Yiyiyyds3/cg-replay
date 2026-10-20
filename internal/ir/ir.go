@@ -26,7 +26,11 @@ type IR struct {
 	EngineID  string  `json:"engine_id"`
 	Fidelity  string  `json:"fidelity"`
 	Meta      Meta    `json:"meta"`
-	Events    []Event `json:"events"`
+	// CanvasW/CanvasH 是游戏的原生舞台尺寸（0 表示未声明，由回放器按素材推断）。
+	// CS2 从 m2config/m2view.cnf 的 #wndsize 读得，用于在缩放图层时保持画布稳定。
+	CanvasW int     `json:"canvas_w,omitempty"`
+	CanvasH int     `json:"canvas_h,omitempty"`
+	Events  []Event `json:"events"`
 }
 
 // Meta 溯源信息。

@@ -11,6 +11,8 @@
     "game_id": { "type": "string", "minLength": 1 },
     "engine_id": { "type": "string", "minLength": 1 },
     "fidelity": { "enum": ["generic", "tuned", "exclusive"] },
+    "canvas_w": { "type": "integer", "minimum": 1 },
+    "canvas_h": { "type": "integer", "minimum": 1 },
     "meta": {
       "type": "object",
       "required": ["generated_by"],

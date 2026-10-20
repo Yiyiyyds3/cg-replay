@@ -67,6 +67,32 @@ func TestExtractRefsSkipsTransformsAndEmote(t *testing.T) {
 	}
 }
 
+func TestBuildIRFade(t *testing.T) {
+	ast := astFromCommands([]Command{
+		{Tag: "bg", Args: []string{"0", "bg03_smr_b"}},
+		{Tag: "bg", Args: []string{"0", "fade", "48", "0", "255"}},
+	})
+	resolve := func(ref string) (*ir.AssetRef, bool) {
+		return &ir.AssetRef{Hash: "hash-" + ref, OrigPath: "image00/" + ref + ".hg3", Role: "其它"}, true
+	}
+	out, err := (&Adapter{}).BuildIR(ast, &adapter.BuildCtx{GameID: "test", Resolver: resolve})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := &out.Events[0]
+	if len(ev.Timeline) != 2 {
+		t.Fatalf("timeline = %d ops, want 2: %#v", len(ev.Timeline), ev.Timeline)
+	}
+	op := ev.Timeline[1]
+	if op.Op != "layer_fade" || op.Target != "bg0" {
+		t.Fatalf("fade op = %s(%s), want layer_fade(bg0)", op.Op, op.Target)
+	}
+	p, _ := op.Params.(map[string]interface{})
+	if p["from"] != 0.0 || p["to"] != 1.0 || p["duration_ms"] != 768 || p["opacity"] != 1.0 {
+		t.Fatalf("fade params = %#v", p)
+	}
+}
+
 func TestBuildIRStaticLayersAndEmote(t *testing.T) {
 	ast := astFromCommands([]Command{
 		{Tag: "bg", Args: []string{"0", "scale", "63%", "63%"}},
@@ -108,11 +134,33 @@ func TestBuildIRStaticLayersAndEmote(t *testing.T) {
 			t.Fatalf("missing layer %s (got %#v)", id, seenLayer)
 		}
 	}
-	if len(ev.Timeline) != 3 {
-		t.Fatalf("timeline = %d ops, want 3: %#v", len(ev.Timeline), ev.Timeline)
+	if out.CanvasW != 1600 || out.CanvasH != 900 {
+		t.Fatalf("canvas = %dx%d, want 1600x900", out.CanvasW, out.CanvasH)
 	}
-	for _, op := range ev.Timeline {
+	if len(ev.Timeline) != 5 {
+		t.Fatalf("timeline = %d ops, want 5: %#v", len(ev.Timeline), ev.Timeline)
+	}
+	want := []struct {
+		op, target string
+		params     map[string]interface{}
+	}{
+		{"layer_set", "bg0", map[string]interface{}{"scale": 0.63}},
+		{"image_show", "bg0", map[string]interface{}{"ref": "bg03_smr_b", "scale": 0.63}},
+		{"layer_set", "bg0", map[string]interface{}{"left": float64(-80), "top": float64(-410)}},
+		{"image_show", "bg1", map[string]interface{}{"ref": "bgwhite"}},
+		{"image_show", "eg1", map[string]interface{}{"ref": "bgeffect03"}},
+	}
+	for i, w := range want {
+		op := ev.Timeline[i]
+		if op.Op != w.op || op.Target != w.target {
+			t.Fatalf("timeline[%d] = %s(%s), want %s(%s)", i, op.Op, op.Target, w.op, w.target)
+		}
 		p, _ := op.Params.(map[string]interface{})
+		for k, v := range w.params {
+			if p[k] != v {
+				t.Fatalf("timeline[%d].%s = %#v, want %#v (all: %#v)", i, k, p[k], v, p)
+			}
+		}
 		ref, _ := p["ref"].(string)
 		switch ref {
 		case "63%", "-80", "#570+100", "FaChit01", "stchit01l":
