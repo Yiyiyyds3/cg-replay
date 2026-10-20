@@ -753,6 +753,7 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		case "fw", "mpl", "chr":
 			// E-mote/动态立绘：需要 .psz + .pfl/.dif/.inc 才能还原。
 			// 按 docs 的硬边界不复刻；不要把 HG3 部件当静态立绘。
+			ev.HasEmote = true
 			ev.Unrecognized = append(ev.Unrecognized, ir.Unrecognized{
 				NodePath: "cmd[" + tag + "]", Raw: c.Raw,
 				Reason: "E-mote/动态立绘（不复刻）",
@@ -819,8 +820,9 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		IRVersion: ir.IRVersion, GameID: ctx.GameID, EngineID: "catsystem2",
 		Fidelity: ir.FidelityGeneric,
 		CanvasW:  canvasW, CanvasH: canvasH,
-		Meta:   ir.Meta{ScriptEncoding: ast.Encoding, GeneratedBy: "ucgr/catsystem2.BuildIR v2"},
-		Events: []ir.Event{*ev},
+		HasEmote: ev.HasEmote,
+		Meta:     ir.Meta{ScriptEncoding: ast.Encoding, GeneratedBy: "ucgr/catsystem2.BuildIR v2"},
+		Events:   []ir.Event{*ev},
 	}
 	if n := ctx.Config["script_name"]; n != "" {
 		out.Events[0].EventID = strings.TrimSuffix(filepath.Base(n), filepath.Ext(n))

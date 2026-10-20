@@ -21,16 +21,18 @@ const (
 
 // IR 顶层结构。
 type IR struct {
-	IRVersion string  `json:"ir_version"`
-	GameID    string  `json:"game_id"`
-	EngineID  string  `json:"engine_id"`
-	Fidelity  string  `json:"fidelity"`
-	Meta      Meta    `json:"meta"`
+	IRVersion string `json:"ir_version"`
+	GameID    string `json:"game_id"`
+	EngineID  string `json:"engine_id"`
+	Fidelity  string `json:"fidelity"`
+	Meta      Meta   `json:"meta"`
 	// CanvasW/CanvasH 是游戏的原生舞台尺寸（0 表示未声明，由回放器按素材推断）。
 	// CS2 从 m2config/m2view.cnf 的 #wndsize 读得，用于在缩放图层时保持画布稳定。
-	CanvasW int     `json:"canvas_w,omitempty"`
-	CanvasH int     `json:"canvas_h,omitempty"`
-	Events  []Event `json:"events"`
+	CanvasW int `json:"canvas_w,omitempty"`
+	CanvasH int `json:"canvas_h,omitempty"`
+	// HasEmote 表示整份 IR 是否含 E-mote 动态立绘（不可复刻项，FR-19）。
+	HasEmote bool    `json:"has_emote"`
+	Events   []Event `json:"events"`
 }
 
 // Meta 溯源信息。
@@ -59,6 +61,7 @@ type Event struct {
 	StartMs      int64          `json:"start_ms,omitempty"`
 	EndMs        int64          `json:"end_ms,omitempty"`
 	Characters   []string       `json:"characters,omitempty"`
+	HasEmote     bool           `json:"has_emote"`
 	Layers       []Layer        `json:"layers"`
 	Timeline     []TimelineOp   `json:"timeline"`
 	Show         []ShowOp       `json:"show,omitempty"` // 演出台本（顺序，给播放器；见 show.go）

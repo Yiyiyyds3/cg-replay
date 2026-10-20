@@ -91,6 +91,9 @@ func TestBuildIRFade(t *testing.T) {
 	if p["from"] != 0.0 || p["to"] != 1.0 || p["duration_ms"] != 768 || p["opacity"] != 1.0 {
 		t.Fatalf("fade params = %#v", p)
 	}
+	if out.HasEmote || ev.HasEmote {
+		t.Fatalf("static bg should not set has_emote: ir:%v event:%v", out.HasEmote, ev.HasEmote)
+	}
 }
 
 func TestBuildIRStaticLayersAndEmote(t *testing.T) {
@@ -136,6 +139,9 @@ func TestBuildIRStaticLayersAndEmote(t *testing.T) {
 	}
 	if out.CanvasW != 1600 || out.CanvasH != 900 {
 		t.Fatalf("canvas = %dx%d, want 1600x900", out.CanvasW, out.CanvasH)
+	}
+	if !out.HasEmote || !ev.HasEmote {
+		t.Fatalf("has_emote = ir:%v event:%v, want true (fw/mpl)", out.HasEmote, ev.HasEmote)
 	}
 	if len(ev.Timeline) != 5 {
 		t.Fatalf("timeline = %d ops, want 5: %#v", len(ev.Timeline), ev.Timeline)

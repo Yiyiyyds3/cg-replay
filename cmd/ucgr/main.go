@@ -641,9 +641,13 @@ func cmdIR(args []string) error {
 				nv++
 			}
 		}
-		fmt.Printf("  #%-2d %-16s %-10s 图层%d 台词%d(语音%d) 转场%d 资产%d 未识别%d\n",
+		emote := ""
+		if ev.HasEmote {
+			emote = " E-mote(不可复刻)"
+		}
+		fmt.Printf("  #%-2d %-16s %-10s 图层%d 台词%d(语音%d) 转场%d 资产%d 未识别%d%s\n",
 			ev.Ord, ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts), nv,
-			len(ev.Transitions), len(ev.Assets), len(ev.Unrecognized))
+			len(ev.Transitions), len(ev.Assets), len(ev.Unrecognized), emote)
 	}
 	if outPath != "" {
 		b, err := json.MarshalIndent(out, "", "  ")
@@ -1096,8 +1100,12 @@ func cmdPlay(args []string) error {
 	}
 	opt.Speed = 1 // 倍速在下面按 dt 计算，避免与 Advance 内部乘 Speed 重复
 	shotN := 0
+	title := fmt.Sprintf("ucgr play — %s %s", gameID, ev.EventID)
+	if ev.HasEmote {
+		title += " [E-mote 不可复刻]"
+	}
 	return win32.Run(win32.Options{
-		Title:  fmt.Sprintf("ucgr play — %s %s", gameID, ev.EventID),
+		Title:  title,
 		Width:  w,
 		Height: h,
 	}, func(c *win32.Canvas, dtMs int64, in win32.Input) {
@@ -1214,8 +1222,12 @@ func parseSize(spec string) (int, int) {
 // replayDump 文本回放：图层清单 + 时间轴 + 转场/分支。
 func replayDump(doc *ir.IR) {
 	for _, ev := range doc.Events {
-		fmt.Printf("\n=== 事件 %s（%s）图层 %d 台词 %d ===\n",
-			ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts))
+		emote := ""
+		if ev.HasEmote {
+			emote = "  ⚠ E-mote 不可复刻"
+		}
+		fmt.Printf("\n=== 事件 %s（%s）图层 %d 台词 %d%s ===\n",
+			ev.EventID, ev.Kind, len(ev.Layers), len(ev.Texts), emote)
 		// 图层清单
 		for _, l := range ev.Layers {
 			name := "-"

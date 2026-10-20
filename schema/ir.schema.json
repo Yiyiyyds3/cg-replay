@@ -11,6 +11,7 @@
     "game_id": { "type": "string", "minLength": 1 },
     "engine_id": { "type": "string", "minLength": 1 },
     "fidelity": { "enum": ["generic", "tuned", "exclusive"] },
+    "has_emote": { "type": "boolean" },
     "canvas_w": { "type": "integer", "minimum": 1 },
     "canvas_h": { "type": "integer", "minimum": 1 },
     "meta": {
@@ -211,7 +212,7 @@
     "Event": {
       "type": "object",
       "required": [
-        "event_id", "kind", "ord", "layers", "timeline",
+        "event_id", "kind", "ord", "has_emote", "layers", "timeline",
         "texts", "voices", "transitions", "branches", "unrecognized", "assets"
       ],
       "additionalProperties": false,
@@ -223,6 +224,7 @@
         "start_ms": { "type": "integer", "minimum": 0 },
         "end_ms": { "type": "integer", "minimum": 0 },
         "characters": { "type": "array", "items": { "type": "string" } },
+        "has_emote": { "type": "boolean" },
         "layers": { "type": "array", "items": { "$ref": "#/$defs/Layer" } },
         "timeline": { "type": "array", "items": { "$ref": "#/$defs/TimelineOp" } },
         "texts": { "type": "array", "items": { "$ref": "#/$defs/TextLine" } },
