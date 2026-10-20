@@ -16,17 +16,26 @@
 // 每段形如 u32 sectionSize + "stdinfo"，段内布局同上；下段起点 = 本段起点 + sectionSize
 // （sectionSize 为 0 表示直到文件尾）。
 //
-// 图像段（base+headerSize 起）：8 字节类型标签，实测样本全是 "img0000\0"：
+// 图像段（base+headerSize 起）按 8 字节类型标签分派：
 //
-//	+0x18  packedDataSize   +0x1C dataSize
-//	+0x20  packedCtlSize    +0x24 ctlSize
-//	+0x28  数据段（zlib，解出 dataSize 字节）
-//	其后 控制段（zlib，解出 ctlSize 字节；LSB 优先位流）
+//	img0000 —— 本机 4645 个样本的常见变种：
+//	  +0x18  packedDataSize   +0x1C dataSize
+//	  +0x20  packedCtlSize    +0x24 ctlSize
+//	  +0x28  数据段（zlib，解出 dataSize 字节）
+//	  其后 控制段（zlib，解出 ctlSize 字节；LSB 优先位流）
 //
-// 控制位流语义：首个 bit = copy 标志；随后 GetBitCount 得「输出总长」；
-// 之后循环 GetBitCount 得 run 长度 —— copy 为真时从数据段顺序搬运 run 字节，
-// 为假时该段填 0，copy 取反。搬运完的缓冲再做两级差分还原（先首行横向、再逐行纵向），
-// 最后行序上下翻转（img0000 是自下而上存的）。
+//	  控制位流语义：首个 bit = copy 标志；随后 GetBitCount 得「输出总长」；
+//	  之后循环 GetBitCount 得 run 长度 —— copy 为真时从数据段顺序搬运 run 字节，
+//	  为假时该段填 0，copy 取反。搬运完的缓冲再做两级差分还原（先首行横向、再逐行纵向），
+//	  最后行序上下翻转（img0000 是自下而上存的）。
+//
+//	img_jpg —— 段头之后是子段目录（TOC），每项 8 字节名字 + u32 段大小：
+//	  "img_jpg" 段 +0x0C 是 u32 JPEG 长度，+0x10 起是 JPEG 数据；
+//	  "img_al"  段 +0x10 是 u32 压缩长度、+0x14 是 u32 解压长度，+0x18 起是 zlib alpha；
+//	  "imgmode" 段仅按存在与否生效（GARbro 交换 R/B 通道，语义存疑但照做）。
+//	  JPEG 不自下而上存，不做翻转；输出 BGRA，缺 alpha 段时 alpha 全 0xFF。
+//
+//	img_wbp —— WebP 变种，仍返回明确错误。
 package decode
 
 import (
@@ -160,7 +169,7 @@ func decodeHg3Section(data []byte, s Hg3Section) (*Image, error) {
 	case bytes.Equal(tag, []byte("img0000\x00")):
 		return decodeHg3Img0000(data, s, p)
 	case bytes.Equal(tag, []byte("img_jpg\x00")):
-		return nil, fmt.Errorf("HG3 img_jpg（JPEG + 独立 alpha 段）暂未实现：本机 4645 个样本中 0 例")
+		return decodeHg3ImgJPG(data, s)
 	case bytes.Equal(tag, []byte("img_wbp\x00")):
 		return nil, fmt.Errorf("HG3 img_wbp（WebP）暂未实现")
 	default:
@@ -232,6 +241,96 @@ func decodeHg3Img0000(data []byte, s Hg3Section, p int) (*Image, error) {
 		colors = 3
 	}
 	return &Image{Width: s.Width, Height: s.Height, Colors: colors, Pixels: flipped}, nil
+}
+
+// decodeHg3ImgJPG 解 img_jpg 变种：JPEG 主体 + 可选 zlib alpha + 可选 imgmode 通道交换。
+//
+// TOC 偏移以本段 stdinfo 的 Base 为原点（GARbro 把输入流定位在 0x14，并从
+// HeaderSize 开始读 TOC；单图文件 Base 恰为 0x14）。段大小包含 12 字节的名字/大小头。
+func decodeHg3ImgJPG(data []byte, s Hg3Section) (*Image, error) {
+	toc, err := hg3ReadSections(data, s)
+	if err != nil {
+		return nil, err
+	}
+	jpgSec, ok := toc["img_jpg"]
+	if !ok {
+		return nil, fmt.Errorf("HG3 img_jpg 缺少 img_jpg 子段")
+	}
+	if jpgSec+16 > len(data) {
+		return nil, fmt.Errorf("HG3 img_jpg 段头越界")
+	}
+	jpegSize := int(int32(binary.LittleEndian.Uint32(data[jpgSec+12:])))
+	if jpegSize <= 0 || jpgSec+16+jpegSize > len(data) {
+		return nil, fmt.Errorf("HG3 img_jpg JPEG 长度异常（%d）", jpegSize)
+	}
+	im, err := decodeJPEG(data[jpgSec+16:jpgSec+16+jpegSize], 0)
+	if err != nil {
+		return nil, fmt.Errorf("HG3 img_jpg 主体: %w", err)
+	}
+	if im.Width != s.Width || im.Height != s.Height {
+		return nil, fmt.Errorf("HG3 img_jpg 尺寸不符（头 %dx%d，JPEG %dx%d）",
+			s.Width, s.Height, im.Width, im.Height)
+	}
+	total := s.Width * s.Height
+	if total <= 0 || total > 1<<30 {
+		return nil, fmt.Errorf("HG3 img_jpg 像素数异常（%d）", total)
+	}
+
+	alpha := bytes.Repeat([]byte{0xFF}, total)
+	if alSec, ok := toc["img_al"]; ok {
+		if alSec+0x18 > len(data) {
+			return nil, fmt.Errorf("HG3 img_al 段头越界")
+		}
+		packed := int(int32(binary.LittleEndian.Uint32(data[alSec+0x10:])))
+		alphaSize := int(int32(binary.LittleEndian.Uint32(data[alSec+0x14:])))
+		if packed < 0 || alphaSize < total || alSec+0x18+packed > len(data) {
+			return nil, fmt.Errorf("HG3 img_al 长度异常（压缩 %d，解压 %d，需要 %d）",
+				packed, alphaSize, total)
+		}
+		alpha, err = hg3Inflate(data[alSec+0x18:alSec+0x18+packed], alphaSize)
+		if err != nil {
+			return nil, fmt.Errorf("HG3 img_al 解压失败: %w", err)
+		}
+	}
+
+	// GARbro 默认把解码器给出的 BGR(A) 原样写成 B,G,R,A；存在 imgmode 时把
+	// 源 R/B 下标对调，等价于在这里交换 B 与 R。GARbro 自己标了「XXX ???」，
+	// 这里保持同一行为，待有真实样本再校正。
+	if _, ok := toc["imgmode"]; ok {
+		for i := 0; i < total; i++ {
+			im.Pixels[i*4], im.Pixels[i*4+2] = im.Pixels[i*4+2], im.Pixels[i*4]
+		}
+	}
+	for i := 0; i < total; i++ {
+		im.Pixels[i*4+3] = alpha[i]
+	}
+	im.Colors = 4
+	return im, nil
+}
+
+// hg3ReadSections 读 img_jpg 的子段目录。返回「段名 → 段绝对偏移」。
+// 目录以 section_size == 0 的项结束（GARbro 的 do/while）。
+func hg3ReadSections(data []byte, s Hg3Section) (map[string]int, error) {
+	toc := make(map[string]int)
+	off := s.Base + s.HeaderSize
+	for i := 0; i < 1024; i++ {
+		if off < 0 || off+12 > len(data) {
+			return nil, fmt.Errorf("HG3 子段目录越界（偏移 0x%X）", off)
+		}
+		name := string(bytes.TrimRight(data[off:off+8], "\x00"))
+		size := int(binary.LittleEndian.Uint32(data[off+8:]))
+		if name != "" {
+			toc[name] = off
+		}
+		if size == 0 {
+			return toc, nil
+		}
+		if size < 12 || off+size > len(data) {
+			return nil, fmt.Errorf("HG3 子段 %q 大小异常（%d）", name, size)
+		}
+		off += size
+	}
+	return nil, fmt.Errorf("HG3 子段目录项过多")
 }
 
 // hg3Inflate 解一段 zlib，要求恰好得到 want 字节。
