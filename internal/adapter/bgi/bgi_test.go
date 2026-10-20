@@ -266,6 +266,121 @@ func TestIdentify(t *testing.T) {
 	}
 }
 
+// TestParseArchiveARC 校验 PackFile 与 BURIKO ARC20 两种 .arc 索引。
+func TestParseArchiveARC(t *testing.T) {
+	dir := t.TempDir()
+
+	pack := filepath.Join(dir, "pack.arc")
+	writePackARC(t, pack, []arcFixture{
+		{name: []byte{0x83, 0x65, 0x83, 0x58, 0x83, 0x67, '.', 'b', 's'}, data: []byte("hello")},
+		{name: []byte("data.bin"), data: []byte("world!!")},
+	})
+	ents, err := (&Adapter{}).ParseArchive(pack)
+	if err != nil {
+		t.Fatalf("ParseArchive(PackFile): %v", err)
+	}
+	if len(ents) != 2 {
+		t.Fatalf("条目数 = %d", len(ents))
+	}
+	if ents[0].Path != "data.bin" || ents[1].Path != "テスト.bs" {
+		t.Errorf("路径 = %q, %q", ents[0].Path, ents[1].Path)
+	}
+	if ents[1].Offset != 16+2*0x20 || ents[1].Size != 5 || ents[1].UncompressedSize != 5 {
+		t.Errorf("テスト.bs 索引 = %+v", ents[1])
+	}
+	if id, err := (&Adapter{}).Identify(pack); err != nil || id != engineID {
+		t.Errorf("Identify(PackFile) = %q, %v", id, err)
+	}
+
+	buriko := filepath.Join(dir, "buriko.arc")
+	writeBurikoARC(t, buriko, []arcFixture{{name: []byte("00_op_01"), data: []byte("bse!")}})
+	ents, err = (&Adapter{}).ParseArchive(buriko)
+	if err != nil {
+		t.Fatalf("ParseArchive(BURIKO): %v", err)
+	}
+	if len(ents) != 1 || ents[0].Path != "00_op_01" || ents[0].Size != 4 {
+		t.Fatalf("BURIKO 条目 = %+v", ents)
+	}
+	if id, err := (&Adapter{}).Identify(buriko); err != nil || id != engineID {
+		t.Errorf("Identify(BURIKO) = %q, %v", id, err)
+	}
+
+	// 不是 BGI 的 .arc 不认领，且解析时明确报错。
+	bad := filepath.Join(dir, "bad.arc")
+	if err := os.WriteFile(bad, []byte("not an archive"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if id, _ := (&Adapter{}).Identify(bad); id != "" {
+		t.Errorf("非 BGI .arc 被认领：%q", id)
+	}
+	if _, err := (&Adapter{}).ParseArchive(bad); err == nil || !strings.Contains(err.Error(), ".arc") {
+		t.Errorf("ParseArchive(坏 .arc) = %v，应明确报错", err)
+	}
+}
+
+type arcFixture struct {
+	name []byte
+	data []byte
+}
+
+func writePackARC(t *testing.T, path string, entries []arcFixture) {
+	t.Helper()
+	const indexSize = 0x20
+	base := 16 + indexSize*len(entries)
+	var buf []byte
+	hdr := make([]byte, 16)
+	copy(hdr, bgiArcMagic)
+	binary.LittleEndian.PutUint32(hdr[12:], uint32(len(entries)))
+	buf = append(buf, hdr...)
+	dataOff := 0
+	for _, e := range entries {
+		rec := make([]byte, indexSize)
+		copy(rec, e.name)
+		binary.LittleEndian.PutUint32(rec[0x10:], uint32(dataOff))
+		binary.LittleEndian.PutUint32(rec[0x14:], uint32(len(e.data)))
+		buf = append(buf, rec...)
+		dataOff += len(e.data)
+	}
+	if len(buf) != base {
+		t.Fatalf("索引长度 %d，期望 %d", len(buf), base)
+	}
+	for _, e := range entries {
+		buf = append(buf, e.data...)
+	}
+	if err := os.WriteFile(path, buf, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeBurikoARC(t *testing.T, path string, entries []arcFixture) {
+	t.Helper()
+	const indexSize = 0x80
+	base := 16 + indexSize*len(entries)
+	var buf []byte
+	hdr := make([]byte, 16)
+	copy(hdr, burikoArcMagic)
+	binary.LittleEndian.PutUint32(hdr[12:], uint32(len(entries)))
+	buf = append(buf, hdr...)
+	dataOff := 0
+	for _, e := range entries {
+		rec := make([]byte, indexSize)
+		copy(rec, e.name)
+		binary.LittleEndian.PutUint32(rec[0x60:], uint32(dataOff))
+		binary.LittleEndian.PutUint32(rec[0x64:], uint32(len(e.data)))
+		buf = append(buf, rec...)
+		dataOff += len(e.data)
+	}
+	if len(buf) != base {
+		t.Fatalf("索引长度 %d，期望 %d", len(buf), base)
+	}
+	for _, e := range entries {
+		buf = append(buf, e.data...)
+	}
+	if err := os.WriteFile(path, buf, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestRealCorpus 真机语料（需设 UCGR_BGI_DIR）。
 // 期望值与 Python 原型（analyze2.py）一致：文件数 / 指令数逐款吻合。
 func TestRealCorpus(t *testing.T) {

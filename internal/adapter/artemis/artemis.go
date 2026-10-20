@@ -103,8 +103,8 @@ func hasFileWithExt(root, ext string, maxDepth int) bool {
 
 // ParseArchive 列出归档条目（只列条目，不解压）。
 //
-// 现状：支持**已解包目录**（WalkDir；.ast 剧本不列入，剧本走 ParseScript）；
-// .pfs 容器解析尚未实现 → 返回明确错误（P1-7 不静默失败）。
+// 支持**已解包目录**（WalkDir；.ast 剧本不列入，剧本走 ParseScript）
+// 与 .pfs 容器（v2/v6/v8；v8 标记 SHA1(index) XOR 加密）。
 func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -112,7 +112,7 @@ func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 	}
 	if !fi.IsDir() {
 		if strings.EqualFold(filepath.Ext(path), archiveExt) {
-			return nil, fmt.Errorf("artemis: .pfs 容器解析尚未实现（%s）；请使用解包后的目录", filepath.Base(path))
+			return parsePFS(path)
 		}
 		return nil, fmt.Errorf("artemis: 不是目录也不是 .pfs 归档: %s", path)
 	}

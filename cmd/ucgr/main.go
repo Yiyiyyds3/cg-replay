@@ -301,9 +301,13 @@ func cmdProbe(args []string) error {
 	// 扩展名分布
 	dist := map[string]int{}
 	for _, e := range ents {
-		ext := e.Path[strings.LastIndex(e.Path, "."):]
-		if i := strings.LastIndex(e.Path, "/"); i >= 0 {
-			ext = e.Path[strings.LastIndex(e.Path, "."):]
+		name := e.Path
+		if i := strings.LastIndexByte(name, '/'); i >= 0 {
+			name = name[i+1:]
+		}
+		ext := "(无扩展名)"
+		if i := strings.LastIndexByte(name, '.'); i >= 0 {
+			ext = name[i:]
 		}
 		dist[strings.ToLower(ext)]++
 	}

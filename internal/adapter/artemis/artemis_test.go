@@ -1,6 +1,7 @@
 package artemis
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"strings"
@@ -287,11 +288,96 @@ func TestIdentify(t *testing.T) {
 	if got, err := (&Adapter{}).Identify(f); err != nil || got != "artemis" {
 		t.Fatalf("Identify(.ast 文件) = %q, %v", got, err)
 	}
-	// .pfs 归档：不静默失败
-	if _, err := (&Adapter{}).ParseArchive(filepath.Join(dir, "x.pfs")); err == nil {
-		t.Error("ParseArchive(.pfs) 应报明确错误")
-	} else if !strings.Contains(err.Error(), ".pfs") {
-		t.Errorf("ParseArchive 错误应提到 .pfs: %v", err)
+	// .pfs 归档：v6 明文，能列出条目
+	pfs := filepath.Join(dir, "x.pfs")
+	writePFS(t, pfs, 6, []pfsFixture{{name: []byte("script\\01_01.ast"), data: []byte("ast")}})
+	ents, err := (&Adapter{}).ParseArchive(pfs)
+	if err != nil {
+		t.Fatalf("ParseArchive(.pfs) 失败: %v", err)
+	}
+	if len(ents) != 1 || ents[0].Path != "script/01_01.ast" || ents[0].Encrypted {
+		t.Errorf("ParseArchive(.pfs) = %+v", ents)
+	}
+}
+
+// TestParseArchivePFS 校验 v6 明文与 v8 SHA1-XOR 两种 PFS 索引。
+func TestParseArchivePFS(t *testing.T) {
+	for _, version := range []int{6, 8} {
+		t.Run(string(rune('0'+version)), func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "test.pfs")
+			writePFS(t, p, version, []pfsFixture{
+				{name: []byte("script\\01_01.ast"), data: []byte("ast!")},
+				{name: []byte{'i', 'm', 'a', 'g', 'e', '\\', 0x83, 0x65, 0x83, 0x58, 0x83, 0x67, '.', 'p', 'n', 'g'}, data: []byte("png-data")},
+			})
+			ents, err := (&Adapter{}).ParseArchive(p)
+			if err != nil {
+				t.Fatalf("ParseArchive(v%d): %v", version, err)
+			}
+			if len(ents) != 2 {
+				t.Fatalf("条目数 = %d", len(ents))
+			}
+			if ents[0].Path != "image/テスト.png" || ents[1].Path != "script/01_01.ast" {
+				t.Errorf("路径 = %q, %q", ents[0].Path, ents[1].Path)
+			}
+			if ents[0].Size != int64(len("png-data")) || ents[1].Size != int64(len("ast!")) {
+				t.Errorf("大小 = %d, %d", ents[0].Size, ents[1].Size)
+			}
+			for _, e := range ents {
+				if e.Encrypted != (version == 8) {
+					t.Errorf("v%d Encrypted = %v", version, e.Encrypted)
+				}
+				if version == 8 && e.KeyHint == "" {
+					t.Errorf("v8 缺少 KeyHint")
+				}
+			}
+		})
+	}
+}
+
+type pfsFixture struct {
+	name []byte
+	data []byte
+}
+
+func writePFS(t *testing.T, path string, version int, entries []pfsFixture) {
+	t.Helper()
+	// PFS 的 index 从文件偏移 7 开始，前 4 字节是 count；index_size 含这 4 字节。
+	indexLen := 4
+	for _, e := range entries {
+		indexLen += len(e.name) + 16
+	}
+	dataBase := 7 + indexLen
+
+	index := make([]byte, 4, indexLen)
+	binary.LittleEndian.PutUint32(index, uint32(len(entries)))
+	dataOff := 0
+	var data []byte
+	for _, e := range entries {
+		var rec [4]byte
+		binary.LittleEndian.PutUint32(rec[:], uint32(len(e.name)))
+		index = append(index, rec[:]...)
+		index = append(index, e.name...)
+		index = append(index, 0, 0, 0, 0)
+		var offSize [8]byte
+		binary.LittleEndian.PutUint32(offSize[:], uint32(dataBase+dataOff))
+		binary.LittleEndian.PutUint32(offSize[4:], uint32(len(e.data)))
+		index = append(index, offSize[:]...)
+		data = append(data, e.data...)
+		dataOff += len(e.data)
+	}
+	if len(index) != indexLen {
+		t.Fatalf("PFS index 长度 %d，期望 %d", len(index), indexLen)
+	}
+	hdr := []byte{'p', 'f', byte('0' + version), 0, 0, 0, 0}
+	binary.LittleEndian.PutUint32(hdr[3:], uint32(len(index)))
+
+	all := append(hdr, index...)
+	all = append(all, data...)
+	if len(all) != dataBase+len(data) {
+		t.Fatalf("fixture 长度 %d，期望 %d", len(all), dataBase+len(data))
+	}
+	if err := os.WriteFile(path, all, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

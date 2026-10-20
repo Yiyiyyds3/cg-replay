@@ -1,8 +1,8 @@
 // adapter.go —— BGI / Ethornell 适配器（五方法实现）。
 //
 // 本机语料是三款 BGI 游戏的解包目录（樱之诗 / 秽翼的尤斯蒂娅 / 美好的每一天），
-// 脚本在 <根>/文本_脚本/**/*.bs；.arc 归档本体未在语料里，故 ParseArchive 只支持目录，
-// 遇到归档文件照实报错（缺资源告警 P1-7：不支持就明说，不静默降级）。
+// 脚本在 <根>/文本_脚本/**/*.bs；.arc 支持 PackFile 与 BURIKO ARC20 两种索引，
+// 只列目录、不解 DSC/BSE 数据段。
 package bgi
 
 import (
@@ -25,7 +25,8 @@ func init() {
 }
 
 // Identify 报告路径是否属于 BGI。
-//   - 文件：.bs 且头是 BurikoCompiledScriptVer1.00（不看扩展名之外的证据，不猜）；
+//   - 文件：.bs 且头是 BurikoCompiledScriptVer1.00；.arc 且头是
+//     "PackFile    " / "BURIKO ARC20"（不看扩展名之外的证据，不猜）；
 //   - 目录：深度 5 内存在带头魔数的 .bs，且没有其它引擎的反向证据（.xp3/.cst/.ast）。
 //
 // 不确定一律返回 ""（契约纪律：识别歧义由调用方报错，比误认领好）。
@@ -35,10 +36,10 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 		return "", err
 	}
 	if !st.IsDir() {
-		if !strings.EqualFold(filepath.Ext(archiveOrDir), scriptExt) {
-			return "", nil
-		}
-		if fileHasMagic(archiveOrDir) {
+		switch {
+		case strings.EqualFold(filepath.Ext(archiveOrDir), scriptExt) && fileHasMagic(archiveOrDir):
+			return engineID, nil
+		case strings.EqualFold(filepath.Ext(archiveOrDir), archiveExt) && arcHasMagic(archiveOrDir):
 			return engineID, nil
 		}
 		return "", nil
@@ -54,7 +55,7 @@ func (a *Adapter) Identify(archiveOrDir string) (string, error) {
 	return "", nil
 }
 
-// ParseArchive 列出解包目录里的文件（BGI 的 .arc 归档解析未实现，明确报错）。
+// ParseArchive 列出解包目录或 BGI .arc 归档里的文件。
 func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -62,9 +63,9 @@ func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 	}
 	if !st.IsDir() {
 		if strings.EqualFold(filepath.Ext(path), archiveExt) {
-			return nil, fmt.Errorf("bgi: .arc 归档解析未实现（本机语料为解包目录，请传目录）")
+			return parseARC(path)
 		}
-		return nil, fmt.Errorf("bgi: ParseArchive 只支持解包目录，得到 %s", path)
+		return nil, fmt.Errorf("bgi: ParseArchive 只支持解包目录或 .arc 归档，得到 %s", path)
 	}
 	var out []adapter.ArchiveEntry
 	err = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
