@@ -270,16 +270,28 @@ func Compose(sts []LayerState, load Loader, canvasW, canvasH int) (*image.RGBA, 
 	var drawn []string
 	var dst *image.RGBA
 	if canvasW <= 0 || canvasH <= 0 {
-		for _, s := range ordered {
-			if !s.Visible || s.Ref == "" {
-				continue
+		// 优先用 z 最小的可见层定画布。若事件开头还没有任何可见层
+		// （CS2 常见的 fade-in：bg 在 4800ms 才 image_show），退而用
+		// 已登记但尚未显示的层定尺寸；否则会得到 1×1 黑帧。
+		useLayer := func(visibleOnly bool) bool {
+			for _, s := range ordered {
+				if s.Ref == "" || (visibleOnly && !s.Visible) {
+					continue
+				}
+				img, err := load(s.Ref)
+				if err != nil {
+					if visibleOnly {
+						return false
+					}
+					continue
+				}
+				canvasW, canvasH = img.Bounds().Dx(), img.Bounds().Dy()
+				return true
 			}
-			img, err := load(s.Ref)
-			if err != nil {
-				return nil, drawn, err
-			}
-			canvasW, canvasH = img.Bounds().Dx(), img.Bounds().Dy()
-			break
+			return false
+		}
+		if !useLayer(true) {
+			useLayer(false)
 		}
 	}
 	if canvasW <= 0 || canvasH <= 0 {

@@ -11,6 +11,9 @@ import (
 // assetDirs 常见的素材子目录（相对解包根）。
 var assetDirs = []string{
 	"",
+	// CatSystem2：解包树把图片按归档分成 image00/image01/cndate04，
+	// 剧本里的裸名（如 bg03_smr_b）需要在这些目录里按 stem+ext 找。
+	"image00", "image01", "cndate04",
 	"raw/data/fgimage", "raw/data/image", "raw/data/bgimage", "raw/data/system", "raw/data/rule",
 	"fgimage", "image", "bgimage", "system", "rule",
 }

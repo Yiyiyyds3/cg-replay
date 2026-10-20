@@ -457,21 +457,50 @@ var (
 // 用于滤掉 `(70+0)`、`#(950+#300)` 这类表达式噪声。
 var refNameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.\-/]*$`)
 
+// layerNameRe 静态图层图片名（对应 cst_refs.IMG_RE 的第三个捕获组）：
+// 只接受字母开头的裸名，排除 `63%`、`-80`、`#570+100` 等表达式/数字。
+var layerNameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+
+// layerRef 取静态图层命令的图片名。
+//
+// CS2 的图层命令是「<命令> <槽位> <图片名> [其余参数]」；当第二个位置参数
+// （Args[1]）是 scale/pos/fade/... 时，这是一条对已有图层的变换命令，不是
+// 新图片。Python 原型用 IMG_RE 的第三个 token 做同样的事，这里保持同口径。
+// 例：`bg 0 bg03_smr_b` → bg03_smr_b；`bg 0 scale 63% 63%` → ""。
+func layerRef(c *Command) string {
+	if c == nil || len(c.Args) < 2 {
+		return ""
+	}
+	v := c.Args[1]
+	if i := strings.IndexByte(v, ','); i >= 0 {
+		v = v[:i]
+	}
+	v = strings.Trim(v, `"'`)
+	if v == "" || isAllDigits(v) || isCSCmdWord(v) || strings.HasPrefix(strings.ToLower(v), "m2") {
+		return ""
+	}
+	if !layerNameRe.MatchString(v) {
+		return ""
+	}
+	return v
+}
+
 // ExtractRefs 提取资源引用。
 //
 // 规则（对应 cst_refs.parse_refs_cs2）：
 //   - pcm <名>            语音（同时登记去 _<数字> take 后缀变体）
 //   - se <buf> <名>       音效（跳过一个缓冲参数）
-//   - bg <槽位> <名>      背景（跳过槽位参数）
-//   - chr c/l/r/ll/rr=   立绘（属性）
+//   - bg/cg/fg/eg <槽位> <名>  静态图层图片（只取第三个 token；变换命令不取）
 //   - mface name=         差分（属性）
 //   - movie <名> / evset file= / fesds ... 按需
 //   - call <子剧本>       非资产（DR-25 剧本全留）
+//
+// fw/mpl 的 E-mote 数据（.psz）按硬边界不复刻，不登记为资源；pl 是粒子控制。
 func (ast *Ast) ExtractRefs() []string {
 	var refs []string
 	add := func(v string) {
 		v = strings.Trim(v, `"'`)
-		if v == "" || strings.HasPrefix(v, "%") || strings.HasPrefix(v, "&") || strings.HasPrefix(v, "$") {
+		if v == "" || isAllDigits(v) || strings.HasPrefix(v, "%") || strings.HasPrefix(v, "&") || strings.HasPrefix(v, "$") {
 			return
 		}
 		v = strings.ReplaceAll(v, "\\", "/")
@@ -481,20 +510,24 @@ func (ast *Ast) ExtractRefs() []string {
 		refs = append(refs, v)
 	}
 	for _, c := range ast.Commands {
-		switch strings.ToLower(c.Tag) {
+		tag := strings.ToLower(c.Tag)
+		switch tag {
 		case "pcm", "pcmch":
 			if len(c.Args) >= 1 {
 				v := c.Args[0]
-				add(v)
-				// take 后缀变体：A_19_sayuki_ex01_022_1 → A_19_sayuki_ex01_022
-				if i := strings.LastIndex(v, "_"); i > 0 && isAllDigits(v[i+1:]) {
-					add(v[:i])
+				// `pcm 0 end 90` 是控制命令（停止/淡出），不是语音名。
+				if !isAllDigits(v) && !isCSCmdWord(v) {
+					add(v)
+					// take 后缀变体：A_19_sayuki_ex01_022_1 → A_19_sayuki_ex01_022
+					if i := strings.LastIndex(v, "_"); i > 0 && isAllDigits(v[i+1:]) {
+						add(v[:i])
+					}
 				}
 			}
 		case "se":
 			// se <buf> <名>：第一个位置参数是缓冲号（数字），取其后
 			for _, a := range c.Args {
-				if isAllDigits(a) {
+				if isAllDigits(a) || isCSCmdWord(a) {
 					continue
 				}
 				add(a)
@@ -505,24 +538,22 @@ func (ast *Ast) ExtractRefs() []string {
 					add(v)
 				}
 			}
-		case "bg", "bgm", "movie", "sysmovie":
-			for _, a := range c.Args {
-				if isAllDigits(a) {
-					continue // 槽位/缓冲号
-				}
-				add(a)
-				break
+		case "bg", "cg", "fg", "eg":
+			if v := layerRef(&c); v != "" {
+				add(v)
 			}
-		case "chr", "fg", "eg", "fw", "pl", "mpl":
-			for _, k := range []string{"c", "l", "r", "ll", "rr"} {
-				if v := c.Attrs[k]; v != "" {
+			for k, v := range c.Attrs {
+				if resourceAttrs[k] {
 					add(v)
 				}
 			}
+		case "bgm", "movie", "sysmovie":
 			for _, a := range c.Args {
-				if !isAllDigits(a) && !isCSCmdWord(a) {
-					add(a)
+				if isAllDigits(a) || isCSCmdWord(a) {
+					continue // 槽位/缓冲号/end/vol 等控制词
 				}
+				add(a)
+				break
 			}
 		case "mface", "face":
 			if v := c.Attrs["name"]; v != "" {
@@ -533,7 +564,7 @@ func (ast *Ast) ExtractRefs() []string {
 					add(a)
 				}
 			}
-		case "evset", "ev", "cg", "image":
+		case "evset", "ev", "image":
 			for k, v := range c.Attrs {
 				if resourceAttrs[k] {
 					add(v)
@@ -559,9 +590,11 @@ func (ast *Ast) ExtractRefs() []string {
 // isCSCmdWord CS2 命令里的非资源关键字。
 func isCSCmdWord(s string) bool {
 	switch strings.ToLower(s) {
-	case "blend", "pos", "tone", "stop", "mode", "attr_def", "disp", "scale",
-		"fade", "hide", "show", "sync", "wait", "loop", "normal", "grayscale",
-		"msgoff", "resetcolor", "time", "left", "right", "center", "true", "false":
+	case "blend", "pos", "blur", "tone", "stop", "mode", "attr_def", "disp",
+		"scale", "fade", "arc", "wait", "quake", "anti", "clear", "copy",
+		"effect", "hide", "show", "sync", "loop", "normal", "grayscale",
+		"msgoff", "resetcolor", "time", "left", "right", "center", "true", "false",
+		"end", "vol", "m2fade", "m2move", "m2amove", "m2amove1", "m2amove3", "pri":
 		return true
 	}
 	return false
@@ -659,8 +692,10 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		c := it.Cmd
 		tag := strings.ToLower(c.Tag)
 		switch tag {
-		case "bg", "chr", "fg", "eg", "fw", "mface", "ev", "cg", "image", "evset":
-			ref := firstRef(c)
+		case "bg", "cg", "fg", "eg":
+			// 只有第三 token 是图片名时才是换图；`bg 0 scale 63% 63%`、
+			// `bg 0 pos -80 -410` 这类是对已有图层的变换，不能当资源。
+			ref := layerRef(c)
 			if ref == "" {
 				continue
 			}
@@ -668,16 +703,54 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 			kind := ir.LayerCG
 			if tag == "bg" {
 				kind = ir.LayerBackground
-			} else if tag == "chr" || tag == "fg" || tag == "eg" || tag == "fw" {
+			} else if tag == "fg" || tag == "eg" {
 				kind = ir.LayerStand
 			}
+			// 槽位是并存的图层：bg 0 / bg 1 / eg 1 不能互相覆盖。
+			lid := tag
+			if len(c.Args) > 0 && isAllDigits(c.Args[0]) {
+				lid = tag + c.Args[0]
+			}
+			if v := c.Attrs["id"]; v != "" {
+				lid = tag + v
+			}
+			l, ex := layers[lid]
+			if !ex {
+				// 事件初态为空：真正的画面由 t=0 之后的 image_show 给出。
+				// 若沿用「最后一张图」做初态，脚本中途才出现的槽位会在开头
+				// 就露出来（CS2 一个脚本只切一个事件，这种错误尤其明显）。
+				l = &ir.Layer{LayerID: lid, Kind: kind, Z: len(order) + 1, Visible: false}
+				layers[lid] = l
+				order = append(order, lid)
+			}
+			if ar != nil {
+				l.Asset = ar
+			}
+			ev.Timeline = append(ev.Timeline, ir.TimelineOp{
+				TMs: clock, Op: "image_show", Target: lid,
+				Params: map[string]interface{}{"ref": ref},
+			})
+		case "fw", "mpl", "chr":
+			// E-mote/动态立绘：需要 .psz + .pfl/.dif/.inc 才能还原，
+			// 按 docs 的硬边界不复刻；不要把它的 HG3 部件当静态立绘。
+			ev.Unrecognized = append(ev.Unrecognized, ir.Unrecognized{
+				NodePath: "cmd[" + tag + "]", Raw: c.Raw,
+				Reason: "E-mote/动态立绘（不复刻）",
+			})
+		case "mface", "ev", "image", "evset":
+			ref := firstRef(c)
+			if ref == "" {
+				continue
+			}
+			ar := add(ref)
+			kind := ir.LayerCG
 			lid := tag
 			if v := c.Attrs["id"]; v != "" {
 				lid = tag + v
 			}
 			l, ex := layers[lid]
 			if !ex {
-				l = &ir.Layer{LayerID: lid, Kind: kind, Z: len(order) + 1, Visible: true}
+				l = &ir.Layer{LayerID: lid, Kind: kind, Z: len(order) + 1, Visible: false}
 				layers[lid] = l
 				order = append(order, lid)
 			}

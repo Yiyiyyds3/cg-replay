@@ -5,6 +5,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"ucgr/internal/ir"
@@ -190,6 +192,56 @@ func TestStatesAtResolvesStorageName(t *testing.T) {
 	}
 	if got := StatesAt(ev, 250)[0].Ref; got != "没这个文件" {
 		t.Fatalf("解析不了时应原样保留: %q", got)
+	}
+}
+
+func TestGameLoaderCS2AssetDirs(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "image00")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := solidPNG(t, 3, 2, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+	if err := os.WriteFile(filepath.Join(dir, "bg_test.png"), img, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	load := GameLoader(root)
+	got, err := load("bg_test") // 剧本里的裸名（无扩展名、无目录）
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Bounds().Dx() != 3 || got.Bounds().Dy() != 2 {
+		t.Fatalf("加载到错误尺寸: %v", got.Bounds())
+	}
+}
+
+func TestComposeAutoCanvasBeforeFirstShow(t *testing.T) {
+	// CS2 的 fade-in：事件开头没有可见层，但 bg 已登记在 Layers。
+	// 自动画布不能退化成 1×1，否则首帧是 75 字节的坏 PNG。
+	ev := &ir.Event{
+		EventID: "EV4",
+		Layers: []ir.Layer{
+			{LayerID: "bg0", Kind: ir.LayerBackground, Z: 1, Visible: false,
+				Asset: &ir.AssetRef{OrigPath: "image00/bg.hg3"}},
+		},
+		Timeline: []ir.TimelineOp{
+			{TMs: 4800, Op: "image_show", Target: "bg0",
+				Params: map[string]interface{}{"ref": "image00/bg.hg3"}},
+		},
+	}
+	imgs := map[string]image.Image{
+		"image00/bg.hg3": solidImg(t, 16, 12, color.RGBA{R: 0, G: 0, B: 255, A: 255}),
+	}
+	load := func(rel string) (image.Image, error) { return imgs[rel], nil }
+	img, drawn, err := Compose(StatesAt(ev, 0), load, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(drawn) != 0 {
+		t.Fatalf("t=0 不应画任何层: %v", drawn)
+	}
+	if img.Bounds().Dx() != 16 || img.Bounds().Dy() != 12 {
+		t.Fatalf("自动画布应取已登记 bg 的尺寸，实为 %v", img.Bounds())
 	}
 }
 
