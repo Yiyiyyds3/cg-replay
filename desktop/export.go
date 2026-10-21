@@ -184,7 +184,7 @@ func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg strin
 		return ExportResult{}, fmt.Errorf("台本为空，没有可导出的帧")
 	}
 
-	dir := filepath.Join(exeDir(), "exports", safeName(kind)+"_"+safeName(id))
+	dir := filepath.Join(dataDir(), "exports", safeName(kind)+"_"+safeName(id))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return ExportResult{}, err
 	}

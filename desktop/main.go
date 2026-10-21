@@ -59,7 +59,12 @@ type App struct {
 func NewApp() *App { return &App{} }
 
 // startup 保存运行上下文（后续弹窗/全屏/剪贴板都从 ctx 取窗口）。
-func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	// 一次性数据迁移：v0.2 及以前数据在 exe 同目录，装进 Program Files 后
+	// 非管理员写不动；搬到 dataDir()（只搬不删，目标存在不覆盖）。
+	migrateLegacyData(exeDir(), dataDir())
+}
 
 // Version 绑定桥自检：前端启动时调用，验证 window.go 通路。
 func (a *App) Version() string {
@@ -69,7 +74,7 @@ func (a *App) Version() string {
 // ReportClientError 前端未捕获异常上报（落到 exe 同目录 errors.log）。
 // 诊断用；保留常驻——黑屏比红横幅更糟（FR-12 不静默的兜底）。
 func (a *App) ReportClientError(msg string) error {
-	f, err := os.OpenFile(filepath.Join(exeDir(), "errors.log"),
+	f, err := os.OpenFile(filepath.Join(dataDir(), "errors.log"),
 		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

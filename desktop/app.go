@@ -18,12 +18,13 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"ucgr/internal/catalog"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
 	"ucgr/internal/replay"
 )
 
-// exeDir 返回 exe 所在目录（conf/covers/library.json 都在这里）。
+// exeDir 返回 exe 所在目录（只读用途：如日志排查时告诉用户 exe 在哪）。
 func exeDir() string {
 	exe, err := os.Executable()
 	if err != nil {
@@ -32,7 +33,102 @@ func exeDir() string {
 	return filepath.Dir(exe)
 }
 
-// conf 记忆上次的选择，与 cmd/cgreplay 同格式同文件。
+// dataDir 返回**可写数据目录**（conf/games.json/libraries/covers/exports/
+// catalog.db/errors.log 都落这里）：优先 %LOCALAPPDATA%\cgreplay-ui，回退
+// %APPDATA%\cgreplay-ui，再回退 exe 同目录（拿不到用户目录的老行为）。
+// 开发期（build/bin 直接跑）与安装后（Program Files）走同一位置，
+// 行为一致；且安装到 Program Files 后非管理员也能正常写。
+// 副作用：确保目录存在（建不出来则回退 exeDir）。
+func dataDir() string {
+	var base string
+	switch {
+	case os.Getenv("LOCALAPPDATA") != "":
+		base = os.Getenv("LOCALAPPDATA")
+	case os.Getenv("APPDATA") != "":
+		base = os.Getenv("APPDATA")
+	default:
+		return exeDir()
+	}
+	dir := filepath.Join(base, "cgreplay-ui")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return exeDir()
+	}
+	return dir
+}
+
+// legacyDataNames 老版本（v0.2 及以前）落在 exe 同目录的数据文件。
+var legacyDataFiles = []string{
+	confName,
+	registry.FileName,
+	catalog.FileName,
+	catalog.FileName + "-wal",
+	catalog.FileName + "-shm",
+	"errors.log",
+}
+
+// legacyDataDirs 老版本落在 exe 同目录的数据目录。
+var legacyDataDirs = []string{"libraries", "covers", "exports"}
+
+// migrateLegacyData 一次性把 from（老 exe 目录）里的既有数据搬到 to（dataDir）。
+// 规则：目标已存在则不覆盖；**只搬不删**（老目录留着当备份——删用户数据
+// 是不可逆操作，不符合本项目的静默原则）。from == to 或 from 没数据时no-op。
+func migrateLegacyData(from, to string) {
+	if from == to {
+		return
+	}
+	if err := os.MkdirAll(to, 0o755); err != nil {
+		return // 建不了目标：保持老路径行为，后续读写用 exeDir 回退
+	}
+	for _, name := range legacyDataFiles {
+		copyIfAbsent(filepath.Join(from, name), filepath.Join(to, name))
+	}
+	for _, name := range legacyDataDirs {
+		copyDirIfAbsent(filepath.Join(from, name), filepath.Join(to, name))
+	}
+}
+
+// copyIfAbsent 目标不存在才复制（存在即跳过，不覆盖用户数据）。
+func copyIfAbsent(src, dst string) {
+	if src == dst {
+		return
+	}
+	if _, err := os.Stat(dst); err == nil {
+		return
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return // 源不存在（首次运行）或读不了：跳过
+	}
+	_ = os.WriteFile(dst, data, 0o644)
+}
+
+// copyDirIfAbsent 目标目录不存在才整目录复制（存在即跳过）。
+func copyDirIfAbsent(src, dst string) {
+	if src == dst {
+		return
+	}
+	if _, err := os.Stat(dst); err == nil {
+		return
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return // 源不存在：跳过
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return
+	}
+	for _, e := range entries {
+		s, d := filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			copyDirIfAbsent(s, d)
+			continue
+		}
+		copyIfAbsent(s, d)
+	}
+}
+
+// conf 记忆上次的选择，与 cmd/cgreplay 同格式（文件位置不同：
+// GUI 在 dataDir()，CLI 在 exe 同目录——GUI 安装后 exe 目录不可写）。
 type conf struct {
 	Root    string `json:"root"`
 	Library string `json:"library"`
@@ -66,10 +162,10 @@ type GamesDTO struct {
 	Games  []GameDTO `json:"games"`
 }
 
-// loadConf 读 exe 同目录 conf；不存在返回零值 + missing 标记（不静默）。
+// loadConf 读 dataDir conf；不存在返回零值 + missing 标记（不静默）。
 func (a *App) loadConf() (conf, bool) {
 	var c conf
-	data, err := os.ReadFile(filepath.Join(exeDir(), confName))
+	data, err := os.ReadFile(filepath.Join(dataDir(), confName))
 	if err != nil {
 		return c, false
 	}
@@ -85,7 +181,7 @@ func (a *App) saveConf(c conf) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(exeDir(), confName)
+	path := filepath.Join(dataDir(), confName)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
 		return err
@@ -107,7 +203,7 @@ func (a *App) PickDirectory() (string, error) {
 }
 
 // registryPath 多游戏登记表路径（与 cgreplay.conf 同目录）。
-func (a *App) registryPath() string { return registry.Path(exeDir()) }
+func (a *App) registryPath() string { return registry.Path(dataDir()) }
 
 // loadRegistry 读游戏登记表。首次运行（games.json 不存在）把旧版 conf
 // 里的单根目录迁移成一条登记项；迁移只做一次，失败原样上抛。
@@ -129,7 +225,7 @@ func (a *App) loadRegistry(c conf) (*registry.Registry, error) {
 			if _, serr := os.Stat(library.ScenarioDir(clean)); serr == nil {
 				libPath := strings.TrimSpace(c.Library)
 				if libPath == "" {
-					libPath = registry.LibraryPath(exeDir(), registry.IDFor(clean))
+					libPath = registry.LibraryPath(dataDir(), registry.IDFor(clean))
 				}
 				g, _ := reg.Ensure(clean, libPath)
 				reg.Active = g.ID
@@ -209,7 +305,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 		return nil, err
 	}
 	id := registry.IDFor(clean)
-	libPath := registry.LibraryPath(exeDir(), id)
+	libPath := registry.LibraryPath(dataDir(), id)
 	if old := reg.Find(id); old != nil && strings.TrimSpace(old.Library) != "" {
 		libPath = old.Library
 	}
@@ -243,7 +339,7 @@ func (a *App) SetActiveGame(id string) (*library.Library, error) {
 		return nil, fmt.Errorf("游戏「%s」根目录不可用：%w", g.Title, err)
 	}
 	if g.Library == "" {
-		g.Library = registry.LibraryPath(exeDir(), g.ID)
+		g.Library = registry.LibraryPath(dataDir(), g.ID)
 	}
 	lib, err := a.loadOrScanLib(g)
 	if err != nil {
@@ -270,7 +366,7 @@ func (a *App) GetLibrary() (*library.Library, error) {
 		return nil, err
 	}
 	if g.Library == "" {
-		g.Library = registry.LibraryPath(exeDir(), g.ID)
+		g.Library = registry.LibraryPath(dataDir(), g.ID)
 		if err := reg.Save(a.registryPath()); err != nil {
 			return nil, err
 		}
@@ -298,7 +394,7 @@ func (a *App) Rescan() (*library.Library, error) {
 		return nil, err
 	}
 	if g.Library == "" {
-		g.Library = registry.LibraryPath(exeDir(), g.ID)
+		g.Library = registry.LibraryPath(dataDir(), g.ID)
 	}
 	if err := lib.Save(g.Library); err != nil {
 		return nil, err
@@ -340,7 +436,7 @@ func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
 // coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
 func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
-	dir := filepath.Join(exeDir(), "covers", safeName(g.ID))
+	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

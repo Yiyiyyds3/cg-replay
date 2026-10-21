@@ -29,7 +29,7 @@ func (a *App) withCatalog(fn func(*catalog.Catalog) error) error {
 	a.catalogMu.Lock()
 	defer a.catalogMu.Unlock()
 	if a.catalogDB == nil {
-		c, err := catalog.Open(filepath.Join(exeDir(), catalog.FileName))
+		c, err := catalog.Open(filepath.Join(dataDir(), catalog.FileName))
 		if err != nil {
 			return err
 		}
@@ -427,7 +427,7 @@ func (a *App) logAuxError(area string, err error) {
 	if err == nil {
 		return
 	}
-	f, ferr := os.OpenFile(filepath.Join(exeDir(), "errors.log"),
+	f, ferr := os.OpenFile(filepath.Join(dataDir(), "errors.log"),
 		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if ferr != nil {
 		return

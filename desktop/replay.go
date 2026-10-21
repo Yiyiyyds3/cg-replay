@@ -628,7 +628,7 @@ func (a *App) Screenshot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(exeDir(), "exports", safeName(s.kind)+"_"+safeName(s.id))
+	dir := filepath.Join(dataDir(), "exports", safeName(s.kind)+"_"+safeName(s.id))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
