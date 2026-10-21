@@ -64,6 +64,57 @@ export interface CatalogStatsDTO {
   error?: string;
 }
 
+// ---------- 跨游戏视图 / 台词检索（第三阶段） ----------
+
+/** 跨游戏事件卡片（desktop/catalog.go CatalogEventDTO）。 */
+export interface CatalogEventDTO {
+  game_id: string;
+  game_title: string;
+  game_root: string;
+  kind: string;
+  id: string;
+  title: string;
+  ord: number;
+  pages: number;
+  has_cover: boolean;
+}
+export interface CatalogEventsDTO {
+  events: CatalogEventDTO[];
+  warnings: string[];
+}
+/** 台词命中（desktop/catalog.go CatalogTextHitDTO）。 */
+export interface CatalogTextHitDTO {
+  line_id: number;
+  game_id: string;
+  game_title: string;
+  kind: string;
+  event_id: string;
+  t_ms: number;
+  speaker: string;
+  text: string;
+}
+export interface CatalogTextDTO {
+  hits: CatalogTextHitDTO[];
+  warnings: string[];
+  indexed: boolean; // false = 台词尚未抽取，0 条结果不代表没搜到
+}
+export interface CatalogIndexResultDTO {
+  game_id: string;
+  events: number;
+  lines: number;
+  warnings: string[];
+}
+/** 最近播放（desktop/catalog.go CatalogRecentDTO）。 */
+export interface CatalogRecentDTO {
+  game_id: string;
+  game_title: string;
+  kind: string;
+  event_id: string;
+  title: string;
+  played_at: string;
+  play_count: number;
+}
+
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
   | { kind: "cg"; id: string; title: string; note: string; ok: true }
@@ -87,6 +138,19 @@ export const api = {
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,
+  // ---------- 跨游戏视图（全部游戏卡片墙 / 台词检索） ----------
+  catalogEvents: (query: string, limit: number) =>
+    bridge().CatalogEvents(query, limit) as Promise<CatalogEventsDTO>,
+  catalogSearchText: (query: string, limit: number) =>
+    bridge().CatalogSearchText(query, limit) as Promise<CatalogTextDTO>,
+  catalogTextCounts: () =>
+    bridge().CatalogTextCounts() as Promise<Record<string, number>>,
+  catalogIndexText: (gameID: string) =>
+    bridge().CatalogIndexText(gameID) as Promise<CatalogIndexResultDTO>,
+  catalogRecent: (limit: number) =>
+    bridge().CatalogRecent(limit) as Promise<CatalogRecentDTO[]>,
+  getCoverForGame: (gameID: string, kind: string, id: string) =>
+    bridge().GetCoverForGame(gameID, kind, id) as Promise<string>,
   // 兼容旧绑定；等价于 addGame
   setRoot: (root: string) => bridge().SetRoot(root) as Promise<LibraryDTO>,
   getLibrary: () => bridge().GetLibrary() as Promise<LibraryDTO>,

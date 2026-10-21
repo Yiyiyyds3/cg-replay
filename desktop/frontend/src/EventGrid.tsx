@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Clock,
   Database,
   FolderOpen,
   Gamepad2,
@@ -14,7 +15,10 @@ import {
 import {
   api,
   type CardItem,
+  type CatalogEventDTO,
+  type CatalogRecentDTO,
   type CatalogStatsDTO,
+  type CatalogTextHitDTO,
   type GameDTO,
   type GamesDTO,
   type LibraryDTO,
@@ -23,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type Tab = "cg" | "scene" | "chapter";
+type Tab = "all" | "cg" | "scene" | "chapter";
 
 type Status =
   | { state: "loading" }
@@ -47,6 +51,19 @@ export default function EventGrid({
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyGame, setBusyGame] = useState("");
+  // ---------- 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 ----------
+  const [allEvents, setAllEvents] = useState<CatalogEventDTO[] | null>(null);
+  const [allWarnings, setAllWarnings] = useState<string[]>([]);
+  const [textHits, setTextHits] = useState<CatalogTextHitDTO[] | null>(null);
+  const [textIndexed, setTextIndexed] = useState(true);
+  const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
+  const [textCounts, setTextCounts] = useState<Record<string, number>>({});
+  const [indexing, setIndexing] = useState<{
+    title: string;
+    done: number;
+    total: number;
+  } | null>(null);
+  const allBooted = useRef(false); // StrictMode 双挂载只加载一次
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return window.localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -100,6 +117,124 @@ export default function EventGrid({
         text_lines: 0,
         error: e?.message ?? String(e),
       });
+    }
+  };
+
+  // ---------- 「全部」页签数据 ----------
+
+  // 串行索引一批游戏的台词（CatalogIndexText 幂等；单游戏失败不阻断其余）。
+  const indexGames = async (list: GameDTO[]) => {
+    for (let i = 0; i < list.length; i++) {
+      const g = list[i];
+      setIndexing({ title: g.title, done: i, total: list.length });
+      try {
+        await api.catalogIndexText(g.id);
+      } catch (e: any) {
+        setAllWarnings((w) => [
+          ...w,
+          `索引「${g.title}」台词失败：${e?.message ?? String(e)}`,
+        ]);
+      }
+    }
+    setIndexing(null);
+    try {
+      const [tc, st] = await Promise.all([api.catalogTextCounts(), api.catalogStats()]);
+      setTextCounts(tc);
+      setCatalog(st);
+    } catch {
+      /* 角标刷新失败不影响已写入的索引 */
+    }
+  };
+
+  // 进入「全部」：查询前由后端逐游戏同步 catalog；0 台词游戏按需抽台词。
+  const loadAll = async () => {
+    try {
+      const gs = await api.listGames();
+      setGames(gs);
+      const [ev, rc, tc] = await Promise.all([
+        api.catalogEvents("", 2000),
+        api.catalogRecent(12),
+        api.catalogTextCounts(),
+      ]);
+      setAllEvents(ev.events);
+      setAllWarnings(ev.warnings);
+      setRecentItems(rc);
+      setTextCounts(tc);
+      const pending = gs.games.filter((g) => !tc[g.id]);
+      if (pending.length > 0) await indexGames(pending);
+    } catch (e: any) {
+      setAllWarnings([e?.message ?? String(e)]);
+    }
+  };
+
+  // 切到「全部」时加载一次（StrictMode 双挂载用 ref 防重入）。
+  useEffect(() => {
+    if (tab !== "all" || allBooted.current) return;
+    allBooted.current = true;
+    void loadAll();
+  }, [tab]);
+
+  // 台词检索防抖（仅「全部」页签；空查询回到分组卡片墙）。
+  useEffect(() => {
+    if (tab !== "all") return;
+    const query = q.trim();
+    if (!query) {
+      setTextHits(null);
+      return;
+    }
+    const h = setTimeout(() => {
+      void api
+        .catalogSearchText(query, 100)
+        .then((r) => {
+          setTextHits(r.hits);
+          setTextIndexed(r.indexed);
+          if (r.warnings.length) setAllWarnings(r.warnings);
+        })
+        .catch((e: any) => setAllWarnings([e?.message ?? String(e)]));
+    }, 250);
+    return () => clearTimeout(h);
+  }, [tab, q]);
+
+  // 跨游戏打开：先切到该游戏（后端 SetActiveGame 重扫/读库），再进回放。
+  const openFromGame = async (
+    gameID: string,
+    kind: string,
+    id: string,
+    title: string,
+  ) => {
+    if (gameID && gameID !== games?.active) {
+      setBusy(true);
+      try {
+        const l = await api.setActiveGame(gameID);
+        const gs = await api.listGames();
+        setGames(gs);
+        setLib(l);
+        covers.current.clear();
+      } catch (e: any) {
+        setStatus({ state: "error", message: e?.message ?? String(e) });
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    onOpen(kind, id, title);
+  };
+
+  // 封面按游戏路由（跨游戏卡片墙）；缺失回 null，不阻断卡片。
+  const coverFor = async (
+    gameID: string,
+    kind: string,
+    id: string,
+  ): Promise<string | null> => {
+    const key = `${gameID}:${kind}:${id}`;
+    const hit = covers.current.get(key);
+    if (hit) return hit;
+    try {
+      const url = await api.getCoverForGame(gameID, kind, id);
+      covers.current.set(key, url);
+      return url;
+    } catch {
+      return null;
     }
   };
 
@@ -202,20 +337,6 @@ export default function EventGrid({
       }));
   }, [lib, tab, q]);
 
-  const coverOf = async (kind: string, id: string): Promise<string | null> => {
-    const key = `${games?.active ?? lib?.root ?? ""}:${kind}:${id}`;
-    const hit = covers.current.get(key);
-    if (hit) return hit;
-    try {
-      const url = await api.getCover(kind, id);
-      covers.current.set(key, url);
-      return url;
-    } catch {
-      // 封面缺失不阻断卡片（回放时缺素材才红横幅，FR-12 主线不变）
-      return null;
-    }
-  };
-
   if (status.state === "setup") {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -297,6 +418,7 @@ export default function EventGrid({
           <nav className="flex shrink-0 gap-1">
             {(
               [
+                ["all", `全部 ${allEvents ? allEvents.length : "·"}`],
                 ["cg", `CG鉴赏 ${lib?.cgs?.length ?? 0}`],
                 ["scene", `主线场景 ${lib?.scenes?.length ?? 0}`],
                 ["chapter", `演出段落 ${lib?.chapters?.length ?? 0}`],
@@ -322,7 +444,7 @@ export default function EventGrid({
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="搜索 cg17 / 标题…"
+              placeholder={tab === "all" ? "搜索全部游戏：标题 / 台词…" : "搜索 cg17 / 标题…"}
               className="h-9 w-32 rounded-md border border-input bg-input/40 pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring lg:w-44 xl:w-60"
             />
           </div>
@@ -342,23 +464,46 @@ export default function EventGrid({
           <div className="shrink-0 bg-destructive px-5 py-1.5 text-sm">{banner}</div>
         )}
 
-        {/* 卡片墙 */}
-        <main className="grid flex-1 auto-rows-max content-start gap-4 overflow-y-auto p-5"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-          {cards.map((c) => (
-            <EventCard
-              key={`${lib?.root ?? ""}:${c.kind}:${c.id}`}
-              card={c}
-              lookup={coverOf}
-              onClick={() => onOpen(c.kind, c.id, c.title)}
-            />
-          ))}
-          {cards.length === 0 && (
-            <div className="col-span-full py-24 text-center text-sm text-muted-foreground">
-              没有匹配的事件
-            </div>
-          )}
-        </main>
+        {/* 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 */}
+        {tab === "all" ? (
+          <AllGames
+            events={allEvents ?? []}
+            loaded={allEvents !== null}
+            warnings={allWarnings}
+            indexing={indexing}
+            recent={recentItems}
+            textHits={textHits}
+            textIndexed={textIndexed}
+            textCounts={textCounts}
+            busy={busy}
+            onOpen={openFromGame}
+            onCover={coverFor}
+            onIndexAll={() => {
+              const pending = gameList.filter((g) => !textCounts[g.id]);
+              if (pending.length > 0) void indexGames(pending);
+              else void loadAll();
+            }}
+          />
+        ) : (
+          /* 卡片墙 */
+          <main className="grid flex-1 auto-rows-max content-start gap-4 overflow-y-auto p-5"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+            {cards.map((c) => (
+              <EventCard
+                key={`${lib?.root ?? ""}:${c.kind}:${c.id}`}
+                card={c}
+                gameID={games?.active ?? ""}
+                lookup={coverFor}
+                onClick={() => onOpen(c.kind, c.id, c.title)}
+              />
+            ))}
+            {cards.length === 0 && (
+              <div className="col-span-full py-24 text-center text-sm text-muted-foreground">
+                没有匹配的事件
+              </div>
+            )}
+          </main>
+        )}
       </div>
     </div>
   );
@@ -621,21 +766,253 @@ function shortRoot(root: string): string {
   return parent ? `${drive}\\${parent}` : `${drive}\\${tail}`;
 }
 
+// ---------- 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 ----------
+
+const KIND_LABEL: Record<string, string> = { cg: "CG", scene: "场景", chapter: "段落" };
+
+function kindLabel(kind: string): string {
+  return KIND_LABEL[kind] ?? kind;
+}
+
+/** 毫秒 → m:ss（台词行的时刻参考）。 */
+function mmss(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** catalog 事件 → 卡片视图（kind 收窄成 CardItem 联合，未知 kind 走 ok:false）。 */
+function cardFor(e: CatalogEventDTO): CardItem {
+  switch (e.kind) {
+    case "cg":
+      return { kind: "cg", id: e.id, title: e.title, note: e.pages > 1 ? `×${e.pages}页` : "", ok: true };
+    case "scene":
+      return { kind: "scene", id: e.id, title: e.title, note: "", ok: true };
+    case "chapter":
+      return { kind: "chapter", id: e.id, title: e.title, note: "", ok: true };
+    default:
+      return { kind: e.kind, id: e.id, title: e.title, note: "", ok: false };
+  }
+}
+
+function AllGames({
+  events,
+  loaded,
+  warnings,
+  indexing,
+  recent,
+  textHits,
+  textIndexed,
+  textCounts,
+  busy,
+  onOpen,
+  onCover,
+  onIndexAll,
+}: {
+  events: CatalogEventDTO[];
+  loaded: boolean;
+  warnings: string[];
+  indexing: { title: string; done: number; total: number } | null;
+  recent: CatalogRecentDTO[];
+  textHits: CatalogTextHitDTO[] | null;
+  textIndexed: boolean;
+  textCounts: Record<string, number>;
+  busy: boolean;
+  onOpen: (gameID: string, kind: string, id: string, title: string) => void;
+  onCover: (gameID: string, kind: string, id: string) => Promise<string | null>;
+  onIndexAll: () => void;
+}) {
+  // 按游戏分组（后端按游戏标题排序，保持出现序即分组序）。
+  const groups = useMemo(() => {
+    const out: { game: CatalogEventDTO; items: CatalogEventDTO[] }[] = [];
+    const idx = new Map<string, number>();
+    for (const e of events) {
+      let gi = idx.get(e.game_id);
+      if (gi === undefined) {
+        gi = out.length;
+        idx.set(e.game_id, gi);
+        out.push({ game: e, items: [] });
+      }
+      out[gi].items.push(e);
+    }
+    return out;
+  }, [events]);
+
+  // 台词行的事件标题：从已加载事件里查（查不到回落 event_id）。
+  const titleOf = (gameID: string, kind: string, id: string) =>
+    events.find((e) => e.game_id === gameID && e.kind === kind && e.id === id)?.title ?? id;
+
+  if (!loaded) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        正在汇总全部游戏…
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* 同步/索引告警：部分成功也明示（FR-12 不静默） */}
+      {(warnings.length > 0 || indexing) && (
+        <div className="shrink-0 space-y-1 border-b border-amber-900/60 bg-amber-950/40 px-5 py-2 text-xs text-amber-300">
+          {indexing && (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              正在抽取台词：{indexing.title}（{indexing.done + 1}/{indexing.total}）…
+            </div>
+          )}
+          {warnings.map((w, i) => (
+            <div key={i} className="break-all">
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <main className="flex-1 space-y-6 overflow-y-auto p-5">
+        {/* 最近播放 */}
+        {recent.length > 0 && !textHits && (
+          <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" />
+              最近播放
+            </h2>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {recent.map((r) => (
+                <button
+                  key={`${r.game_id}:${r.kind}:${r.event_id}`}
+                  disabled={busy}
+                  onClick={() => onOpen(r.game_id, r.kind, r.event_id, r.title)}
+                  className="shrink-0 rounded-md border border-border bg-card px-3 py-1.5 text-left text-xs transition-colors hover:border-primary/60 disabled:opacity-50"
+                  title={`${r.game_title}\n${r.title}`}
+                >
+                  <span className="block max-w-[180px] truncate font-medium">{r.title}</span>
+                  <span className="block max-w-[180px] truncate text-muted-foreground">
+                    {r.game_title} · ×{r.play_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 台词检索结果 */}
+        {textHits !== null ? (
+          <section className="space-y-2">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              台词命中 {textHits.length} 条
+            </h2>
+            {!textIndexed && (
+              <div className="flex items-center gap-3 rounded-md border border-amber-900/60 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-300">
+                <span className="flex-1">
+                  台词索引尚未抽取（当前只匹配事件标题）。抽取后可按原文检索全部台词。
+                </span>
+                <Button size="sm" variant="outline" onClick={onIndexAll} disabled={busy}>
+                  立即索引
+                </Button>
+              </div>
+            )}
+            {textHits.length === 0 ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">没有匹配的台词</div>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {textHits.map((h) => (
+                  <li key={h.line_id}>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        onOpen(h.game_id, h.kind, h.event_id, titleOf(h.game_id, h.kind, h.event_id))
+                      }
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/60 disabled:opacity-50"
+                    >
+                      <span
+                        className="w-28 shrink-0 truncate text-xs text-muted-foreground"
+                        title={h.game_title}
+                      >
+                        {h.game_title}
+                      </span>
+                      <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px]">
+                        {kindLabel(h.kind)}
+                      </Badge>
+                      <span className="w-20 shrink-0 truncate text-xs text-muted-foreground">
+                        {h.speaker || "旁白"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm">{h.text}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">{mmss(h.t_ms)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : groups.length === 0 ? (
+          <div className="py-24 text-center text-sm text-muted-foreground">
+            还没有任何事件。从左侧游戏栏底部「添加游戏」登记解包目录。
+          </div>
+        ) : (
+          groups.map((g) => {
+            const cgN = g.items.filter((e) => e.kind === "cg").length;
+            const scN = g.items.filter((e) => e.kind === "scene").length;
+            const chN = g.items.filter((e) => e.kind === "chapter").length;
+            const lines = textCounts[g.game.game_id] ?? 0;
+            return (
+              <section key={g.game.game_id} className="space-y-3">
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-sm font-semibold">{g.game.game_title}</h2>
+                  <span
+                    className="truncate text-[10px] text-muted-foreground"
+                    title={g.game.game_root}
+                  >
+                    {shortRoot(g.game.game_root)}
+                  </span>
+                  <span className="flex-1" />
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {cgN > 0 && `CG ${cgN} · `}
+                    {scN > 0 && `场景 ${scN} · `}
+                    {chN > 0 && `段落 ${chN} · `}
+                    台词 {lines}
+                  </span>
+                </div>
+                <div
+                  className="grid auto-rows-max gap-4"
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+                >
+                  {g.items.map((e) => (
+                    <EventCard
+                      key={`${e.game_id}:${e.kind}:${e.id}`}
+                      card={cardFor(e)}
+                      gameID={e.game_id}
+                      lookup={onCover}
+                      onClick={() => onOpen(e.game_id, e.kind, e.id, e.title)}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })
+        )}
+      </main>
+    </div>
+  );
+}
+
 // ---------- 卡片 ----------
 function EventCard({
   card,
+  gameID,
   lookup,
   onClick,
 }: {
   card: CardItem;
-  lookup: (kind: string, id: string) => Promise<string | null>;
+  gameID: string;
+  lookup: (gameID: string, kind: string, id: string) => Promise<string | null>;
   onClick: () => void;
 }) {
   const [cover, setCover] = useState<string | null>(null);
   const [miss, setMiss] = useState(false); // 封面缺失：角标可见，不静默
   useEffect(() => {
     let alive = true;
-    void lookup(card.kind, card.id).then((u) => {
+    void lookup(gameID, card.kind, card.id).then((u) => {
       if (!alive) return;
       setCover(u);
       if (!u) setMiss(true);
@@ -643,7 +1020,7 @@ function EventCard({
     return () => {
       alive = false;
     };
-  }, [card.kind, card.id]);
+  }, [gameID, card.kind, card.id]);
 
   return (
     <button
