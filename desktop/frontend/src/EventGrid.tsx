@@ -41,6 +41,7 @@ type Status =
   | { state: "error"; message: string };
 
 const SIDEBAR_KEY = "ucgr.sidebarCollapsed";
+const RECENT_LIMIT = 12; // 「全部」页签最近播放取多少条（清理后同量刷新）
 
 // M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
 export default function EventGrid({
@@ -62,6 +63,7 @@ export default function EventGrid({
   const [textHits, setTextHits] = useState<CatalogTextHitDTO[] | null>(null);
   const [textIndexed, setTextIndexed] = useState(true);
   const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
+  const [pruningRecent, setPruningRecent] = useState(false); // 清理 72h 前记录进行中
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
   const [favItems, setFavItems] = useState<FavoriteDTO[]>([]); // 收藏区列表（含标题）
@@ -184,7 +186,7 @@ export default function EventGrid({
       setGames(gs);
       const [ev, rc, tc] = await Promise.all([
         api.catalogEvents("", 2000),
-        api.catalogRecent(12),
+        api.catalogRecent(RECENT_LIMIT),
         api.catalogTextCounts(),
       ]);
       setAllEvents(ev.events);
@@ -310,6 +312,26 @@ export default function EventGrid({
         `保存角色收藏信息失败：${e?.message ?? String(e)}`,
       ]);
       throw e;
+    }
+  };
+
+  // 清理 72h（3 天）前的最近播放：删完顺手刷新，删除条数进提示（不静默）。
+  const pruneRecent = async () => {
+    setPruningRecent(true);
+    try {
+      const n = await api.catalogPruneRecent(3);
+      setRecentItems(await api.catalogRecent(RECENT_LIMIT));
+      setAllWarnings((w) => [
+        ...w,
+        n > 0 ? `已清理 ${n} 条 3 天前的最近播放记录` : "没有 3 天前的最近播放记录可清理",
+      ]);
+    } catch (e: any) {
+      setAllWarnings((w) => [
+        ...w,
+        `清理最近播放失败：${e?.message ?? String(e)}`,
+      ]);
+    } finally {
+      setPruningRecent(false);
     }
   };
 
@@ -621,6 +643,8 @@ export default function EventGrid({
             warnings={allWarnings}
             indexing={indexing}
             recent={recentItems}
+            pruningRecent={pruningRecent}
+            onPruneRecent={pruneRecent}
             favItems={favItems}
             favs={favs}
             speakers={speakers}
@@ -1021,6 +1045,8 @@ function AllGames({
   warnings,
   indexing,
   recent,
+  pruningRecent,
+  onPruneRecent,
   favItems,
   favs,
   speakers,
@@ -1044,6 +1070,8 @@ function AllGames({
   warnings: string[];
   indexing: { title: string; done: number; total: number } | null;
   recent: CatalogRecentDTO[];
+  pruningRecent: boolean;
+  onPruneRecent: () => Promise<void>;
   favItems: FavoriteDTO[];
   favs: Set<string>;
   speakers: SpeakerDTO[];
@@ -1109,6 +1137,39 @@ function AllGames({
     for (const f of favCharItems) m.set(`${f.game_id}:${f.item_id}`, f);
     return m;
   }, [favCharItems]);
+
+  // 最近播放按本地日历日分组（今天/昨天/M月D日）；recent 已按时间降序，
+  // 组序即出现序。用 `new Date(y, m, d-1)` 做日历减法，避开 DST 的 24h 误差。
+  const recentGroups = useMemo(() => {
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startYest = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    ).getTime();
+    const out: { label: string; items: CatalogRecentDTO[] }[] = [];
+    const idx = new Map<string, number>();
+    for (const r of recent) {
+      const t = new Date(r.played_at).getTime();
+      let label: string;
+      if (Number.isNaN(t)) label = "时间未知";
+      else if (t >= startToday) label = "今天";
+      else if (t >= startYest) label = "昨天";
+      else {
+        const d = new Date(t);
+        label = `${d.getMonth() + 1}月${d.getDate()}日`;
+      }
+      let gi = idx.get(label);
+      if (gi === undefined) {
+        gi = out.length;
+        idx.set(label, gi);
+        out.push({ label, items: [] });
+      }
+      out[gi].items.push(r);
+    }
+    return out;
+  }, [recent]);
 
   // 正在编辑评分/备注的角色（同一时刻只开一个；chips 下方渲染编辑器）。
   const [editingChar, setEditingChar] = useState<{
@@ -1264,29 +1325,48 @@ function AllGames({
           </section>
         )}
 
-        {/* 最近播放 */}
+        {/* 最近播放（按天分组；72h 冷归档清理） */}
         {recent.length > 0 && !textHits && (
           <section className="space-y-2">
-            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              最近播放
-            </h2>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {recent.map((r) => (
-                <button
-                  key={`${r.game_id}:${r.kind}:${r.event_id}`}
-                  disabled={busy}
-                  onClick={() => onOpen(r.game_id, r.kind, r.event_id, r.title)}
-                  className="shrink-0 rounded-md border border-border bg-card px-3 py-1.5 text-left text-xs transition-colors hover:border-primary/60 disabled:opacity-50"
-                  title={`${r.game_title}\n${r.title}`}
-                >
-                  <span className="block max-w-[180px] truncate font-medium">{r.title}</span>
-                  <span className="block max-w-[180px] truncate text-muted-foreground">
-                    {r.game_title} · ×{r.play_count}
-                  </span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                最近播放
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs text-muted-foreground"
+                disabled={busy || pruningRecent}
+                title="清理 3 天前（72h）的最近播放记录；不影响收藏与索引"
+                onClick={() => void onPruneRecent()}
+              >
+                {pruningRecent ? "清理中…" : "清理 3 天前"}
+              </Button>
             </div>
+            {recentGroups.map((g) => (
+              <div key={g.label} className="space-y-1.5">
+                <div className="text-[10px] text-muted-foreground">
+                  {g.label} · {g.items.length} 条
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {g.items.map((r) => (
+                    <button
+                      key={`${r.game_id}:${r.kind}:${r.event_id}`}
+                      disabled={busy}
+                      onClick={() => onOpen(r.game_id, r.kind, r.event_id, r.title)}
+                      className="shrink-0 rounded-md border border-border bg-card px-3 py-1.5 text-left text-xs transition-colors hover:border-primary/60 disabled:opacity-50"
+                      title={`${r.game_title}\n${r.title}\n播放 ${r.play_count} 次`}
+                    >
+                      <span className="block max-w-[180px] truncate font-medium">{r.title}</span>
+                      <span className="block max-w-[180px] truncate text-muted-foreground">
+                        {r.game_title} · ×{r.play_count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
         )}
 

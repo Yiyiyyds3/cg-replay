@@ -22,6 +22,10 @@ export function CatalogIndexText(arg1) {
   return window['go']['main']['App']['CatalogIndexText'](arg1);
 }
 
+export function CatalogPruneRecent(arg1) {
+  return window['go']['main']['App']['CatalogPruneRecent'](arg1);
+}
+
 export function CatalogRecent(arg1) {
   return window['go']['main']['App']['CatalogRecent'](arg1);
 }

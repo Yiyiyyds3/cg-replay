@@ -169,6 +169,9 @@ export const api = {
     bridge().CatalogIndexText(gameID) as Promise<CatalogIndexResultDTO>,
   catalogRecent: (limit: number) =>
     bridge().CatalogRecent(limit) as Promise<CatalogRecentDTO[]>,
+  /** 清理 N 天前的最近播放（0 = 默认 3 天/72h），返回删除条数。 */
+  catalogPruneRecent: (days: number) =>
+    bridge().CatalogPruneRecent(days) as Promise<number>,
   // ---------- 收藏（event 级；game/character 级 API 已就绪、UI 后续） ----------
   addFavorite: (itemType: string, gameID: string, itemID: string, rating: number, note: string) =>
     bridge().AddFavorite(itemType, gameID, itemID, rating, note) as Promise<void>,

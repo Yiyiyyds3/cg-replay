@@ -8,6 +8,7 @@ package catalog
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"ucgr/internal/ir"
 )
@@ -115,6 +116,30 @@ func (c *Catalog) Recent(limit int) ([]RecentItem, error) {
 		return nil, fmt.Errorf("遍历最近播放失败：%w", err)
 	}
 	return out, nil
+}
+
+// PruneRecent 清理 played_at 早于 days 天的最近播放，返回删除条数（0 = 没得删）。
+//
+// 72h 冷归档窗口：days 传 0 用默认 3 天；负数或 >3650 直接报错（不静默改语义）。
+// played_at 由 now() 统一写成 UTC RFC3339 文本，字典序即时间序，可直接比较。
+// 只删 recent 表——不碰 favorites/text_lines/events（用户数据与索引都不受影响）。
+func (c *Catalog) PruneRecent(days int) (int, error) {
+	if days == 0 {
+		days = 3
+	}
+	if days < 0 || days > 3650 {
+		return 0, fmt.Errorf("清理窗口 %d 天非法（0 = 默认 3 天，范围 1~3650）", days)
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -days).Format(time.RFC3339)
+	res, err := c.db.Exec(`DELETE FROM recent WHERE played_at < ?`, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("清理最近播放失败：%w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("清理最近播放计数失败：%w", err)
+	}
+	return int(n), nil
 }
 
 // TextCounts 每个游戏已索引的台词条数（没有台词行的游戏不出现在 map 里）。

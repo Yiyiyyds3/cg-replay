@@ -192,6 +192,18 @@ func (a *App) ListFavorites(itemType string) ([]FavoriteDTO, error) {
 	return out, nil
 }
 
+// CatalogPruneRecent 清理 N 天前的最近播放（72h 冷归档；days=0 → 默认 3 天），
+// 返回删除条数。只删 recent 表，不碰收藏/台词索引/事件。
+func (a *App) CatalogPruneRecent(days int) (int, error) {
+	n := 0
+	err := a.withCatalog(func(c *catalog.Catalog) error {
+		var perr error
+		n, perr = c.PruneRecent(days)
+		return perr
+	})
+	return n, err
+}
+
 // ---------- 说话人聚合（character 级收藏的前置） ----------
 
 // SpeakerDTO 说话人聚合行（与 internal/catalog.Speaker 对齐）。

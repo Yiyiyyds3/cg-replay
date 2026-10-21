@@ -13,6 +13,8 @@ export function CatalogEvents(arg1:string,arg2:number):Promise<main.CatalogEvent
 
 export function CatalogIndexText(arg1:string):Promise<main.CatalogIndexResultDTO>;
 
+export function CatalogPruneRecent(arg1:number):Promise<number>;
+
 export function CatalogRecent(arg1:number):Promise<Array<main.CatalogRecentDTO>>;
 
 export function CatalogSearchText(arg1:string,arg2:number):Promise<main.CatalogTextDTO>;
