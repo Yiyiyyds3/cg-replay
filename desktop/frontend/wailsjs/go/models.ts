@@ -422,6 +422,34 @@ export namespace main {
 	        this.note = source["note"];
 	    }
 	}
+	export class FavoriteDTO {
+	    item_type: string;
+	    game_id: string;
+	    item_id: string;
+	    rating: number;
+	    note: string;
+	    title: string;
+	    game_title: string;
+	    created_at: string;
+	    updated_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FavoriteDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.item_type = source["item_type"];
+	        this.game_id = source["game_id"];
+	        this.item_id = source["item_id"];
+	        this.rating = source["rating"];
+	        this.note = source["note"];
+	        this.title = source["title"];
+	        this.game_title = source["game_title"];
+	        this.created_at = source["created_at"];
+	        this.updated_at = source["updated_at"];
+	    }
+	}
 	export class LayerDTO {
 	    layer: string;
 	    ref: string;
@@ -566,6 +594,7 @@ export namespace main {
 	    kind: string;
 	    id: string;
 	    title: string;
+	    game_id: string;
 	    stage_w: number;
 	    stage_h: number;
 	    op_count: number;
@@ -581,6 +610,7 @@ export namespace main {
 	        this.kind = source["kind"];
 	        this.id = source["id"];
 	        this.title = source["title"];
+	        this.game_id = source["game_id"];
 	        this.stage_w = source["stage_w"];
 	        this.stage_h = source["stage_h"];
 	        this.op_count = source["op_count"];

@@ -139,6 +139,59 @@ type CatalogRecentDTO struct {
 	PlayCount int    `json:"play_count"`
 }
 
+// ---------- 收藏（favorites 表；本轮 UI 只做 event 级） ----------
+
+// FavoriteDTO 一条收藏（与 internal/catalog.Favorite 对齐）。
+type FavoriteDTO struct {
+	ItemType  string `json:"item_type"` // game / event / character
+	GameID    string `json:"game_id"`
+	ItemID    string `json:"item_id"`
+	Rating    int    `json:"rating"` // 0 = 未评分
+	Note      string `json:"note"`
+	Title     string `json:"title"`      // 展示用（events/games join，缺失回落 item_id）
+	GameTitle string `json:"game_title"` // 展示用
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// AddFavorite 新增/更新收藏（同键 upsert rating/note）。
+func (a *App) AddFavorite(itemType, gameID, itemID string, rating int, note string) error {
+	return a.withCatalog(func(c *catalog.Catalog) error {
+		return c.AddFavorite(itemType, gameID, itemID, rating, note)
+	})
+}
+
+// RemoveFavorite 取消收藏（不存在时幂等成功）。
+func (a *App) RemoveFavorite(itemType, gameID, itemID string) error {
+	return a.withCatalog(func(c *catalog.Catalog) error {
+		return c.RemoveFavorite(itemType, gameID, itemID)
+	})
+}
+
+// ListFavorites 收藏列表（itemType 为空 = 全部；新的在前）。
+func (a *App) ListFavorites(itemType string) ([]FavoriteDTO, error) {
+	var out []FavoriteDTO
+	err := a.withCatalog(func(c *catalog.Catalog) error {
+		items, lerr := c.ListFavorites(itemType, 0)
+		if lerr != nil {
+			return lerr
+		}
+		out = make([]FavoriteDTO, 0, len(items))
+		for _, f := range items {
+			out = append(out, FavoriteDTO{
+				ItemType: f.ItemType, GameID: f.GameID, ItemID: f.ItemID,
+				Rating: f.Rating, Note: f.Note, Title: f.Title,
+				GameTitle: f.GameTitle, CreatedAt: f.CreatedAt, UpdatedAt: f.UpdatedAt,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ensureCatalogSync 查询前把登记表里的每款游戏同步进 catalog
 // （loadOrScanLib + SyncGame）。失败的游戏记 warnings 后跳过，
 // 返回已成功部分——不启动时全量扫盘，只在查询时按需同步。

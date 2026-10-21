@@ -3,6 +3,8 @@
 import {library} from '../models';
 import {main} from '../models';
 
+export function AddFavorite(arg1:string,arg2:string,arg3:string,arg4:number,arg5:string):Promise<void>;
+
 export function AddGame(arg1:string):Promise<library.Library>;
 
 export function CatalogEvents(arg1:string,arg2:number):Promise<main.CatalogEventsDTO>;
@@ -33,6 +35,8 @@ export function GetLibrary():Promise<library.Library>;
 
 export function InputClick():Promise<void>;
 
+export function ListFavorites(arg1:string):Promise<Array<main.FavoriteDTO>>;
+
 export function ListGames():Promise<main.GamesDTO>;
 
 export function OpenEvent(arg1:string,arg2:string):Promise<main.SessionMeta>;
@@ -42,6 +46,8 @@ export function Pause():Promise<void>;
 export function PickDirectory():Promise<string>;
 
 export function Play():Promise<void>;
+
+export function RemoveFavorite(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ReportClientError(arg1:string):Promise<void>;
 

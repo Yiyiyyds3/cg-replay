@@ -87,6 +87,7 @@ type SessionMeta struct {
 	Kind       string `json:"kind"`
 	ID         string `json:"id"`
 	Title      string `json:"title"`
+	GameID     string `json:"game_id"` // 收藏/跨游戏定位用
 	StageW     int    `json:"stage_w"`
 	StageH     int    `json:"stage_h"`
 	OpCount    int    `json:"op_count"`
@@ -278,6 +279,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		Kind:       kind,
 		ID:         id,
 		Title:      title,
+		GameID:     g.ID,
 		StageW:     stageW,
 		StageH:     stageH,
 		OpCount:    len(ev.Show),
