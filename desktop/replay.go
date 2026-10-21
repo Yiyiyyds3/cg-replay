@@ -176,13 +176,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	defer a.sessMu.Unlock()
 	a.closeSessionLocked()
 
-	c, ok := a.loadConf()
-	if !ok || strings.TrimSpace(c.Root) == "" {
-		return SessionMeta{}, fmt.Errorf("未设置游戏根目录，请先在网格页选择解包目录")
+	c, _ := a.loadConf()
+	reg, g, err := a.activeGame(c)
+	if err != nil {
+		return SessionMeta{}, err
 	}
-	root := strings.TrimSpace(c.Root)
+	root := g.Root
 
-	lib, err := a.loadOrScanLib(c)
+	lib, err := a.loadOrScanLib(g)
 	if err != nil {
 		return SessionMeta{}, err
 	}
@@ -261,6 +262,10 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		}
 	}
 	a.sess = s
+
+	// 最近播放时间：派生元数据，写失败不阻断回放。
+	reg.Touch(g.ID)
+	_ = reg.Save(a.registryPath())
 
 	return SessionMeta{
 		Kind:       kind,

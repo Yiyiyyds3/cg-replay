@@ -43,6 +43,19 @@ export interface ConfDTO {
   auto: boolean;
   conf_missing: boolean;
 }
+export interface GameDTO {
+  id: string;
+  title: string;
+  root: string;
+  library?: string;
+  engine?: string;
+  added_at: string;
+  last_played_at?: string;
+}
+export interface GamesDTO {
+  active: string;
+  games: GameDTO[];
+}
 
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
@@ -62,6 +75,11 @@ export const api = {
   pingVersion: () => bridge().Version() as Promise<string>,
   getConf: () => bridge().GetConf() as Promise<ConfDTO>,
   pickDirectory: () => bridge().PickDirectory() as Promise<string>,
+  listGames: () => bridge().ListGames() as Promise<GamesDTO>,
+  addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
+  setActiveGame: (id: string) =>
+    bridge().SetActiveGame(id) as Promise<LibraryDTO>,
+  // 兼容旧绑定；等价于 addGame
   setRoot: (root: string) => bridge().SetRoot(root) as Promise<LibraryDTO>,
   getLibrary: () => bridge().GetLibrary() as Promise<LibraryDTO>,
   rescan: () => bridge().Rescan() as Promise<LibraryDTO>,

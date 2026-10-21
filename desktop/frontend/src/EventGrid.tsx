@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FolderOpen, RefreshCw, Search, Ship } from "lucide-react";
+import { FolderOpen, Plus, RefreshCw, Search, Ship } from "lucide-react";
 import {
   api,
   type CardItem,
+  type GamesDTO,
   type LibraryDTO,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -24,20 +25,22 @@ export default function EventGrid({
 }) {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [lib, setLib] = useState<LibraryDTO | null>(null);
+  const [games, setGames] = useState<GamesDTO | null>(null);
   const [tab, setTab] = useState<Tab>("cg");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
-  const covers = useRef(new Map<string, string>()); // id → dataURL 缓存
+  const covers = useRef(new Map<string, string>()); // game:id → dataURL 缓存
 
-  // 启动链：conf → 库（有清单读清单，没有就扫描建库）
+  // 启动链：游戏登记表 → 当前游戏的库（有清单读清单，没有就扫描建库）。
   const boot = async () => {
     try {
-      const conf = await api.getConf();
-      if (!conf.root && conf.conf_missing) {
+      const gs = await api.listGames();
+      setGames(gs);
+      if (!gs.active) {
         setStatus({ state: "setup" });
         return;
       }
-      await reload(true);
+      await reload(false);
     } catch (e: any) {
       setStatus({ state: "error", message: e?.message ?? String(e) });
     }
@@ -52,7 +55,11 @@ export default function EventGrid({
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       setLib((prev) => prev ?? null);
-      setStatus(msg.includes("未设置游戏根目录") ? { state: "setup" } : { state: "error", message: msg });
+      setStatus(
+        msg.includes("还没有游戏库") || msg.includes("未设置游戏根目录")
+          ? { state: "setup" }
+          : { state: "error", message: msg },
+      );
     }
   };
 
@@ -60,13 +67,37 @@ export default function EventGrid({
     void boot();
   }, []);
 
-  const chooseRoot = async () => {
+  // 添加游戏（同一目录重复添加 = 切换并重扫，后端保证不重复登记）。
+  const pickAndAdd = async () => {
     try {
       const dir = await api.pickDirectory();
       if (!dir) return;
       setBusy(true);
-      const l = await api.setRoot(dir);
+      setStatus({ state: "loading" });
+      const l = await api.addGame(dir);
+      const gs = await api.listGames();
+      setGames(gs);
+      covers.current.clear();
       setLib(l);
+      setTab("cg");
+      setStatus({ state: "ready" });
+    } catch (e: any) {
+      setStatus({ state: "error", message: e?.message ?? String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const switchGame = async (id: string) => {
+    if (!id || id === games?.active) return;
+    setBusy(true);
+    try {
+      const l = await api.setActiveGame(id);
+      const gs = await api.listGames();
+      setGames(gs);
+      covers.current.clear();
+      setLib(l);
+      setTab("cg");
       setStatus({ state: "ready" });
     } catch (e: any) {
       setStatus({ state: "error", message: e?.message ?? String(e) });
@@ -80,7 +111,7 @@ export default function EventGrid({
     const query = q.trim().toLowerCase();
     const hit = (s: string) => !query || s.toLowerCase().includes(query);
     if (tab === "cg") {
-      return lib.cgs
+      return (lib.cgs ?? [])
         .filter((c) => hit(c.title) || hit(c.id))
         .map((c) => ({
           kind: "cg" as const,
@@ -92,7 +123,7 @@ export default function EventGrid({
         }));
     }
     if (tab === "scene") {
-      return lib.scenes
+      return (lib.scenes ?? [])
         .filter((s) => hit(s.title))
         .map((s) => ({ kind: "scene" as const, id: s.id, title: s.title, note: "", ok: true as const }));
     }
@@ -108,7 +139,7 @@ export default function EventGrid({
   }, [lib, tab, q]);
 
   const coverOf = async (kind: string, id: string): Promise<string | null> => {
-    const key = `${kind}:${id}`;
+    const key = `${games?.active ?? lib?.root ?? ""}:${kind}:${id}`;
     const hit = covers.current.get(key);
     if (hit) return hit;
     try {
@@ -128,10 +159,11 @@ export default function EventGrid({
           <FolderOpen className="h-9 w-9 text-primary" />
           <h1 className="text-lg font-semibold">先选游戏解包目录</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            选「包含 raw\data\scenario 的那一层」。选择后会自动建立事件库，
-            配置与 CLI 版 cgreplay.exe 共用同一份 cgreplay.conf。
+            选「包含 raw\data\scenario 的那一层」。选择后会自动建立事件库。
+            之后可随时从顶栏「添加游戏」登记更多游戏，配置与 CLI 版
+            cgreplay.exe 共用同一份 cgreplay.conf。
           </p>
-          <Button onClick={chooseRoot} disabled={busy} className="mt-2">
+          <Button onClick={pickAndAdd} disabled={busy} className="mt-2">
             {busy ? "建立中…" : "选择目录"}
           </Button>
         </div>
@@ -154,7 +186,7 @@ export default function EventGrid({
           <h1 className="text-base font-semibold text-red-400">出错了</h1>
           <p className="mt-3 break-all text-sm text-muted-foreground">{status.message}</p>
           <div className="mt-5 flex justify-center gap-3">
-            <Button size="sm" variant="outline" onClick={chooseRoot}>换个目录</Button>
+            <Button size="sm" variant="outline" onClick={pickAndAdd}>换个目录</Button>
             <Button size="sm" variant="outline" onClick={() => void reload(true)}>重试</Button>
           </div>
         </div>
@@ -171,13 +203,34 @@ export default function EventGrid({
       <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-border bg-background/95 px-5 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <Ship className="h-5 w-5 text-primary" />
-          <span className="font-semibold">{lib?.game ?? "CG 演出回放"}</span>
+          {games && games.games.length > 0 ? (
+            <>
+              <select
+                value={games.active}
+                onChange={(e) => void switchGame(e.target.value)}
+                disabled={busy}
+                title="切换游戏库"
+                className="h-9 max-w-[260px] rounded-md border border-input bg-input/40 px-2 text-sm font-semibold outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
+              >
+                {games.games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+              {games.games.length > 1 && (
+                <Badge variant="secondary">{games.games.length} 库</Badge>
+              )}
+            </>
+          ) : (
+            <span className="font-semibold">{lib?.game ?? "CG 演出回放"}</span>
+          )}
         </div>
         <nav className="flex gap-1">
           {(
             [
-              ["cg", `CG鉴赏 ${lib?.cgs.length ?? 0}`],
-              ["scene", `主线场景 ${lib?.scenes.length ?? 0}`],
+              ["cg", `CG鉴赏 ${lib?.cgs?.length ?? 0}`],
+              ["scene", `主线场景 ${lib?.scenes?.length ?? 0}`],
               ["chapter", `演出段落 ${lib?.chapters?.length ?? 0}`],
             ] as [Tab, string][]
           ).map(([k, label]) => (
@@ -208,8 +261,8 @@ export default function EventGrid({
         <Button variant="outline" size="icon" title="重扫" onClick={() => void reload(true)}>
           <RefreshCw className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="icon" title="换目录" onClick={chooseRoot}>
-          <FolderOpen className="h-4 w-4" />
+        <Button variant="outline" size="icon" title="添加游戏" onClick={pickAndAdd} disabled={busy}>
+          <Plus className="h-4 w-4" />
         </Button>
       </header>
 
@@ -223,7 +276,7 @@ export default function EventGrid({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
         {cards.map((c) => (
           <EventCard
-            key={`${c.kind}:${c.id}`}
+            key={`${lib?.root ?? ""}:${c.kind}:${c.id}`}
             card={c}
             lookup={coverOf}
             onClick={() => onOpen(c.kind, c.id, c.title)}

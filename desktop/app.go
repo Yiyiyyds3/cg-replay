@@ -8,6 +8,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -18,6 +19,7 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"ucgr/internal/library"
+	"ucgr/internal/registry"
 	"ucgr/internal/replay"
 )
 
@@ -45,6 +47,23 @@ type Conf struct {
 	Library     string `json:"library"`
 	Auto        bool   `json:"auto"`
 	ConfMissing bool   `json:"conf_missing"`
+}
+
+// GameDTO 前端游戏切换器条目（与 internal/registry.Game 对齐）。
+type GameDTO struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Root         string `json:"root"`
+	Library      string `json:"library,omitempty"`
+	Engine       string `json:"engine,omitempty"`
+	AddedAt      string `json:"added_at"`
+	LastPlayedAt string `json:"last_played_at,omitempty"`
+}
+
+// GamesDTO 游戏库清单。
+type GamesDTO struct {
+	Active string    `json:"active"`
+	Games  []GameDTO `json:"games"`
 }
 
 // loadConf 读 exe 同目录 conf；不存在返回零值 + missing 标记（不静默）。
@@ -87,108 +106,227 @@ func (a *App) PickDirectory() (string, error) {
 	})
 }
 
-// SetRoot 保存根目录并立即建库，返回库（卡片网格直接用）。
-func (a *App) SetRoot(root string) (*library.Library, error) {
-	root = strings.TrimSpace(root)
-	if root == "" {
-		return nil, fmt.Errorf("根目录为空")
-	}
-	if _, err := os.Stat(library.ScenarioDir(root)); err != nil {
-		return nil, fmt.Errorf("目录里没有 raw\\data\\scenario：%w", err)
-	}
-	c, _ := a.loadConf()
-	c.Root = root
-	c.Library = filepath.Join(exeDir(), "library.json")
-	if err := a.saveConf(c); err != nil {
-		return nil, err
-	}
-	lib, err := library.Scan(root)
-	if err != nil {
-		return nil, err
-	}
-	if err := lib.Save(c.Library); err != nil {
-		return nil, err
-	}
-	return lib, nil
-}
+// registryPath 多游戏登记表路径（与 cgreplay.conf 同目录）。
+func (a *App) registryPath() string { return registry.Path(exeDir()) }
 
-// GetLibrary 读库：有清单读清单，没有就扫描建库并落盘。
-// 任何失败原样上抛给前端横幅（不静默降级）。
-func (a *App) GetLibrary() (*library.Library, error) {
-	c, ok := a.loadConf()
-	if !ok {
-		c.Library = filepath.Join(exeDir(), "library.json")
+// loadRegistry 读游戏登记表。首次运行（games.json 不存在）把旧版 conf
+// 里的单根目录迁移成一条登记项；迁移只做一次，失败原样上抛。
+func (a *App) loadRegistry(c conf) (*registry.Registry, error) {
+	path := a.registryPath()
+	reg, err := registry.Load(path)
+	if err == nil {
+		if reg.ActiveGame() == nil && len(reg.Games) > 0 {
+			reg.Active = reg.Games[0].ID
+		}
+		return reg, nil
 	}
-	// ① 优先读清单；root 已变则失效重扫。
-	if c.Library != "" {
-		if lib, err := library.Load(c.Library); err == nil && (c.Root == "" || lib.Root == c.Root) {
-			if c.Root != "" && lib.Root != "" {
-				return lib, nil
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	reg = registry.New()
+	if strings.TrimSpace(c.Root) != "" {
+		if clean, cerr := registry.CleanRoot(c.Root); cerr == nil {
+			if _, serr := os.Stat(library.ScenarioDir(clean)); serr == nil {
+				libPath := strings.TrimSpace(c.Library)
+				if libPath == "" {
+					libPath = registry.LibraryPath(exeDir(), registry.IDFor(clean))
+				}
+				g, _ := reg.Ensure(clean, libPath)
+				reg.Active = g.ID
 			}
 		}
 	}
-	// ② 无清单 → 扫根目录建库。
-	if c.Root == "" {
-		c.Root = exeDir()
-		if _, err := os.Stat(library.ScenarioDir(c.Root)); err != nil {
-			return nil, fmt.Errorf("未设置游戏根目录（conf 缺失），请先选择解包目录")
+	if err := reg.Save(path); err != nil {
+		return nil, err
+	}
+	return reg, nil
+}
+
+// activeGame 当前游戏；没有登记项时给出可操作的错误（不静默）。
+func (a *App) activeGame(c conf) (*registry.Registry, *registry.Game, error) {
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return nil, nil, err
+	}
+	g := reg.ActiveGame()
+	if g == nil {
+		return nil, nil, fmt.Errorf("还没有游戏库，请先添加游戏解包目录")
+	}
+	return reg, g, nil
+}
+
+// syncActiveConf 把当前游戏写回 cgreplay.conf（CLI 版继续读同一份配置）。
+func (a *App) syncActiveConf(g *registry.Game) error {
+	c, _ := a.loadConf()
+	if c.Root == g.Root && c.Library == g.Library {
+		return nil
+	}
+	c.Root = g.Root
+	c.Library = g.Library
+	return a.saveConf(c)
+}
+
+// ListGames 游戏库清单（卡墙启动时调，前端据此渲染切换器）。
+func (a *App) ListGames() (GamesDTO, error) {
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return GamesDTO{}, err
+	}
+	out := GamesDTO{Active: reg.Active, Games: make([]GameDTO, 0, len(reg.Games))}
+	for _, g := range reg.Games {
+		out.Games = append(out.Games, GameDTO{
+			ID: g.ID, Title: g.Title, Root: g.Root, Library: g.Library,
+			Engine: g.Engine, AddedAt: g.AddedAt, LastPlayedAt: g.LastPlayedAt,
+		})
+	}
+	return out, nil
+}
+
+// SetRoot 兼容旧前端：等价于添加/切换游戏。
+func (a *App) SetRoot(root string) (*library.Library, error) { return a.AddGame(root) }
+
+// AddGame 登记并扫描一款游戏，设为当前游戏，返回事件库。
+// 同一根目录重复添加只切换并重扫，不会产生重复登记。
+func (a *App) AddGame(root string) (*library.Library, error) {
+	clean, err := registry.CleanRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(library.ScenarioDir(clean)); err != nil {
+		return nil, fmt.Errorf("目录里没有 raw\\data\\scenario：%w", err)
+	}
+	lib, err := library.Scan(clean)
+	if err != nil {
+		return nil, err
+	}
+	if len(lib.CGs)+len(lib.Scenes)+len(lib.Chapters) == 0 {
+		return nil, fmt.Errorf("没有识别到可回放事件（当前仅支持 KiriKiri 布局：raw\\data\\scenario）")
+	}
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return nil, err
+	}
+	id := registry.IDFor(clean)
+	libPath := registry.LibraryPath(exeDir(), id)
+	if old := reg.Find(id); old != nil && strings.TrimSpace(old.Library) != "" {
+		libPath = old.Library
+	}
+	g, _ := reg.Ensure(clean, libPath)
+	reg.Active = g.ID
+	if err := lib.Save(g.Library); err != nil {
+		return nil, err
+	}
+	if err := reg.Save(a.registryPath()); err != nil {
+		return nil, err
+	}
+	if err := a.syncActiveConf(g); err != nil {
+		return nil, err
+	}
+	return lib, nil
+}
+
+// SetActiveGame 切换当前游戏（读该游戏自己的库清单；失效则重扫）。
+func (a *App) SetActiveGame(id string) (*library.Library, error) {
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return nil, err
+	}
+	g := reg.Find(strings.TrimSpace(id))
+	if g == nil {
+		return nil, fmt.Errorf("游戏 %s 未登记", id)
+	}
+	if _, err := os.Stat(library.ScenarioDir(g.Root)); err != nil {
+		return nil, fmt.Errorf("游戏「%s」根目录不可用：%w", g.Title, err)
+	}
+	if g.Library == "" {
+		g.Library = registry.LibraryPath(exeDir(), g.ID)
+	}
+	lib, err := a.loadOrScanLib(g)
+	if err != nil {
+		return nil, err
+	}
+	reg.Active = g.ID
+	reg.Touch(g.ID)
+	if err := reg.Save(a.registryPath()); err != nil {
+		return nil, err
+	}
+	if err := a.syncActiveConf(g); err != nil {
+		return nil, err
+	}
+	return lib, nil
+}
+
+// GetLibrary 读当前游戏的库：有清单读清单，没有就扫描建库并落盘。
+// 任何失败原样上抛给前端横幅（不静默降级）。
+func (a *App) GetLibrary() (*library.Library, error) {
+	c, _ := a.loadConf()
+	reg, g, err := a.activeGame(c)
+	if err != nil {
+		return nil, err
+	}
+	if g.Library == "" {
+		g.Library = registry.LibraryPath(exeDir(), g.ID)
+		if err := reg.Save(a.registryPath()); err != nil {
+			return nil, err
 		}
 	}
-	c.Root = strings.TrimSpace(c.Root)
-	lib, err := library.Scan(c.Root)
+	lib, err := a.loadOrScanLib(g)
 	if err != nil {
 		return nil, err
 	}
-	if c.Library == "" {
-		c.Library = filepath.Join(exeDir(), "library.json")
-	}
-	if err := a.saveConf(c); err != nil {
-		return nil, err
-	}
-	if err := lib.Save(c.Library); err != nil {
+	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
 	return lib, nil
 }
 
-// Rescan 强制重扫（网格刷新按钮/设置页用）。
+// Rescan 强制重扫当前游戏（网格刷新按钮/设置页用）。
 func (a *App) Rescan() (*library.Library, error) {
-	c, ok := a.loadConf()
-	if !ok || c.Root == "" {
-		return nil, fmt.Errorf("未设置游戏根目录，请先选择解包目录")
-	}
-	lib, err := library.Scan(c.Root)
+	c, _ := a.loadConf()
+	_, g, err := a.activeGame(c)
 	if err != nil {
 		return nil, err
 	}
-	if c.Library == "" {
-		c.Library = filepath.Join(exeDir(), "library.json")
+	lib, err := library.Scan(g.Root)
+	if err != nil {
+		return nil, err
 	}
-	if err := lib.Save(c.Library); err != nil {
+	if g.Library == "" {
+		g.Library = registry.LibraryPath(exeDir(), g.ID)
+	}
+	if err := lib.Save(g.Library); err != nil {
+		return nil, err
+	}
+	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
 	return lib, nil
 }
 
-// GetCover CG 卡封面（懒加载 + 磁盘缓存 covers/<id>.png，返回 data URL 交给 <img>）。
+// GetCover CG 卡封面（懒加载 + 磁盘缓存 covers/<game>/<id>.png，返回 data URL 交给 <img>）。
 // 只用 Pages[0] 原图裁 55:31 比例，不做整段合成（网格打开要快）。
 // 场景/段落暂无封面（前端用占位渐变），M3 回放页复用本函数做抽帧封面。
 func (a *App) GetCover(kind, id string) (string, error) {
-	c, ok := a.loadConf()
-	if !ok || c.Root == "" {
-		return "", fmt.Errorf("未设置游戏根目录")
+	c, _ := a.loadConf()
+	_, g, err := a.activeGame(c)
+	if err != nil {
+		return "", err
 	}
-	dir := filepath.Join(exeDir(), "covers")
+	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
+	dir := filepath.Join(exeDir(), "covers", safeName(g.ID))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	path := filepath.Join(dir, safeName(kind)+"_"+safeName(id)+".png")
 	if _, err := os.Stat(path); err != nil {
-		lib, err := a.loadOrScanLib(c)
+		lib, err := a.loadOrScanLib(g)
 		if err != nil {
 			return "", err
 		}
-		load := replay.GameLoader(c.Root)
+		load := replay.GameLoader(g.Root)
 		var rel string
 		switch kind {
 		case "cg":
@@ -221,17 +359,26 @@ func (a *App) GetCover(kind, id string) (string, error) {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), nil
 }
 
-// loadOrScanLib 读库清单，读不到（或 root 已变）就地扫描兜底。
-func (a *App) loadOrScanLib(c conf) (*library.Library, error) {
-	if c.Library != "" {
-		if lib, err := library.Load(c.Library); err == nil && (c.Root == "" || lib.Root == c.Root) {
+// loadOrScanLib 读该游戏的库清单，读不到（或 root 已变）就地扫描并回写。
+func (a *App) loadOrScanLib(g *registry.Game) (*library.Library, error) {
+	if g.Library != "" {
+		if lib, err := library.Load(g.Library); err == nil && lib.Root == g.Root {
 			return lib, nil
 		}
 	}
-	if c.Root == "" {
-		return nil, fmt.Errorf("未设置游戏根目录")
+	if strings.TrimSpace(g.Root) == "" {
+		return nil, fmt.Errorf("游戏「%s」没有根目录", g.Title)
 	}
-	return library.Scan(c.Root)
+	lib, err := library.Scan(g.Root)
+	if err != nil {
+		return nil, err
+	}
+	if g.Library != "" {
+		if err := lib.Save(g.Library); err != nil {
+			return nil, err
+		}
+	}
+	return lib, nil
 }
 
 // safeName 去掉路径分隔符，防封面缓存名穿目录。

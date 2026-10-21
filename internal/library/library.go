@@ -87,6 +87,9 @@ func Scan(root string) (*Library, error) {
 		Root:        root,
 		Game:        filepath.Base(strings.TrimRight(root, `\/`)),
 		GeneratedAt: time.Now().Format(time.RFC3339),
+		CGs:         []CGEvent{},
+		Scenes:      []SceneEvent{},
+		Chapters:    []ChapterEvent{},
 	}
 
 	// ① 画廊页（cgrai.ks、cgrai2..6.ks）给出槽位顺序 + 缩略图 + 跳转标签。
@@ -162,13 +165,19 @@ func Scan(root string) (*Library, error) {
 	}
 	sort.SliceStable(lib.CGs, func(i, j int) bool { return lib.CGs[i].Index < lib.CGs[j].Index })
 
-	// ③ 主线剧本（编号 .ks）= 场景事件。
+	// ③ 主线剧本 = 场景事件。本作按编号命名（01kuukou.ks…76utyu.ks）；
+	// 其他 KiriKiri 标题不一定编号（如 g01.ks、日语文件名）。没有编号
+	// 场景时回退到「带章节显示名的故事脚本」：系统/引擎脚本没有
+	// `*labelNN|显示名` 章节标记，且通常远小于 8 KiB，用这两个条件排除。
 	var names []string
 	for _, e := range ents {
 		if e.IsDir() || !sceneRe.MatchString(e.Name()) {
 			continue
 		}
 		names = append(names, e.Name())
+	}
+	if len(names) == 0 {
+		names = fallbackStoryScenes(dir)
 	}
 	sort.Strings(names)
 	for _, name := range names {
@@ -253,6 +262,37 @@ func Scan(root string) (*Library, error) {
 		prev.ContLabelPos = info.firstLabelPos
 	}
 	return lib, nil
+}
+
+// fallbackStoryScenes 在解包目录没有编号剧本时，挑出真正的故事脚本。
+// 条件：≥8 KiB 且有 `*labelNN|显示名` 章节标记（引擎脚本通常两者都不满足）。
+func fallbackStoryScenes(dir string) []string {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	const minSize = 8 << 10
+	var out []string
+	for _, e := range ents {
+		name := e.Name()
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(name), ".ks") {
+			continue
+		}
+		if galleryRe.MatchString(name) || strings.EqualFold(name, "cgrai00.ks") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || info.Size() < minSize {
+			continue
+		}
+		ast, err := kirikiri.ParseScriptFile(filepath.Join(dir, name))
+		if err != nil || len(kirikiri.Chapters(ast)) == 0 {
+			continue
+		}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Save 写库清单（JSON）。
