@@ -12,6 +12,7 @@ import {
   Search,
   Ship,
   Star,
+  Users,
 } from "lucide-react";
 import {
   api,
@@ -24,6 +25,7 @@ import {
   type GameDTO,
   type GamesDTO,
   type LibraryDTO,
+  type SpeakerDTO,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +65,9 @@ export default function EventGrid({
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
   const [favItems, setFavItems] = useState<FavoriteDTO[]>([]); // 收藏区列表（含标题）
   const [favGames, setFavGames] = useState<Set<string>>(new Set()); // game 级收藏（游戏 id）
+  const [favChars, setFavChars] = useState<Set<string>>(new Set()); // character|gameID|name
+  const [favCharItems, setFavCharItems] = useState<FavoriteDTO[]>([]); // 收藏角色列表
+  const [speakers, setSpeakers] = useState<SpeakerDTO[]>([]); // 说话人聚合（角色区）
   const [indexing, setIndexing] = useState<{
     title: string;
     done: number;
@@ -152,16 +157,20 @@ export default function EventGrid({
     }
   };
 
-  // 收藏全量刷新（event 列表 + game 星标集）；启动与「全部」页签进入时调。
+  // 收藏全量刷新（event 列表 + game 星标集 + character 星标集）；
+  // 启动与「全部」页签进入时调。
   const refreshFavs = async () => {
     try {
-      const [ev, gm] = await Promise.all([
+      const [ev, gm, ch] = await Promise.all([
         api.listFavorites("event"),
         api.listFavorites("game"),
+        api.listFavorites("character"),
       ]);
       setFavItems(ev);
       setFavs(new Set(ev.map((f) => `event|${f.game_id}|${f.item_id}`)));
       setFavGames(new Set(gm.map((f) => f.item_id)));
+      setFavCharItems(ch);
+      setFavChars(new Set(ch.map((f) => `character|${f.game_id}|${f.item_id}`)));
     } catch {
       /* 收藏读取失败不阻断主流程（星标/计数保持空，FR-12 见操作时警告） */
     }
@@ -184,6 +193,8 @@ export default function EventGrid({
       await refreshFavs();
       const pending = gs.games.filter((g) => !tc[g.id]);
       if (pending.length > 0) await indexGames(pending);
+      // 说话人依赖 text_lines：必须在索引之后拉（0 台词游戏刚抽完）。
+      setSpeakers(await api.catalogSpeakers(""));
     } catch (e: any) {
       setAllWarnings([e?.message ?? String(e)]);
     }
@@ -254,6 +265,35 @@ export default function EventGrid({
       setAllWarnings((w) => [
         ...w,
         `${had ? "取消收藏游戏" : "收藏游戏"}失败：${e?.message ?? String(e)}`,
+      ]);
+    }
+  };
+
+  // 收藏/取消收藏角色（character 级：item_id = 说话人名，game_id 区分同名校色）。
+  // 乐观更新 + 失败回滚；成功后重拉（收藏角色区要标题）。
+  const toggleCharFav = async (gameID: string, name: string) => {
+    const key = `character|${gameID}|${name}`;
+    const had = favChars.has(key);
+    setFavChars((prev) => {
+      const next = new Set(prev);
+      if (had) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    try {
+      if (had) await api.removeFavorite("character", gameID, name);
+      else await api.addFavorite("character", gameID, name, 0, "");
+      await refreshFavs();
+    } catch (e: any) {
+      setFavChars((prev) => {
+        const next = new Set(prev);
+        if (had) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      setAllWarnings((w) => [
+        ...w,
+        `${had ? "取消收藏角色" : "收藏角色"}失败：${e?.message ?? String(e)}`,
       ]);
     }
   };
@@ -568,6 +608,9 @@ export default function EventGrid({
             recent={recentItems}
             favItems={favItems}
             favs={favs}
+            speakers={speakers}
+            favChars={favChars}
+            favCharItems={favCharItems}
             textHits={textHits}
             textIndexed={textIndexed}
             textCounts={textCounts}
@@ -576,6 +619,8 @@ export default function EventGrid({
             onCover={coverFor}
             onToggleFav={toggleFav}
             onSaveFavMeta={saveFavMeta}
+            onToggleCharFav={toggleCharFav}
+            onSearchSpeaker={(name) => setQ(name)}
             onIndexAll={() => {
               const pending = gameList.filter((g) => !textCounts[g.id]);
               if (pending.length > 0) void indexGames(pending);
@@ -962,6 +1007,9 @@ function AllGames({
   recent,
   favItems,
   favs,
+  speakers,
+  favChars,
+  favCharItems,
   textHits,
   textIndexed,
   textCounts,
@@ -970,6 +1018,8 @@ function AllGames({
   onCover,
   onToggleFav,
   onSaveFavMeta,
+  onToggleCharFav,
+  onSearchSpeaker,
   onIndexAll,
 }: {
   events: CatalogEventDTO[];
@@ -979,6 +1029,9 @@ function AllGames({
   recent: CatalogRecentDTO[];
   favItems: FavoriteDTO[];
   favs: Set<string>;
+  speakers: SpeakerDTO[];
+  favChars: Set<string>;
+  favCharItems: FavoriteDTO[];
   textHits: CatalogTextHitDTO[] | null;
   textIndexed: boolean;
   textCounts: Record<string, number>;
@@ -987,6 +1040,8 @@ function AllGames({
   onCover: (gameID: string, kind: string, id: string) => Promise<string | null>;
   onToggleFav: (gameID: string, kind: string, id: string) => void;
   onSaveFavMeta: (gameID: string, itemID: string, rating: number, note: string) => Promise<void>;
+  onToggleCharFav: (gameID: string, name: string) => void;
+  onSearchSpeaker: (name: string) => void;
   onIndexAll: () => void;
 }) {
   // 按游戏分组（后端按游戏标题排序，保持出现序即分组序）。
@@ -1013,6 +1068,22 @@ function AllGames({
   // 台词行的事件标题：从已加载事件里查（查不到回落 event_id）。
   const titleOf = (gameID: string, kind: string, id: string) =>
     events.find((e) => e.game_id === gameID && e.kind === kind && e.id === id)?.title ?? id;
+
+  // 说话人按游戏分组（后端已按条数降序，组内保持）。
+  const speakerGroups = useMemo(() => {
+    const out: { game_id: string; game_title: string; items: SpeakerDTO[] }[] = [];
+    const idx = new Map<string, number>();
+    for (const s of speakers) {
+      let gi = idx.get(s.game_id);
+      if (gi === undefined) {
+        gi = out.length;
+        idx.set(s.game_id, gi);
+        out.push({ game_id: s.game_id, game_title: s.game_title, items: [] });
+      }
+      out[gi].items.push(s);
+    }
+    return out;
+  }, [speakers]);
 
   if (!loaded) {
     return (
@@ -1069,6 +1140,42 @@ function AllGames({
           </section>
         )}
 
+        {/* 收藏的角色（character 级：点名字搜该角色台词） */}
+        {!textHits && favCharItems.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              收藏的角色 {favCharItems.length}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {favCharItems.map((f) => (
+                <span
+                  key={`${f.game_id}:${f.item_id}`}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-card py-1.5 pl-3 pr-1.5 text-xs"
+                  title={`${f.game_title} · ${f.item_id}`}
+                >
+                  <button
+                    disabled={busy}
+                    onClick={() => onSearchSpeaker(f.item_id)}
+                    className="max-w-[180px] truncate hover:text-primary"
+                  >
+                    {f.title}
+                  </button>
+                  <span className="text-[10px] text-muted-foreground">{f.game_title}</span>
+                  <button
+                    disabled={busy}
+                    title="取消收藏角色"
+                    onClick={() => onToggleCharFav(f.game_id, f.item_id)}
+                    className="flex h-6 w-6 items-center justify-center rounded text-amber-400 hover:text-foreground"
+                  >
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* 最近播放 */}
         {recent.length > 0 && !textHits && (
           <section className="space-y-2">
@@ -1092,6 +1199,63 @@ function AllGames({
                 </button>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* 角色（说话人聚合，每游戏 top 8；点名字搜台词，星标收藏） */}
+        {!textHits && speakerGroups.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <Users className="h-3.5 w-3.5" />
+              角色
+            </h2>
+            {speakerGroups.map((sg) => (
+              <div key={sg.game_id} className="space-y-1.5">
+                <div className="text-[10px] text-muted-foreground">
+                  {sg.game_title} · {sg.items.length} 位
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sg.items.slice(0, 8).map((s) => {
+                    const fav = favChars.has(`character|${s.game_id}|${s.name}`);
+                    return (
+                      <span
+                        key={s.name}
+                        className="group flex items-center gap-1 rounded-md border border-border bg-card py-1 pl-3 pr-1 text-xs"
+                      >
+                        <button
+                          disabled={busy}
+                          onClick={() => onSearchSpeaker(s.name)}
+                          title={`搜索「${s.name}」的台词（${s.lines} 条 / ${s.events} 事件）`}
+                          className="max-w-[160px] truncate hover:text-primary"
+                        >
+                          {s.name}
+                        </button>
+                        <span className="text-[10px] text-muted-foreground">×{s.lines}</span>
+                        <button
+                          disabled={busy}
+                          title={fav ? "取消收藏角色" : "收藏角色"}
+                          onClick={() => onToggleCharFav(s.game_id, s.name)}
+                          className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded transition-opacity",
+                            fav
+                              ? "text-amber-400 opacity-100"
+                              : "text-muted-foreground/60 opacity-0 hover:text-amber-400 focus-visible:opacity-100 group-hover:opacity-100",
+                            busy && "cursor-not-allowed opacity-50",
+                          )}
+                        >
+                          <Star className={cn("h-3.5 w-3.5", fav && "fill-current")} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                  {sg.items.length > 8 && (
+                    <span className="self-center text-[10px] text-muted-foreground">
+                      等 {sg.items.length} 位
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </section>
         )}
 

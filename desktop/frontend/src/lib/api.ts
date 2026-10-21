@@ -126,6 +126,14 @@ export interface FavoriteDTO {
   created_at: string;
   updated_at: string;
 }
+/** 说话人聚合（desktop/catalog.go SpeakerDTO）——character 级收藏前置。 */
+export interface SpeakerDTO {
+  game_id: string;
+  game_title: string;
+  name: string;
+  lines: number;
+  events: number;
+}
 
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
@@ -168,6 +176,8 @@ export const api = {
     bridge().RemoveFavorite(itemType, gameID, itemID) as Promise<void>,
   listFavorites: (itemType: string) =>
     bridge().ListFavorites(itemType) as Promise<FavoriteDTO[]>,
+  catalogSpeakers: (gameID: string) =>
+    bridge().CatalogSpeakers(gameID) as Promise<SpeakerDTO[]>,
   getCoverForGame: (gameID: string, kind: string, id: string) =>
     bridge().GetCoverForGame(gameID, kind, id) as Promise<string>,
   // 兼容旧绑定；等价于 addGame
