@@ -16,8 +16,14 @@ import (
 	"ucgr/internal/registry"
 )
 
-func TestTextLinesFromRealCorpus(t *testing.T) {
-	root := os.Getenv("UCGR_BLUE_ROOT")
+// getenvBlueRoot 真机语料根（env-gated；未设置返回空）。
+func getenvBlueRoot() string { return os.Getenv("UCGR_BLUE_ROOT") }
+
+// indexBlueWhale 把蓝鲸岛全作索引进 c（与 desktop CatalogIndexText 同口径：
+// 画廊空槽静默跳过）。失败直接 t.Fatalf。
+func indexBlueWhale(t *testing.T, c *Catalog) {
+	t.Helper()
+	root := getenvBlueRoot()
 	if root == "" {
 		t.Skip("UCGR_BLUE_ROOT 未设置")
 	}
@@ -26,16 +32,9 @@ func TestTextLinesFromRealCorpus(t *testing.T) {
 		t.Fatalf("Scan: %v", err)
 	}
 	g := registry.Game{ID: "gcorpus0001", Title: "重返蓝鲸岛", Root: root, Engine: "kirikiri"}
-
-	c, err := Open(":memory:")
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer c.Close()
 	if err := c.SyncGame(g, lib); err != nil {
 		t.Fatalf("SyncGame: %v", err)
 	}
-
 	write := func(kind, id, script, label string, ch *library.ChapterEvent) {
 		var (
 			ev  *ir.Event
@@ -72,6 +71,15 @@ func TestTextLinesFromRealCorpus(t *testing.T) {
 		ch := lib.Chapters[i]
 		write("chapter", ch.ID, ch.Script, "", &ch)
 	}
+}
+
+func TestTextLinesFromRealCorpus(t *testing.T) {
+	c, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer c.Close()
+	indexBlueWhale(t, c)
 
 	s, err := c.Stats()
 	if err != nil {

@@ -26,6 +26,10 @@ export function CatalogSearchText(arg1, arg2) {
   return window['go']['main']['App']['CatalogSearchText'](arg1, arg2);
 }
 
+export function CatalogSpeakers(arg1) {
+  return window['go']['main']['App']['CatalogSpeakers'](arg1);
+}
+
 export function CatalogStats() {
   return window['go']['main']['App']['CatalogStats']();
 }

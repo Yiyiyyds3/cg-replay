@@ -15,6 +15,8 @@ export function CatalogRecent(arg1:number):Promise<Array<main.CatalogRecentDTO>>
 
 export function CatalogSearchText(arg1:string,arg2:number):Promise<main.CatalogTextDTO>;
 
+export function CatalogSpeakers(arg1:string):Promise<Array<main.SpeakerDTO>>;
+
 export function CatalogStats():Promise<main.CatalogStatsDTO>;
 
 export function CatalogTextCounts():Promise<Record<string, number>>;

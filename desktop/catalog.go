@@ -192,6 +192,41 @@ func (a *App) ListFavorites(itemType string) ([]FavoriteDTO, error) {
 	return out, nil
 }
 
+// ---------- 说话人聚合（character 级收藏的前置） ----------
+
+// SpeakerDTO 说话人聚合行（与 internal/catalog.Speaker 对齐）。
+type SpeakerDTO struct {
+	GameID    string `json:"game_id"`
+	GameTitle string `json:"game_title"`
+	Name      string `json:"name"`
+	Lines     int    `json:"lines"`
+	Events    int    `json:"events"`
+}
+
+// CatalogSpeakers 说话人聚合（gameID 为空 = 全部已索引游戏；按条数降序）。
+// 数据源是 text_lines：台词未抽取的游戏不会出现说话人。
+func (a *App) CatalogSpeakers(gameID string) ([]SpeakerDTO, error) {
+	var out []SpeakerDTO
+	err := a.withCatalog(func(c *catalog.Catalog) error {
+		items, serr := c.Speakers(gameID, 0)
+		if serr != nil {
+			return serr
+		}
+		out = make([]SpeakerDTO, 0, len(items))
+		for _, s := range items {
+			out = append(out, SpeakerDTO{
+				GameID: s.GameID, GameTitle: s.GameTitle, Name: s.Name,
+				Lines: s.Lines, Events: s.Events,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ensureCatalogSync 查询前把登记表里的每款游戏同步进 catalog
 // （loadOrScanLib + SyncGame）。失败的游戏记 warnings 后跳过，
 // 返回已成功部分——不启动时全量扫盘，只在查询时按需同步。

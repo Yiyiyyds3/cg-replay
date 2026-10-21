@@ -618,6 +618,26 @@ export namespace main {
 	        this.duration_ms = source["duration_ms"];
 	    }
 	}
+	export class SpeakerDTO {
+	    game_id: string;
+	    game_title: string;
+	    name: string;
+	    lines: number;
+	    events: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SpeakerDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.game_id = source["game_id"];
+	        this.game_title = source["game_title"];
+	        this.name = source["name"];
+	        this.lines = source["lines"];
+	        this.events = source["events"];
+	    }
+	}
 
 }
 
