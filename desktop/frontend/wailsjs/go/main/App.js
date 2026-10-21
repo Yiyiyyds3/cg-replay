@@ -6,8 +6,28 @@ export function AddGame(arg1) {
   return window['go']['main']['App']['AddGame'](arg1);
 }
 
+export function CatalogEvents(arg1, arg2) {
+  return window['go']['main']['App']['CatalogEvents'](arg1, arg2);
+}
+
+export function CatalogIndexText(arg1) {
+  return window['go']['main']['App']['CatalogIndexText'](arg1);
+}
+
+export function CatalogRecent(arg1) {
+  return window['go']['main']['App']['CatalogRecent'](arg1);
+}
+
+export function CatalogSearchText(arg1, arg2) {
+  return window['go']['main']['App']['CatalogSearchText'](arg1, arg2);
+}
+
 export function CatalogStats() {
   return window['go']['main']['App']['CatalogStats']();
+}
+
+export function CatalogTextCounts() {
+  return window['go']['main']['App']['CatalogTextCounts']();
 }
 
 export function ExitReplay() {
@@ -24,6 +44,10 @@ export function GetConf() {
 
 export function GetCover(arg1, arg2) {
   return window['go']['main']['App']['GetCover'](arg1, arg2);
+}
+
+export function GetCoverForGame(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetCoverForGame'](arg1, arg2, arg3);
 }
 
 export function GetFrame() {

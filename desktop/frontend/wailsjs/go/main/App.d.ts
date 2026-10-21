@@ -5,7 +5,17 @@ import {main} from '../models';
 
 export function AddGame(arg1:string):Promise<library.Library>;
 
+export function CatalogEvents(arg1:string,arg2:number):Promise<main.CatalogEventsDTO>;
+
+export function CatalogIndexText(arg1:string):Promise<main.CatalogIndexResultDTO>;
+
+export function CatalogRecent(arg1:number):Promise<Array<main.CatalogRecentDTO>>;
+
+export function CatalogSearchText(arg1:string,arg2:number):Promise<main.CatalogTextDTO>;
+
 export function CatalogStats():Promise<main.CatalogStatsDTO>;
+
+export function CatalogTextCounts():Promise<Record<string, number>>;
 
 export function ExitReplay():Promise<void>;
 
@@ -14,6 +24,8 @@ export function ExportEvent(arg1:string):Promise<main.ExportResult>;
 export function GetConf():Promise<main.Conf>;
 
 export function GetCover(arg1:string,arg2:string):Promise<string>;
+
+export function GetCoverForGame(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function GetFrame():Promise<main.FrameDTO>;
 

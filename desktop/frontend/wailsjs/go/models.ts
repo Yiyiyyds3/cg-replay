@@ -195,16 +195,118 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class CatalogEventDTO {
+	    game_id: string;
+	    game_title: string;
+	    game_root: string;
+	    kind: string;
+	    id: string;
+	    title: string;
+	    ord: number;
+	    pages: number;
+	    has_cover: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogEventDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.game_id = source["game_id"];
+	        this.game_title = source["game_title"];
+	        this.game_root = source["game_root"];
+	        this.kind = source["kind"];
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.ord = source["ord"];
+	        this.pages = source["pages"];
+	        this.has_cover = source["has_cover"];
+	    }
+	}
+	export class CatalogEventsDTO {
+	    events: CatalogEventDTO[];
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogEventsDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.events = this.convertValues(source["events"], CatalogEventDTO);
+	        this.warnings = source["warnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CatalogIndexResultDTO {
+	    game_id: string;
+	    events: number;
+	    lines: number;
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogIndexResultDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.game_id = source["game_id"];
+	        this.events = source["events"];
+	        this.lines = source["lines"];
+	        this.warnings = source["warnings"];
+	    }
+	}
+	export class CatalogRecentDTO {
+	    game_id: string;
+	    game_title: string;
+	    kind: string;
+	    event_id: string;
+	    title: string;
+	    played_at: string;
+	    play_count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogRecentDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.game_id = source["game_id"];
+	        this.game_title = source["game_title"];
+	        this.kind = source["kind"];
+	        this.event_id = source["event_id"];
+	        this.title = source["title"];
+	        this.played_at = source["played_at"];
+	        this.play_count = source["play_count"];
+	    }
+	}
 	export class CatalogStatsDTO {
 	    games: number;
 	    events: number;
 	    text_lines: number;
 	    error?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CatalogStatsDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.games = source["games"];
@@ -213,6 +315,67 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
+	export class CatalogTextHitDTO {
+	    line_id: number;
+	    game_id: string;
+	    game_title: string;
+	    kind: string;
+	    event_id: string;
+	    t_ms: number;
+	    speaker: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogTextHitDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line_id = source["line_id"];
+	        this.game_id = source["game_id"];
+	        this.game_title = source["game_title"];
+	        this.kind = source["kind"];
+	        this.event_id = source["event_id"];
+	        this.t_ms = source["t_ms"];
+	        this.speaker = source["speaker"];
+	        this.text = source["text"];
+	    }
+	}
+	export class CatalogTextDTO {
+	    hits: CatalogTextHitDTO[];
+	    warnings: string[];
+	    indexed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogTextDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hits = this.convertValues(source["hits"], CatalogTextHitDTO);
+	        this.warnings = source["warnings"];
+	        this.indexed = source["indexed"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class Conf {
 	    root: string;
 	    library: string;

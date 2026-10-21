@@ -26,6 +26,7 @@ import (
 
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
+	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
 	"ucgr/internal/library"
 	"ucgr/internal/player"
@@ -266,6 +267,12 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	// 最近播放时间：派生元数据，写失败不阻断回放。
 	reg.Touch(g.ID)
 	_ = reg.Save(a.registryPath())
+	// 中心库 recent：同样只记元数据；失败只进 errors.log（FR-12 不静默但不阻断）。
+	if rerr := a.withCatalog(func(c *catalog.Catalog) error {
+		return c.NoteRecent(g.ID, kind, id)
+	}); rerr != nil {
+		a.logAuxError("catalog recent", rerr)
+	}
 
 	return SessionMeta{
 		Kind:       kind,

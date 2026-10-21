@@ -313,12 +313,32 @@ func (a *App) Rescan() (*library.Library, error) {
 // GetCover CG 卡封面（懒加载 + 磁盘缓存 covers/<game>/<id>.png，返回 data URL 交给 <img>）。
 // 只用 Pages[0] 原图裁 55:31 比例，不做整段合成（网格打开要快）。
 // 场景/段落暂无封面（前端用占位渐变），M3 回放页复用本函数做抽帧封面。
+// 跨游戏视图（全部游戏卡片墙）用 GetCoverForGame 指定游戏。
 func (a *App) GetCover(kind, id string) (string, error) {
 	c, _ := a.loadConf()
 	_, g, err := a.activeGame(c)
 	if err != nil {
 		return "", err
 	}
+	return a.coverForGame(g, kind, id)
+}
+
+// GetCoverForGame 与 GetCover 同逻辑，但按 gameID 路由（跨游戏卡片墙用）。
+func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return "", err
+	}
+	g := reg.Find(strings.TrimSpace(gameID))
+	if g == nil {
+		return "", fmt.Errorf("游戏 %s 未登记", gameID)
+	}
+	return a.coverForGame(g, kind, id)
+}
+
+// coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
+func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
 	dir := filepath.Join(exeDir(), "covers", safeName(g.ID))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
