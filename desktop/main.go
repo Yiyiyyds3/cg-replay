@@ -68,7 +68,7 @@ func (a *App) startup(ctx context.Context) {
 
 // Version 绑定桥自检：前端启动时调用，验证 window.go 通路。
 func (a *App) Version() string {
-	return "ucgr replay-ui 0.2.0-m2 · wails v2 · go core ready"
+	return "ucgr replay-ui 0.3.0 · wails v2 · go core ready"
 }
 
 // ReportClientError 前端未捕获异常上报（落到 exe 同目录 errors.log）。

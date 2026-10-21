@@ -21,7 +21,6 @@ import {
   type CatalogEventDTO,
   type CatalogRecentDTO,
   type CatalogStatsDTO,
-  type CatalogTextHitDTO,
   type FavoriteDTO,
   type GameDTO,
   type GamesDTO,
@@ -59,10 +58,9 @@ export default function EventGrid({
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyGame, setBusyGame] = useState("");
-  // ---------- 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 ----------
+  // ---------- 「全部」页签：跨游戏卡片墙 / 角色 / 收藏 / 最近播放 ----------
   const [allEvents, setAllEvents] = useState<CatalogEventDTO[] | null>(null);
   const [allWarnings, setAllWarnings] = useState<string[]>([]);
-  const [textHits, setTextHits] = useState<CatalogTextHitDTO[] | null>(null);
   const [textIndexed, setTextIndexed] = useState(true);
   const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
   const [pruningRecent, setPruningRecent] = useState(false); // 清理 72h 前记录进行中
@@ -173,6 +171,7 @@ export default function EventGrid({
       }
     }
     setIndexing(null);
+    setTextIndexed(true); // 台词已抽取（角色区的「抽取台词」提示随之消失）
     try {
       const [tc, st] = await Promise.all([api.catalogTextCounts(), api.catalogStats()]);
       setTextCounts(tc);
@@ -370,27 +369,6 @@ export default function EventGrid({
     allBooted.current = true;
     void loadAll();
   }, [tab]);
-
-  // 台词检索防抖（仅「全部」页签；空查询回到分组卡片墙）。
-  useEffect(() => {
-    if (tab !== "all") return;
-    const query = q.trim();
-    if (!query) {
-      setTextHits(null);
-      return;
-    }
-    const h = setTimeout(() => {
-      void api
-        .catalogSearchText(query, 100)
-        .then((r) => {
-          setTextHits(r.hits);
-          setTextIndexed(r.indexed);
-          if (r.warnings.length) setAllWarnings(r.warnings);
-        })
-        .catch((e: any) => setAllWarnings([e?.message ?? String(e)]));
-    }, 250);
-    return () => clearTimeout(h);
-  }, [tab, q]);
 
   // 跨游戏打开：先切到该游戏（后端 SetActiveGame 重扫/读库），再进回放。
   const openFromGame = async (
@@ -644,7 +622,7 @@ export default function EventGrid({
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={tab === "all" ? "搜索全部游戏：标题 / 台词…" : "搜索 cg17 / 标题…"}
+              placeholder={tab === "all" ? "按游戏名 / 事件标题筛选…" : "搜索 cg17 / 标题…"}
               className="h-9 w-32 rounded-md border border-input bg-input/40 pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring lg:w-44 xl:w-60"
             />
           </div>
@@ -672,6 +650,7 @@ export default function EventGrid({
             warnings={allWarnings}
             indexing={indexing}
             recent={recentItems}
+            filter={q}
             pruningRecent={pruningRecent}
             autoPrune={autoPrune}
             onPruneRecent={() => pruneRecent(true)}
@@ -681,7 +660,6 @@ export default function EventGrid({
             speakers={speakers}
             favChars={favChars}
             favCharItems={favCharItems}
-            textHits={textHits}
             textIndexed={textIndexed}
             textCounts={textCounts}
             busy={busy}
@@ -691,7 +669,6 @@ export default function EventGrid({
             onSaveFavMeta={saveFavMeta}
             onToggleCharFav={toggleCharFav}
             onSaveCharMeta={saveCharMeta}
-            onSearchSpeaker={(name) => setQ(name)}
             onIndexAll={() => {
               const pending = gameList.filter((g) => !textCounts[g.id]);
               if (pending.length > 0) void indexGames(pending);
@@ -1044,18 +1021,6 @@ function shortRoot(root: string): string {
 
 // ---------- 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 ----------
 
-const KIND_LABEL: Record<string, string> = { cg: "CG", scene: "场景", chapter: "段落" };
-
-function kindLabel(kind: string): string {
-  return KIND_LABEL[kind] ?? kind;
-}
-
-/** 毫秒 → m:ss（台词行的时刻参考）。 */
-function mmss(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
 /** catalog 事件 → 卡片视图（kind 收窄成 CardItem 联合，未知 kind 走 ok:false）。 */
 function cardFor(e: CatalogEventDTO): CardItem {
   switch (e.kind) {
@@ -1085,7 +1050,7 @@ function AllGames({
   speakers,
   favChars,
   favCharItems,
-  textHits,
+  filter,
   textIndexed,
   textCounts,
   busy,
@@ -1095,7 +1060,6 @@ function AllGames({
   onSaveFavMeta,
   onToggleCharFav,
   onSaveCharMeta,
-  onSearchSpeaker,
   onIndexAll,
 }: {
   events: CatalogEventDTO[];
@@ -1112,7 +1076,7 @@ function AllGames({
   speakers: SpeakerDTO[];
   favChars: Set<string>;
   favCharItems: FavoriteDTO[];
-  textHits: CatalogTextHitDTO[] | null;
+  filter: string;
   textIndexed: boolean;
   textCounts: Record<string, number>;
   busy: boolean;
@@ -1122,14 +1086,18 @@ function AllGames({
   onSaveFavMeta: (gameID: string, itemID: string, rating: number, note: string) => Promise<void>;
   onToggleCharFav: (gameID: string, name: string) => void;
   onSaveCharMeta: (gameID: string, name: string, rating: number, note: string) => Promise<void>;
-  onSearchSpeaker: (name: string) => void;
   onIndexAll: () => void;
 }) {
   // 按游戏分组（后端按游戏标题排序，保持出现序即分组序）。
+  // filter = 顶部搜索框：按**游戏名 / 事件标题**过滤（台词检索已按用户要求撤除）。
   const groups = useMemo(() => {
+    const query = filter.trim().toLowerCase();
+    const hit = (s: string) => !query || s.toLowerCase().includes(query);
     const out: { game: CatalogEventDTO; items: CatalogEventDTO[] }[] = [];
     const idx = new Map<string, number>();
     for (const e of events) {
+      // 命中条件含游戏名：按游戏名搜就该保留这款游戏的全部卡片。
+      if (query && !hit(e.game_title) && !hit(e.title) && !hit(e.id)) continue;
       let gi = idx.get(e.game_id);
       if (gi === undefined) {
         gi = out.length;
@@ -1139,16 +1107,12 @@ function AllGames({
       out[gi].items.push(e);
     }
     return out;
-  }, [events]);
+  }, [events, filter]);
 
   // (game_id, item_id) → kind：收藏行打开事件时定位类型
   //（favorites 不存 kind；item_id 在各作 library 内实际唯一）。
   const kindOf = (gameID: string, id: string): string | null =>
     events.find((e) => e.game_id === gameID && e.id === id)?.kind ?? null;
-
-  // 台词行的事件标题：从已加载事件里查（查不到回落 event_id）。
-  const titleOf = (gameID: string, kind: string, id: string) =>
-    events.find((e) => e.game_id === gameID && e.kind === kind && e.id === id)?.title ?? id;
 
   // 说话人按游戏分组（后端已按条数降序，组内保持）。
   const speakerGroups = useMemo(() => {
@@ -1252,7 +1216,7 @@ function AllGames({
 
       <main className="flex-1 space-y-6 overflow-y-auto p-5">
         {/* 收藏（event 级；星标同款数据） */}
-        {!textHits && favItems.length > 0 && (
+        {favItems.length > 0 && (
           <section className="space-y-2">
             <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               <Star className="h-3.5 w-3.5 fill-current" />
@@ -1278,7 +1242,7 @@ function AllGames({
         )}
 
         {/* 收藏的角色（character 级：点名字搜该角色台词；铅笔编辑评分/备注） */}
-        {!textHits && favCharItems.length > 0 && (
+        {favCharItems.length > 0 && (
           <section className="space-y-2">
             <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               <Star className="h-3.5 w-3.5 fill-current" />
@@ -1293,13 +1257,12 @@ function AllGames({
                     className="flex items-center gap-1.5 rounded-md border border-border bg-card py-1.5 pl-3 pr-1.5 text-xs"
                     title={`${f.game_title} · ${f.item_id}${meta?.note ? `\n备注：${meta.note}` : ""}`}
                   >
-                    <button
-                      disabled={busy}
-                      onClick={() => onSearchSpeaker(f.item_id)}
-                      className="max-w-[180px] truncate hover:text-primary"
+                    <span
+                      title={`${f.game_title} · ${f.item_id}`}
+                      className="max-w-[180px] truncate"
                     >
                       {f.title}
-                    </button>
+                    </span>
                     {(meta?.rating ?? 0) > 0 && (
                       <span className="text-[11px] leading-none text-amber-400" title={`评分 ${meta?.rating}/5`}>
                         ★{meta?.rating}
@@ -1371,7 +1334,7 @@ function AllGames({
         )}
 
         {/* 最近播放（按天分组；72h 冷归档清理） */}
-        {recent.length > 0 && !textHits && (
+        {recent.length > 0 && (
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -1433,12 +1396,19 @@ function AllGames({
         )}
 
         {/* 角色（说话人聚合，每游戏 top 8；点名字搜台词，星标收藏） */}
-        {!textHits && speakerGroups.length > 0 && (
+        {speakerGroups.length > 0 && (
           <section className="space-y-3">
-            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              <Users className="h-3.5 w-3.5" />
-              角色
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                角色
+              </h2>
+              {!textIndexed && (
+                <Button size="sm" variant="outline" onClick={onIndexAll} disabled={busy}>
+                  抽取台词以显示角色
+                </Button>
+              )}
+            </div>
             {speakerGroups.map((sg) => {
               const expanded = speakerExpanded.has(sg.game_id);
               const shown = expanded ? sg.items : sg.items.slice(0, 8);
@@ -1456,14 +1426,12 @@ function AllGames({
                         key={s.name}
                         className="group flex items-center gap-1 rounded-md border border-border bg-card py-1 pl-3 pr-1 text-xs"
                       >
-                        <button
-                          disabled={busy}
-                          onClick={() => onSearchSpeaker(s.name)}
-                          title={`搜索「${s.name}」的台词（${s.lines} 条 / ${s.events} 事件）`}
-                          className="max-w-[160px] truncate hover:text-primary"
+                        <span
+                          title={`「${s.name}」共 ${s.lines} 条台词 / ${s.events} 个事件`}
+                          className="max-w-[160px] truncate"
                         >
                           {s.name}
-                        </button>
+                        </span>
                         <span className="text-[10px] text-muted-foreground">×{s.lines}</span>
                         {rated > 0 && (
                           <span
@@ -1505,58 +1473,11 @@ function AllGames({
           </section>
         )}
 
-        {/* 台词检索结果 */}
-        {textHits !== null ? (
-          <section className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              台词命中 {textHits.length} 条
-            </h2>
-            {!textIndexed && (
-              <div className="flex items-center gap-3 rounded-md border border-amber-900/60 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-300">
-                <span className="flex-1">
-                  台词索引尚未抽取（当前只匹配事件标题）。抽取后可按原文检索全部台词。
-                </span>
-                <Button size="sm" variant="outline" onClick={onIndexAll} disabled={busy}>
-                  立即索引
-                </Button>
-              </div>
-            )}
-            {textHits.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">没有匹配的台词</div>
-            ) : (
-              <ul className="divide-y divide-border rounded-md border border-border">
-                {textHits.map((h) => (
-                  <li key={h.line_id}>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        onOpen(h.game_id, h.kind, h.event_id, titleOf(h.game_id, h.kind, h.event_id))
-                      }
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/60 disabled:opacity-50"
-                    >
-                      <span
-                        className="w-28 shrink-0 truncate text-xs text-muted-foreground"
-                        title={h.game_title}
-                      >
-                        {h.game_title}
-                      </span>
-                      <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px]">
-                        {kindLabel(h.kind)}
-                      </Badge>
-                      <span className="w-20 shrink-0 truncate text-xs text-muted-foreground">
-                        {h.speaker || "旁白"}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm">{h.text}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">{mmss(h.t_ms)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : groups.length === 0 ? (
+        {groups.length === 0 ? (
           <div className="py-24 text-center text-sm text-muted-foreground">
-            还没有任何事件。从左侧游戏栏底部「添加游戏」登记解包目录。
+            {filter.trim()
+              ? "没有匹配的游戏或事件。换个关键词，或清空搜索框看全部。"
+              : "还没有任何事件。从左侧游戏栏底部「添加游戏」登记解包目录。"}
           </div>
         ) : (
           groups.map((g) => {

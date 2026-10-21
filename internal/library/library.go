@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/ir"
 )
@@ -73,12 +74,46 @@ var (
 	galleryRe = regexp.MustCompile(`^cgrai[0-9]*\.ks$`)
 )
 
-// ScenarioDir 解包目录下的剧本目录。
-func ScenarioDir(root string) string { return filepath.Join(root, "raw", "data", "scenario") }
+// conventionRe 把约定里的正则编译出来（空表达式 = 该项不启用）。
+func conventionRe(expr string) *regexp.Regexp {
+	if expr == "" {
+		return nil
+	}
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		// 约定由代码生成或用户提供，非法表达式不该让整个扫描崩掉：
+		// 退回「不启用该项」，扫描照常进行（缺画廊就没有 CG 事件）。
+		return nil
+	}
+	return re
+}
 
-// Scan 扫一个解包目录，产出事件库。
+// ScenarioDir 解包目录下的剧本目录（KiriKiri 默认约定）。
+func ScenarioDir(root string) string {
+	return filepath.Join(root, adapter.DefaultKiriKiri().ScenarioDir)
+}
+
+// Scan 扫一个解包目录，产出事件库（KiriKiri 默认约定）。
+//
+// 换一款同引擎游戏、目录/命名不同时，用 ScanWith + 自定义约定，
+// 或在游戏根目录放 `ucgr-convention.json` 覆盖。
 func Scan(root string) (*Library, error) {
-	dir := ScenarioDir(root)
+	return ScanWith(root, adapter.DefaultKiriKiri())
+}
+
+// ScanWith 按给定约定扫一个解包目录，产出事件库。
+//
+// 约定决定：剧本目录、画廊文件模式、画廊索引脚本、CG 标签正则、场景文件正则。
+// 解析器仍是引擎专属的（KiriKiri 的 AST），约定只管「文件在哪、叫什么」。
+func ScanWith(root string, conv adapter.Convention) (*Library, error) {
+	if conv.ScenarioDir == "" {
+		conv = conv.Merge(adapter.DefaultKiriKiri())
+	}
+	thumbRe := conventionRe(conv.CGLabelRe)
+	labelRe := conventionRe(conv.CGLabelRe)
+	galleryRe := conventionRe(conv.GalleryRe)
+	sceneRe := conventionRe(conv.SceneRe)
+	dir := filepath.Join(root, filepath.FromSlash(conv.ScenarioDir))
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
@@ -129,7 +164,7 @@ func Scan(root string) (*Library, error) {
 	}
 
 	// ② cgrai00.ks 里每个 *cgNN 段的图片序列。
-	cgScript := filepath.Join(dir, "cgrai00.ks")
+	cgScript := filepath.Join(dir, conv.GalleryIndex)
 	rel := func(p string) string {
 		if r, err := filepath.Rel(root, p); err == nil {
 			return filepath.ToSlash(r)

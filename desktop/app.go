@@ -18,11 +18,38 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"ucgr/internal/adapter"
 	"ucgr/internal/catalog"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
 	"ucgr/internal/replay"
 )
+
+// gameConvention 取一个游戏的扫描约定：
+//
+//	① 引擎默认约定（KiriKiri = 本作实测的 raw\data\scenario + cgrai*.ks + cgNN）；
+//	② 游戏根目录下的 `ucgr-convention.json` 覆盖（同引擎不同游戏的目录/命名差异
+//	   **只改配置不改代码** —— 这就是「引擎适配一劳永逸」落地的关键）。
+//
+// 约定文件写坏了要报错（用户明确写了配置却写坏，静默忽略会让人以为配置生效了）。
+func gameConvention(root, engineID string) (adapter.Convention, error) {
+	conv, ok := adapter.ConventionByEngine(engineID)
+	if !ok {
+		// 未知引擎先按 KiriKiri 试（约定文件可覆盖）；真扫不出事件时上层会报错。
+		conv = adapter.DefaultKiriKiri()
+	}
+	file, exists, err := adapter.LoadConventionFile(root)
+	if err != nil {
+		return conv, err
+	}
+	if exists {
+		conv = file.Merge(conv)
+	}
+	if err := conv.Validate(); err != nil {
+		return conv, err
+	}
+	return conv, nil
+}
 
 // exeDir 返回 exe 所在目录（只读用途：如日志排查时告诉用户 exe 在哪）。
 func exeDir() string {
@@ -289,10 +316,14 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := os.Stat(library.ScenarioDir(clean)); err != nil {
-		return nil, fmt.Errorf("目录里没有 raw\\data\\scenario：%w", err)
+	conv, cerr := gameConvention(clean, "")
+	if cerr != nil {
+		return nil, cerr
 	}
-	lib, err := library.Scan(clean)
+	if _, err := os.Stat(filepath.Join(clean, filepath.FromSlash(conv.ScenarioDir))); err != nil {
+		return nil, fmt.Errorf("目录里没有 %s：%w", conv.ScenarioDir, err)
+	}
+	lib, err := library.ScanWith(clean, conv)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +420,11 @@ func (a *App) Rescan() (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	lib, err := library.Scan(g.Root)
+	conv, cerr := gameConvention(g.Root, g.Engine)
+	if cerr != nil {
+		return nil, cerr
+	}
+	lib, err := library.ScanWith(g.Root, conv)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +524,11 @@ func (a *App) loadOrScanLib(g *registry.Game) (*library.Library, error) {
 	if strings.TrimSpace(g.Root) == "" {
 		return nil, fmt.Errorf("游戏「%s」没有根目录", g.Title)
 	}
-	lib, err := library.Scan(g.Root)
+	conv, cerr := gameConvention(g.Root, g.Engine)
+	if cerr != nil {
+		return nil, cerr
+	}
+	lib, err := library.ScanWith(g.Root, conv)
 	if err != nil {
 		return nil, err
 	}

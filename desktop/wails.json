@@ -13,7 +13,7 @@
   "info": {
     "companyName": "personal",
     "productName": "重返蓝鲸岛 · CG 演出回放",
-    "productVersion": "0.2.0",
-    "comments": "cg_replay 方案 B（Wails v2 稳定版 + React 18 + shadcn/ui）"
+    "productVersion": "0.3.0",
+    "comments": "cg_replay 0.3.0 多游戏库 MVP（Wails v2 + React 18 + shadcn/ui）"
   }
 }
