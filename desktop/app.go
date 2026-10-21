@@ -224,6 +224,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
+	a.syncCatalog(g, lib)
 	return lib, nil
 }
 
@@ -256,6 +257,7 @@ func (a *App) SetActiveGame(id string) (*library.Library, error) {
 	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
+	a.syncCatalog(g, lib)
 	return lib, nil
 }
 
@@ -280,6 +282,7 @@ func (a *App) GetLibrary() (*library.Library, error) {
 	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
+	a.syncCatalog(g, lib)
 	return lib, nil
 }
 
@@ -303,6 +306,7 @@ func (a *App) Rescan() (*library.Library, error) {
 	if err := a.syncActiveConf(g); err != nil {
 		return nil, err
 	}
+	a.syncCatalog(g, lib)
 	return lib, nil
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Database,
   FolderOpen,
   Gamepad2,
   Loader2,
@@ -13,6 +14,7 @@ import {
 import {
   api,
   type CardItem,
+  type CatalogStatsDTO,
   type GameDTO,
   type GamesDTO,
   type LibraryDTO,
@@ -40,6 +42,7 @@ export default function EventGrid({
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [lib, setLib] = useState<LibraryDTO | null>(null);
   const [games, setGames] = useState<GamesDTO | null>(null);
+  const [catalog, setCatalog] = useState<CatalogStatsDTO | null>(null);
   const [tab, setTab] = useState<Tab>("cg");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,6 +77,7 @@ export default function EventGrid({
       const l = force ? await api.rescan() : await api.getLibrary();
       setLib(l);
       setStatus({ state: "ready" });
+      void refreshCatalog();
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       setLib((prev) => prev ?? null);
@@ -82,6 +86,20 @@ export default function EventGrid({
           ? { state: "setup" }
           : { state: "error", message: msg },
       );
+    }
+  };
+
+  // 中心库只读统计；失败时 Error 落到角标，不阻断回放。
+  const refreshCatalog = async () => {
+    try {
+      setCatalog(await api.catalogStats());
+    } catch (e: any) {
+      setCatalog({
+        games: 0,
+        events: 0,
+        text_lines: 0,
+        error: e?.message ?? String(e),
+      });
     }
   };
 
@@ -123,6 +141,7 @@ export default function EventGrid({
       setLib(l);
       setTab("cg");
       setStatus({ state: "ready" });
+      void refreshCatalog();
     } catch (e: any) {
       setStatus({ state: "error", message: e?.message ?? String(e) });
     } finally {
@@ -142,6 +161,7 @@ export default function EventGrid({
       setLib(l);
       setTab("cg");
       setStatus({ state: "ready" });
+      void refreshCatalog();
     } catch (e: any) {
       setStatus({ state: "error", message: e?.message ?? String(e) });
     } finally {
@@ -252,6 +272,7 @@ export default function EventGrid({
         busy={busy}
         busyGame={busyGame}
         collapsed={collapsed}
+        catalog={catalog}
         onToggle={() => setCollapsed((v) => !v)}
         onSelect={(id) => void switchGame(id)}
         onAdd={() => void pickAndAdd()}
@@ -351,6 +372,7 @@ function GameSidebar({
   busy,
   busyGame,
   collapsed,
+  catalog,
   onToggle,
   onSelect,
   onAdd,
@@ -360,6 +382,7 @@ function GameSidebar({
   busy: boolean;
   busyGame: string;
   collapsed: boolean;
+  catalog: CatalogStatsDTO | null;
   onToggle: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
@@ -407,6 +430,17 @@ function GameSidebar({
           })}
         </div>
         <div className="space-y-1 border-t border-border p-2">
+          <div
+            title={catalogTitle(catalog)}
+            className="mx-auto flex h-8 w-9 items-center justify-center"
+          >
+            <Database
+              className={cn(
+                "h-4 w-4",
+                catalog?.error ? "text-amber-400" : "text-muted-foreground/70",
+              )}
+            />
+          </div>
           <button
             onClick={onAdd}
             disabled={busy}
@@ -524,6 +558,26 @@ function GameSidebar({
         )}
       </div>
 
+      <div className="border-t border-border px-3 py-2" title={catalogTitle(catalog)}>
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <Database
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              catalog?.error ? "text-amber-400" : "text-primary/70",
+            )}
+          />
+          {catalog?.error ? (
+            <span className="truncate text-amber-400">索引失败</span>
+          ) : catalog ? (
+            <span className="truncate text-muted-foreground">
+              索引 {catalog.events} 事件 · {catalog.games} 库
+            </span>
+          ) : (
+            <span className="truncate text-muted-foreground">索引检查中…</span>
+          )}
+        </div>
+      </div>
+
       <div className="border-t border-border p-2">
         <Button
           variant="ghost"
@@ -537,6 +591,13 @@ function GameSidebar({
       </div>
     </aside>
   );
+}
+
+/** 索引角标 tooltip：失败原因常驻可查，不静默。 */
+function catalogTitle(c: CatalogStatsDTO | null): string {
+  if (!c) return "中心库索引检查中…";
+  if (c.error) return `中心库索引失败：${c.error}`;
+  return `本地 SQLite 索引\n${c.games} 个游戏 / ${c.events} 个事件 / ${c.text_lines} 条台词\n只存可检索元数据，回放仍读原始素材。`;
 }
 
 /** 折叠态图标：中文取首字，拉丁字母取前两位。 */

@@ -6,6 +6,10 @@ export function AddGame(arg1) {
   return window['go']['main']['App']['AddGame'](arg1);
 }
 
+export function CatalogStats() {
+  return window['go']['main']['App']['CatalogStats']();
+}
+
 export function ExitReplay() {
   return window['go']['main']['App']['ExitReplay']();
 }

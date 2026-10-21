@@ -56,6 +56,13 @@ export interface GamesDTO {
   active: string;
   games: GameDTO[];
 }
+/** 中心库索引规模（desktop/catalog.go CatalogStatsDTO）。 */
+export interface CatalogStatsDTO {
+  games: number;
+  events: number;
+  text_lines: number;
+  error?: string;
+}
 
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
@@ -79,6 +86,7 @@ export const api = {
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
+  catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,
   // 兼容旧绑定；等价于 addGame
   setRoot: (root: string) => bridge().SetRoot(root) as Promise<LibraryDTO>,
   getLibrary: () => bridge().GetLibrary() as Promise<LibraryDTO>,

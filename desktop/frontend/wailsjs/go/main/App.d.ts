@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function AddGame(arg1:string):Promise<library.Library>;
 
+export function CatalogStats():Promise<main.CatalogStatsDTO>;
+
 export function ExitReplay():Promise<void>;
 
 export function ExportEvent(arg1:string):Promise<main.ExportResult>;

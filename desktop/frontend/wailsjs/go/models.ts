@@ -195,6 +195,24 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class CatalogStatsDTO {
+	    games: number;
+	    events: number;
+	    text_lines: number;
+	    error?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new CatalogStatsDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.games = source["games"];
+	        this.events = source["events"];
+	        this.text_lines = source["text_lines"];
+	        this.error = source["error"];
+	    }
+	}
 	export class Conf {
 	    root: string;
 	    library: string;

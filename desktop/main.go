@@ -26,6 +26,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
+	"ucgr/internal/catalog"
 	"ucgr/internal/scan"
 )
 
@@ -43,6 +44,10 @@ type App struct {
 
 	// 导出任务（Phase 2）：同一时刻只允许一个（TryLock 直接拒绝）。
 	exportMu sync.Mutex
+
+	// 中心库 SQLite（可检索元数据；失败不阻断回放）。
+	catalogMu sync.Mutex
+	catalogDB *catalog.Catalog
 }
 
 // NewApp 构造绑定层。
@@ -89,8 +94,9 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup: app.startup,
-		Bind:      []interface{}{app},
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
+		Bind:       []interface{}{app},
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
