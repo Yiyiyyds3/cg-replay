@@ -6,6 +6,10 @@ export function ExitReplay() {
   return window['go']['main']['App']['ExitReplay']();
 }
 
+export function ExportEvent(arg1) {
+  return window['go']['main']['App']['ExportEvent'](arg1);
+}
+
 export function GetConf() {
   return window['go']['main']['App']['GetConf']();
 }

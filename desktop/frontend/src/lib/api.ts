@@ -82,6 +82,8 @@ export const api = {
   seekTo: (ms: number) => bridge().SeekTo(Math.round(ms)) as Promise<void>,
   exitReplay: () => bridge().ExitReplay() as Promise<void>,
   screenshot: () => bridge().Screenshot() as Promise<string>,
+  exportEvent: (format: string) =>
+    bridge().ExportEvent(format) as Promise<ExportResult>,
 };
 
 // ---------- M3 回放 DTO（与 desktop/replay.go 对应） ----------
@@ -143,4 +145,17 @@ export interface FrameDTO {
   missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
   layers: LayerDTO[]; // 调试抽屉 D
   texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
+}
+
+/** 导出结果（desktop/export.go ExportResult）。 */
+export interface ExportResult {
+  path: string;
+  format: "gif" | "mp4";
+  frames: number;
+  fps: number;
+  width: number;
+  height: number;
+  duration_ms: number;
+  missing: string[];
+  note: string;
 }

@@ -40,6 +40,9 @@ type App struct {
 	// 回放会话（M3）：同一时刻最多一个；sessMu 保护 sess 替换。
 	sessMu sync.Mutex
 	sess   *replaySession
+
+	// 导出任务（Phase 2）：同一时刻只允许一个（TryLock 直接拒绝）。
+	exportMu sync.Mutex
 }
 
 // NewApp 构造绑定层。

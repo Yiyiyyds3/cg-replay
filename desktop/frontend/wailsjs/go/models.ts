@@ -213,6 +213,34 @@ export namespace main {
 	        this.conf_missing = source["conf_missing"];
 	    }
 	}
+	export class ExportResult {
+	    path: string;
+	    format: string;
+	    frames: number;
+	    fps: number;
+	    width: number;
+	    height: number;
+	    duration_ms: number;
+	    missing: string[];
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.format = source["format"];
+	        this.frames = source["frames"];
+	        this.fps = source["fps"];
+	        this.width = source["width"];
+	        this.height = source["height"];
+	        this.duration_ms = source["duration_ms"];
+	        this.missing = source["missing"];
+	        this.note = source["note"];
+	    }
+	}
 	export class LayerDTO {
 	    layer: string;
 	    ref: string;

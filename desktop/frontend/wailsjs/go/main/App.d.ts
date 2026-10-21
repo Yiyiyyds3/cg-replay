@@ -5,6 +5,8 @@ import {library} from '../models';
 
 export function ExitReplay():Promise<void>;
 
+export function ExportEvent(arg1:string):Promise<main.ExportResult>;
+
 export function GetConf():Promise<main.Conf>;
 
 export function GetCover(arg1:string,arg2:string):Promise<string>;

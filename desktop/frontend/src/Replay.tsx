@@ -18,6 +18,8 @@ import {
   Pause,
   Volume2,
   VolumeX,
+  FileImage,
+  FileVideo,
 } from "lucide-react";
 import { api, type FrameDTO, type SessionMeta } from "@/lib/api";
 
@@ -40,6 +42,9 @@ export default function Replay({
   const [showInsp, setShowInsp] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [shot, setShot] = useState(""); // 最近一次截图保存路径提示
+  const [exporting, setExporting] = useState<"" | "gif" | "mp4">("");
+  const [exportPct, setExportPct] = useState(0);
+  const [expMsg, setExpMsg] = useState(""); // 导出结果（路径 + 摘要，非静默）
 
   // 会话关闭不做在卸载清理里：React 18 dev StrictMode 双挂载
   // （mount→unmount→remount）会在首次卸载把正常会话关掉。
@@ -149,6 +154,36 @@ export default function Replay({
     }
   };
 
+  // 导出进度（Go 端 wruntime.EventsEmit；无 runtime 时静默跳过）
+  useEffect(() => {
+    const rt = (window as any).runtime;
+    if (!rt?.EventsOn) return;
+    const off = rt.EventsOn("export:progress", (p: any) =>
+      setExportPct(p?.percent ?? 0),
+    );
+    return () => {
+      if (typeof off === "function") off();
+    };
+  }, []);
+
+  const doExport = async (format: "gif" | "mp4") => {
+    if (exporting) return;
+    setExporting(format);
+    setExportPct(0);
+    try {
+      const r = await api.exportEvent(format);
+      setExpMsg(
+        `已导出 ${r.format.toUpperCase()}：${r.path}（${r.frames} 帧 / ${r.fps}fps / ${r.width}×${r.height}）` +
+          (r.note ? ` · ${r.note}` : ""),
+      );
+      window.setTimeout(() => setExpMsg(""), 12000);
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setExporting("");
+    }
+  };
+
   // 进度条刻度：脚本时钟最大值（dur_ms），可能为 0（无 wait/wt 的事件）
   const dur = meta.duration_ms || 0;
   const pct = dur > 0 ? Math.min(1, (f?.now ?? 0) / dur) : 0;
@@ -191,6 +226,29 @@ export default function Replay({
           <Camera className="h-5 w-5" />
         </Button>
         <Button
+          variant="ghost"
+          size="icon"
+          disabled={!!exporting}
+          onClick={() => doExport("gif")}
+          title="导出 GIF（10fps / 480×360 / 15s 上限）"
+        >
+          <FileImage className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={!!exporting}
+          onClick={() => doExport("mp4")}
+          title="导出 MP4（25fps / 960×720 / 60s 上限；需本机 ffmpeg）"
+        >
+          <FileVideo className="h-5 w-5" />
+        </Button>
+        {exporting && (
+          <Badge variant="outline" className="tabular-nums">
+            {exporting.toUpperCase()} 导出 {exportPct}%
+          </Badge>
+        )}
+        <Button
           variant={showInsp ? "secondary" : "ghost"}
           size="icon"
           onClick={() => setShowInsp((v) => !v)}
@@ -225,6 +283,12 @@ export default function Replay({
       {shot && (
         <div className="absolute right-4 top-14 z-20 max-w-[80%] truncate rounded border border-border bg-card px-3 py-1.5 text-xs shadow">
           已保存：{shot}
+        </div>
+      )}
+      {/* 导出完成提示（路径 + 帧率/尺寸 + 截断/缺素材说明） */}
+      {expMsg && (
+        <div className="absolute right-4 top-14 z-20 max-h-32 max-w-[85%] overflow-auto whitespace-pre-wrap rounded border border-border bg-card px-3 py-1.5 text-xs shadow">
+          {expMsg}
         </div>
       )}
 
