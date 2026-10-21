@@ -21,8 +21,9 @@ import {
   FileImage,
   FileVideo,
   Star,
+  X,
 } from "lucide-react";
-import { api, type FrameDTO, type SessionMeta } from "@/lib/api";
+import { api, onExportEvents, type FrameDTO, type SessionMeta } from "@/lib/api";
 
 const KIND_LABEL: Record<string, string> = {
   cg: "CG 鉴赏",
@@ -45,6 +46,8 @@ export default function Replay({
   const [shot, setShot] = useState(""); // 最近一次截图保存路径提示
   const [exporting, setExporting] = useState<"" | "gif" | "mp4">("");
   const [exportPct, setExportPct] = useState(0);
+  const [exportFrame, setExportFrame] = useState(0);
+  const [exportTotal, setExportTotal] = useState(0);
   const [expMsg, setExpMsg] = useState(""); // 导出结果（路径 + 摘要，非静默）
   const [fav, setFav] = useState(false); // 本事件收藏状态（星标）
   const [favBusy, setFavBusy] = useState(false);
@@ -187,33 +190,60 @@ export default function Replay({
     }
   };
 
-  // 导出进度（Go 端 wruntime.EventsEmit；无 runtime 时静默跳过）
-  useEffect(() => {
-    const rt = (window as any).runtime;
-    if (!rt?.EventsOn) return;
-    const off = rt.EventsOn("export:progress", (p: any) =>
-      setExportPct(p?.percent ?? 0),
-    );
-    return () => {
-      if (typeof off === "function") off();
-    };
-  }, []);
+  // 导出任务中心事件（Go 端 EventsEmit；progress/done/failed 三路）。
+  // done/failed 都要清 running 态；「导出已取消」走 info toast 而非错误横幅
+  // （用户主动取消不是故障，FR-12 不静默但不恐吓）。
+  useEffect(
+    () =>
+      onExportEvents({
+        onProgress: (p) => {
+          setExportPct(p?.percent ?? 0);
+          setExportFrame(p?.frame ?? 0);
+          setExportTotal(p?.total ?? 0);
+        },
+        onDone: (r) => {
+          setExporting("");
+          setExportPct(0);
+          setExpMsg(
+            `已导出 ${r.format.toUpperCase()}：${r.path}（${r.frames} 帧 / ${r.fps}fps / ${r.width}×${r.height}）` +
+              (r.note ? ` · ${r.note}` : ""),
+          );
+          window.setTimeout(() => setExpMsg(""), 12000);
+        },
+        onFailed: (msg) => {
+          setExporting("");
+          setExportPct(0);
+          if (msg.includes("已取消")) {
+            setExpMsg(msg);
+            window.setTimeout(() => setExpMsg(""), 6000);
+          } else {
+            setErr(msg);
+          }
+        },
+      }),
+    [],
+  );
 
   const doExport = async (format: "gif" | "mp4") => {
     if (exporting) return;
     setExporting(format);
     setExportPct(0);
+    setExportFrame(0);
+    setExportTotal(0);
     try {
-      const r = await api.exportEvent(format);
-      setExpMsg(
-        `已导出 ${r.format.toUpperCase()}：${r.path}（${r.frames} 帧 / ${r.fps}fps / ${r.width}×${r.height}）` +
-          (r.note ? ` · ${r.note}` : ""),
-      );
-      window.setTimeout(() => setExpMsg(""), 12000);
+      await api.startExport(format); // 异步：进度/结果/失败走事件
+    } catch (e: any) {
+      // 同步校验失败（并发任务/无会话/无 ffmpeg）——立即回到可操作态
+      setExporting("");
+      setErr(e?.message ?? String(e));
+    }
+  };
+
+  const cancelExport = async () => {
+    try {
+      await api.cancelExport();
     } catch (e: any) {
       setErr(e?.message ?? String(e));
-    } finally {
-      setExporting("");
     }
   };
 
@@ -287,9 +317,24 @@ export default function Replay({
           <FileVideo className="h-5 w-5" />
         </Button>
         {exporting && (
-          <Badge variant="outline" className="tabular-nums">
-            {exporting.toUpperCase()} 导出 {exportPct}%
-          </Badge>
+          <>
+            <Badge
+              variant="outline"
+              className="tabular-nums"
+              title={`第 ${exportFrame}/${exportTotal} 帧`}
+            >
+              {exporting.toUpperCase()} {exportPct}%
+              {exportTotal > 0 && ` · ${exportFrame}/${exportTotal}`}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="取消导出"
+              onClick={() => void cancelExport()}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </>
         )}
         <Button
           variant={showInsp ? "secondary" : "ghost"}

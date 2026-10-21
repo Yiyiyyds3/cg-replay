@@ -10,6 +10,10 @@ export function AddGame(arg1) {
   return window['go']['main']['App']['AddGame'](arg1);
 }
 
+export function CancelExport() {
+  return window['go']['main']['App']['CancelExport']();
+}
+
 export function CatalogEvents(arg1, arg2) {
   return window['go']['main']['App']['CatalogEvents'](arg1, arg2);
 }
@@ -40,10 +44,6 @@ export function CatalogTextCounts() {
 
 export function ExitReplay() {
   return window['go']['main']['App']['ExitReplay']();
-}
-
-export function ExportEvent(arg1) {
-  return window['go']['main']['App']['ExportEvent'](arg1);
 }
 
 export function GetConf() {
@@ -128,6 +128,10 @@ export function SetMuted(arg1) {
 
 export function SetRoot(arg1) {
   return window['go']['main']['App']['SetRoot'](arg1);
+}
+
+export function StartExport(arg1) {
+  return window['go']['main']['App']['StartExport'](arg1);
 }
 
 export function ToggleAuto() {

@@ -7,6 +7,8 @@ export function AddFavorite(arg1:string,arg2:string,arg3:string,arg4:number,arg5
 
 export function AddGame(arg1:string):Promise<library.Library>;
 
+export function CancelExport():Promise<void>;
+
 export function CatalogEvents(arg1:string,arg2:number):Promise<main.CatalogEventsDTO>;
 
 export function CatalogIndexText(arg1:string):Promise<main.CatalogIndexResultDTO>;
@@ -22,8 +24,6 @@ export function CatalogStats():Promise<main.CatalogStatsDTO>;
 export function CatalogTextCounts():Promise<Record<string, number>>;
 
 export function ExitReplay():Promise<void>;
-
-export function ExportEvent(arg1:string):Promise<main.ExportResult>;
 
 export function GetConf():Promise<main.Conf>;
 
@@ -66,6 +66,8 @@ export function SetActiveGame(arg1:string):Promise<library.Library>;
 export function SetMuted(arg1:boolean):Promise<void>;
 
 export function SetRoot(arg1:string):Promise<library.Library>;
+
+export function StartExport(arg1:string):Promise<void>;
 
 export function ToggleAuto():Promise<boolean>;
 

@@ -42,8 +42,13 @@ type App struct {
 	sessMu sync.Mutex
 	sess   *replaySession
 
-	// 导出任务（Phase 2）：同一时刻只允许一个（TryLock 直接拒绝）。
-	exportMu sync.Mutex
+	// 导出任务（第三十三轮起异步）：
+	//   exportMu       —— 「有任务在跑」的旗杆（TryLock 抢占，持有到任务结束）；
+	//   exportCancelMu —— 单独保护 exportCancel（CancelExport 不能去抢 exportMu，
+	//                     那把锁整个任务期都被持有，会直接卡死）。
+	exportMu       sync.Mutex
+	exportCancelMu sync.Mutex
+	exportCancel   context.CancelFunc
 
 	// 中心库 SQLite（可检索元数据；失败不阻断回放）。
 	catalogMu sync.Mutex

@@ -201,9 +201,18 @@ export const api = {
   seekTo: (ms: number) => bridge().SeekTo(Math.round(ms)) as Promise<void>,
   exitReplay: () => bridge().ExitReplay() as Promise<void>,
   screenshot: () => bridge().Screenshot() as Promise<string>,
-  exportEvent: (format: string) =>
-    bridge().ExportEvent(format) as Promise<ExportResult>,
+  // ---------- 导出任务中心（异步：StartExport 起任务，事件推进度/结果） ----------
+  startExport: (format: string) => bridge().StartExport(format) as Promise<void>,
+  cancelExport: () => bridge().CancelExport() as Promise<void>,
 };
+
+/** 导出进度（Go 端 ExportProgress，事件 export:progress）。 */
+export interface ExportProgress {
+  frame: number;
+  total: number;
+  percent: number;
+  format: string;
+}
 
 // ---------- M3 回放 DTO（与 desktop/replay.go 对应） ----------
 
@@ -278,4 +287,35 @@ export interface ExportResult {
   duration_ms: number;
   missing: string[];
   note: string;
+}
+
+/**
+ * 订阅导出任务三事件（Go 端 wruntime.EventsEmit）。
+ * 返回退订函数；没有 window.runtime（非 Wails 环境）时返回 no-op。
+ *   - export:progress → ExportProgress（帧/总数/百分比）
+ *   - export:done     → ExportResult（路径 + 摘要）
+ *   - export:failed   → { message }（含「导出已取消」）
+ */
+export function onExportEvents(handlers: {
+  onProgress?: (p: ExportProgress) => void;
+  onDone?: (r: ExportResult) => void;
+  onFailed?: (message: string) => void;
+}): () => void {
+  const rt = (window as any).runtime;
+  if (!rt?.EventsOn) return () => {};
+  const offs: unknown[] = [];
+  if (handlers.onProgress) offs.push(rt.EventsOn("export:progress", handlers.onProgress));
+  if (handlers.onDone) offs.push(rt.EventsOn("export:done", handlers.onDone));
+  if (handlers.onFailed) {
+    offs.push(
+      rt.EventsOn("export:failed", (e: any) =>
+        handlers.onFailed?.(e?.message ?? String(e)),
+      ),
+    );
+  }
+  return () => {
+    for (const off of offs) {
+      if (typeof off === "function") (off as () => void)();
+    }
+  };
 }

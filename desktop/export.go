@@ -15,6 +15,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"image"
 	"os"
@@ -69,27 +71,34 @@ type exportPlan struct {
 	capFrames int
 }
 
-// ExportEvent 把当前会话的事件导出成 GIF 或 MP4。
+// StartExport 异步启动导出任务（GIF / MP4），立即返回。
 //
-// format：gif | mp4 | auto（空等同 auto）。auto 有 ffmpeg 走 MP4，否则 GIF。
-// 返回落盘路径与摘要；同一时刻只允许一个导出任务（TryLock 直接拒绝）。
-func (a *App) ExportEvent(format string) (ExportResult, error) {
+// 与旧同步版 ExportEvent 的差别：真正的渲染循环在 goroutine 里跑，
+// 前端不再被一个长请求占住；进度/完成/失败走 export:progress /
+// export:done / export:failed 事件，取消走 CancelExport。
+// 同步校验（格式/会话/ffmpeg）仍在此处完成，错误直接返回给调用方。
+// 同一时刻只允许一个任务（exportMu TryLock，锁持有到任务结束）。
+func (a *App) StartExport(format string) error {
 	if !a.exportMu.TryLock() {
-		return ExportResult{}, fmt.Errorf("已有导出任务在进行，请等它结束")
+		return fmt.Errorf("已有导出任务在进行，请等它结束或取消")
 	}
-	defer a.exportMu.Unlock()
+	// 校验失败要在返回前放锁（成功路径的锁由 goroutine 结束时释放）。
+	fail := func(err error) error {
+		a.exportMu.Unlock()
+		return err
+	}
 
 	a.sessMu.Lock()
 	s := a.sess
 	a.sessMu.Unlock()
 	if s == nil {
-		return ExportResult{}, fmt.Errorf("没有活动会话，请先打开一个事件")
+		return fail(fmt.Errorf("没有活动会话，请先打开一个事件"))
 	}
 	s.mu.Lock()
 	ev, root, kind, id := s.ev, s.root, s.kind, s.id
 	s.mu.Unlock()
 	if ev == nil || len(ev.Show) == 0 {
-		return ExportResult{}, fmt.Errorf("当前事件没有可导出的台本")
+		return fail(fmt.Errorf("当前事件没有可导出的台本"))
 	}
 
 	want := strings.ToLower(strings.TrimSpace(format))
@@ -103,7 +112,7 @@ func (a *App) ExportEvent(format string) (ExportResult, error) {
 		// 默认规格：10fps / 480×360 / 15s 上限（8 位调色板，体积可控）。
 	case "mp4":
 		if ffmpeg == "" {
-			return ExportResult{}, fmt.Errorf("未检测到 ffmpeg，无法导出 MP4；可改用 GIF，或把 ffmpeg 加入 PATH")
+			return fail(fmt.Errorf("未检测到 ffmpeg，无法导出 MP4；可改用 GIF，或把 ffmpeg 加入 PATH"))
 		}
 		plan = exportPlan{format: "mp4", fps: 25, width: 960, height: 720, capFrames: 1500}
 	case "auto":
@@ -111,10 +120,56 @@ func (a *App) ExportEvent(format string) (ExportResult, error) {
 			plan = exportPlan{format: "mp4", fps: 25, width: 960, height: 720, capFrames: 1500}
 		}
 	default:
-		return ExportResult{}, fmt.Errorf("未知导出格式 %q（支持 gif / mp4 / auto）", format)
+		return fail(fmt.Errorf("未知导出格式 %q（支持 gif / mp4 / auto）", format))
 	}
 	plan.step = int64(1000 / plan.fps)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	a.setExportCancel(cancel)
+	go func() {
+		defer func() {
+			a.setExportCancel(nil)
+			a.exportMu.Unlock() // 释放 StartExport TryLock 抢占的旗杆锁（任务结束）
+			cancel()            // 释放 context 资源
+		}()
+		res, err := a.runExport(ctx, plan, want, ffmpeg, ev, root, kind, id)
+		switch {
+		case err == nil:
+			a.emitExportDone(res)
+		case errors.Is(err, context.Canceled):
+			a.emitExportFailed("导出已取消")
+		default:
+			a.emitExportFailed(err.Error())
+		}
+	}()
+	return nil
+}
+
+// setExportCancel 写当前任务的取消函数（exportCancelMu 保护；
+// exportMu 整个任务期被持有，不能用它保护这个字段——CancelExport 会卡死）。
+func (a *App) setExportCancel(cancel context.CancelFunc) {
+	a.exportCancelMu.Lock()
+	a.exportCancel = cancel
+	a.exportCancelMu.Unlock()
+}
+
+// CancelExport 取消进行中的导出任务（没有任务则报错，不静默）。
+// 取消后渲染循环在下一帧退出，半成品文件会被清理（cleanup），
+// 前端收到 export:failed「导出已取消」。
+func (a *App) CancelExport() error {
+	a.exportCancelMu.Lock()
+	cancel := a.exportCancel
+	a.exportCancelMu.Unlock()
+	if cancel == nil {
+		return fmt.Errorf("没有正在进行的导出任务")
+	}
+	cancel()
+	return nil
+}
+
+// runExport 导出主体（原 ExportEvent 的渲染循环）：逐帧检查 ctx 取消，
+// 完成/失败由调用方转成 export:done / export:failed 事件。
+func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg string, ev *ir.Event, root, kind, id string) (ExportResult, error) {
 	opt := player.DefaultOptions()
 	opt.FontSize = 48
 	opt.Speed = 1
@@ -177,6 +232,10 @@ func (a *App) ExportEvent(format string) (ExportResult, error) {
 		emitEvery = 1
 	}
 	for i := 0; i < total; i++ {
+		if cerr := ctx.Err(); cerr != nil {
+			cleanup()
+			return ExportResult{}, cerr // context.Canceled → 上层转「导出已取消」
+		}
 		rgba, _, rerr := player.RenderFrame(p, load, stageW, stageH)
 		if rerr != nil {
 			cleanup()
@@ -296,6 +355,22 @@ func (a *App) emitExportProgress(p ExportProgress) {
 		return
 	}
 	wruntime.EventsEmit(a.ctx, "export:progress", p)
+}
+
+// emitExportDone 完成事件（带结果 DTO：路径/帧数/规格/缺素材/Note）。
+func (a *App) emitExportDone(r ExportResult) {
+	if a.ctx == nil {
+		return
+	}
+	wruntime.EventsEmit(a.ctx, "export:done", r)
+}
+
+// emitExportFailed 失败事件（含用户取消；message 一定非空，不静默）。
+func (a *App) emitExportFailed(message string) {
+	if a.ctx == nil {
+		return
+	}
+	wruntime.EventsEmit(a.ctx, "export:failed", map[string]string{"message": message})
 }
 
 // ---------------------------------------------------------------
