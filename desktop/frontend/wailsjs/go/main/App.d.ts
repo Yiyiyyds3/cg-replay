@@ -3,13 +3,25 @@
 import {main} from '../models';
 import {library} from '../models';
 
+export function ExitReplay():Promise<void>;
+
 export function GetConf():Promise<main.Conf>;
 
 export function GetCover(arg1:string,arg2:string):Promise<string>;
 
+export function GetFrame():Promise<main.FrameDTO>;
+
 export function GetLibrary():Promise<library.Library>;
 
+export function InputClick():Promise<void>;
+
+export function OpenEvent(arg1:string,arg2:string):Promise<main.SessionMeta>;
+
+export function Pause():Promise<void>;
+
 export function PickDirectory():Promise<string>;
+
+export function Play():Promise<void>;
 
 export function ReportClientError(arg1:string):Promise<void>;
 
@@ -17,6 +29,16 @@ export function Rescan():Promise<library.Library>;
 
 export function ScanDirectory(arg1:string):Promise<string>;
 
+export function Screenshot():Promise<string>;
+
+export function SeekTo(arg1:number):Promise<void>;
+
+export function SetMuted(arg1:boolean):Promise<void>;
+
 export function SetRoot(arg1:string):Promise<library.Library>;
+
+export function ToggleAuto():Promise<boolean>;
+
+export function TogglePlay():Promise<boolean>;
 
 export function Version():Promise<string>;

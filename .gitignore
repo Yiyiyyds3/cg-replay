@@ -104,6 +104,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
+package.json.md5
 
 # ------------------------------------------------------------
 # 7. Wails 生成物

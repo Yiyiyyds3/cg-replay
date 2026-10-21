@@ -67,4 +67,80 @@ export const api = {
   rescan: () => bridge().Rescan() as Promise<LibraryDTO>,
   getCover: (kind: string, id: string) =>
     bridge().GetCover(kind, id) as Promise<string>,
+
+  // ---------- M3 回放会话（desktop/replay.go 绑定方法） ----------
+  openEvent: (kind: string, id: string) =>
+    bridge().OpenEvent(kind, id) as Promise<SessionMeta>,
+  // 高频轮询：Go 端墙钟推进 + 同帧指纹缓存，前端 rAF/interval 驱动皆可
+  getFrame: () => bridge().GetFrame() as Promise<FrameDTO>,
+  play: () => bridge().Play() as Promise<void>,
+  pause: () => bridge().Pause() as Promise<void>,
+  togglePlay: () => bridge().TogglePlay() as Promise<boolean>,
+  inputClick: () => bridge().InputClick() as Promise<void>,
+  toggleAuto: () => bridge().ToggleAuto() as Promise<boolean>,
+  setMuted: (m: boolean) => bridge().SetMuted(m) as Promise<void>,
+  seekTo: (ms: number) => bridge().SeekTo(Math.round(ms)) as Promise<void>,
+  exitReplay: () => bridge().ExitReplay() as Promise<void>,
+  screenshot: () => bridge().Screenshot() as Promise<string>,
 };
+
+// ---------- M3 回放 DTO（与 desktop/replay.go 对应） ----------
+
+export interface SessionMeta {
+  kind: string;
+  id: string;
+  title: string;
+  stage_w: number; // 目前固定 1600×1200
+  stage_h: number;
+  op_count: number;
+  text_count: number;
+  duration_ms: number; // Show 台本时钟最大值（进度参考刻度），可能为 0（无 wait/wt 事件）
+}
+
+export interface LayerDTO {
+  layer: string;
+  ref: string;
+  visible: boolean;
+  x: number;
+  y: number;
+  opacity: number;
+  z: number;
+  missing: boolean;
+}
+
+export interface LineDTO {
+  speaker: string;
+  text: string;
+}
+
+export interface BoxDTO {
+  layer: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  has_geom: boolean;
+  visible: boolean;
+  frame_color: number[];
+  frame_opacity: number;
+  font_size: number;
+  line_spacing: number;
+  lines: LineDTO[];
+}
+
+export interface FrameDTO {
+  jpeg: string; // dataURL，同画面指纹时为 ""
+  now: number;
+  dur: number;
+  playing: boolean;
+  done: boolean;
+  waiting: boolean;
+  auto: boolean;
+  muted: boolean;
+  quake_x: number;
+  quake_y: number;
+  cached: boolean;
+  missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
+  layers: LayerDTO[]; // 调试抽屉 D
+  texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
+}

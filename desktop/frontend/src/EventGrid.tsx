@@ -16,8 +16,12 @@ type Status =
   | { state: "ready" }
   | { state: "error"; message: string };
 
-// M2 事件网格（卡墙）。M3 在卡片点击处接入回放页。
-export default function EventGrid() {
+// M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
+export default function EventGrid({
+  onOpen,
+}: {
+  onOpen: (kind: string, id: string, title: string) => void;
+}) {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [lib, setLib] = useState<LibraryDTO | null>(null);
   const [tab, setTab] = useState<Tab>("cg");
@@ -222,7 +226,7 @@ export default function EventGrid() {
             key={`${c.kind}:${c.id}`}
             card={c}
             lookup={coverOf}
-            onClick={() => setTabDrawerHint(c)}
+            onClick={() => onOpen(c.kind, c.id, c.title)}
           />
         ))}
         {cards.length === 0 && (
@@ -233,11 +237,6 @@ export default function EventGrid() {
       </main>
     </div>
   );
-}
-
-/** 暂接位：M3 在这里切回放页。 */
-function setTabDrawerHint(c: CardItem) {
-  console.info("[M3 接入回放]", c.kind, c.id, c.title);
 }
 
 // ---------- 卡片 ----------

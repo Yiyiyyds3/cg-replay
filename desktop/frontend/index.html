@@ -34,13 +34,21 @@
         }, 50);
         setTimeout(function () { clearInterval(hookedTimer); }, 10000);
 
+        // Wails v2 dev 桥自身噪声（Svelte 5 重启 overlay 的 ipc.js nodes 解引用）
+        // 不上报，避免污染 errors.log（诊断ifact 2026-10-21）。
+        function noise(msg) {
+          return msg.indexOf("reading 'nodes'") >= 0 && /ipc(_websocket)?\.js/.test(msg);
+        }
         window.addEventListener("error", function (e) {
-          push("error:", (e && e.message) || String(e));
+          var m = (e && e.message) || String(e);
+          if (noise(m)) return;
+          push("error:", m);
         });
         window.addEventListener("unhandledrejection", function (e) {
           var r = e && e.reason;
           var m = r && r.message ? r.message : String(r);
           var st = r && r.stack ? "\n" + r.stack : "";
+          if (noise(m + st)) return;
           push("reject:", m + st);
         });
       })();

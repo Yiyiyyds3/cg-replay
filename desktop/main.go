@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -32,7 +33,11 @@ var assets embed.FS
 // App Wails 绑定层：把 core 能力暴露给前端（v2 通过 Bind 注册）。
 type App struct {
 	ctx  context.Context
-	root string // 游戏根目录（conf 迁移在 M4 接入）
+	root string // 游戏根目录
+
+	// 回放会话（M3）：同一时刻最多一个；sessMu 保护 sess 替换。
+	sessMu sync.Mutex
+	sess   *replaySession
 }
 
 // NewApp 构造绑定层。
