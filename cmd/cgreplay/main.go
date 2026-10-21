@@ -351,12 +351,11 @@ func (a *app) play() {
 	}
 	e := a.entries[i]
 	var script, label string
-	chapterPos := -1
 	switch {
 	case e.cg != nil:
 		script, label = e.cg.Script, e.cg.Label
 	case e.chapter != nil:
-		script, chapterPos = e.chapter.Script, e.chapter.LabelPos
+		script = e.chapter.Script
 	case e.scene != nil:
 		script = e.scene.Script
 	}
@@ -367,8 +366,9 @@ func (a *app) play() {
 	sp := filepath.Join(root, filepath.FromSlash(script))
 	var ev *ir.Event
 	var err error
-	if chapterPos >= 0 {
-		ev, err = kirikiri.BuildShowChapterFile(sp, chapterPos)
+	if e.chapter != nil {
+		// 走 library 入口：章跨文件时自动补演下一场景的章前段。
+		ev, err = library.BuildChapterEvent(root, e.chapter)
 	} else {
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}
@@ -798,8 +798,7 @@ func (a *app) selftest(id string) int {
 		extra string
 	)
 	if ch := lib.FindChapter(id); ch != nil {
-		sp := filepath.Join(root, filepath.FromSlash(ch.Script))
-		e, berr := kirikiri.BuildShowChapterFile(sp, ch.LabelPos)
+		e, berr := library.BuildChapterEvent(root, ch)
 		if berr != nil {
 			fmt.Println("自检失败：", berr)
 			return 2

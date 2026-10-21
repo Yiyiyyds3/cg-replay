@@ -263,7 +263,7 @@ func saveRatioCrop(src image.Image, path string, targetW, targetH int) error {
 	for y := 0; y < targetH; y++ {
 		sy := oy + y*chh/targetH
 		for x := 0; x < targetW; x++ {
-			newOut := src.At(b.Min.X + ox + x*cw/targetW, b.Min.Y + sy)
+			newOut := src.At(b.Min.X+ox+x*cw/targetW, b.Min.Y+sy)
 			out.Set(x, y, newOut)
 		}
 	}

@@ -32,6 +32,8 @@ export namespace library {
 	    scene: string;
 	    label_pos: number;
 	    name: string;
+	    cont_script?: string;
+	    cont_label_pos?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ChapterEvent(source);
@@ -46,6 +48,8 @@ export namespace library {
 	        this.scene = source["scene"];
 	        this.label_pos = source["label_pos"];
 	        this.name = source["name"];
+	        this.cont_script = source["cont_script"];
+	        this.cont_label_pos = source["cont_label_pos"];
 	    }
 	}
 	export class SceneEvent {

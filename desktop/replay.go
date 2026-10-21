@@ -27,16 +27,17 @@ import (
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
 	"ucgr/internal/ir"
+	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 )
 
 const (
-	stageW       = 1600
-	stageH       = 1200
-	autoWaitMs   = 2500 // 与 cmd/cgreplay 一致
-	jpegQuality  = 88
-	encMinGap    = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
+	stageW      = 1600
+	stageH      = 1200
+	autoWaitMs  = 2500 // 与 cmd/cgreplay 一致
+	jpegQuality = 88
+	encMinGap   = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
 
 	durSnapshots = 240 // 时长估计取样点数
 )
@@ -61,7 +62,7 @@ type replaySession struct {
 	muted    bool
 	input    player.Input
 	lastTick time.Time
-	waited   bool   // 正停在等待点（自动推进计时用）
+	waited   bool // 正停在等待点（自动推进计时用）
 	waitedAt time.Time
 
 	missing map[string]string // ref → 最近一次加载错误
@@ -129,11 +130,11 @@ type rgbaDTO struct {
 
 // BoxDTO 前端文本覆盖层（几何由后端给，前端照抄定位；框图缺席时可用底色兜底）。
 type BoxDTO struct {
-	Layer string  `json:"layer"`
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	W     float64 `json:"w"`
-	H     float64 `json:"h"`
+	Layer        string    `json:"layer"`
+	X            float64   `json:"x"`
+	Y            float64   `json:"y"`
+	W            float64   `json:"w"`
+	H            float64   `json:"h"`
 	HasGeom      bool      `json:"has_geom"`
 	Visible      bool      `json:"visible"`
 	FrameColor   rgbaDTO   `json:"frame_color"`
@@ -188,6 +189,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 
 	var script, label, title string
 	chapterPos := -1
+	var chEvent *library.ChapterEvent
 	switch kind {
 	case "cg":
 		e := lib.FindCG(id)
@@ -201,6 +203,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 			return SessionMeta{}, fmt.Errorf("找不到演出段落 %s", id)
 		}
 		script, chapterPos, title = e.Script, e.LabelPos, e.Title
+		chEvent = e
 	case "scene":
 		e := lib.FindScene(id)
 		if e == nil {
@@ -215,8 +218,9 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	}
 	sp := filepath.Join(root, filepath.FromSlash(script))
 	var ev *ir.Event
-	if chapterPos >= 0 {
-		ev, err = kirikiri.BuildShowChapterFile(sp, chapterPos)
+	if chapterPos >= 0 && chEvent != nil {
+		// 走 library 入口：章跨文件时自动补演下一场景的章前段。
+		ev, err = library.BuildChapterEvent(root, chEvent)
 	} else {
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}

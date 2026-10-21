@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/ir"
 )
 
 // CGEvent 一个 CG 事件的回放单位（= cgrai00.ks 里的一个 *cgNN 段）。
@@ -49,6 +50,10 @@ type ChapterEvent struct {
 	Scene    string `json:"scene"`     // 所属场景 id
 	LabelPos int    `json:"label_pos"` // 章节标记在脚本标签表里的下标
 	Name     string `json:"name"`      // 标签名（label94）
+	// 章跨文件：本章演完还要接下一场景脚本的「章前段」
+	// （首个章节标记之前的内容）。空 = 无接续。
+	ContScript   string `json:"cont_script,omitempty"`    // 下一场景脚本（相对 root）
+	ContLabelPos int    `json:"cont_label_pos,omitempty"` // 下一场景首章的 LabelPos（定位章前段截止处）
 }
 
 // Library 事件库清单。
@@ -177,12 +182,35 @@ func Scan(root string) (*Library, error) {
 
 	// ④ 演出段落：场景脚本里原作自己的章节标记（*labelNN|显示名）。
 	// 一个长脚本常有几十个标签但只有十来个章节标记，按章节切才是「演出段落」。
+	//
+	// 章跨文件：下一个场景脚本的首个章节标记之前还有一段演出（本作的章尾
+	// 常常写在下一文件开头），它没有自己的章节标记，只能挂到「上一章」的
+	// 尾巴上。章节号（labelNN）全作递增，用它可以精确找出前序（文件编号
+	// 不可靠：99tikadesu.ks 的 label60 排在 38tikatu 之后、但不是 71 的前序）。
+	type sceneChapters struct {
+		start, end    int // lib.Chapters 里的区间
+		hasPrefix     bool
+		first, last   int // 首/末章章节号
+		firstLabelPos int
+	}
+	sceneInfo := map[string]*sceneChapters{}
 	for _, s := range lib.Scenes {
 		ast, err := kirikiri.ParseScriptFile(filepath.Join(root, filepath.FromSlash(s.Script)))
 		if err != nil {
 			continue
 		}
-		for _, ch := range kirikiri.Chapters(ast) {
+		chs := kirikiri.Chapters(ast)
+		if len(chs) == 0 {
+			continue
+		}
+		info := &sceneChapters{
+			start:         len(lib.Chapters),
+			hasPrefix:     chs[0].SeqStart > 0,
+			first:         chs[0].Index,
+			last:          chs[len(chs)-1].Index,
+			firstLabelPos: chs[0].LabelPos,
+		}
+		for _, ch := range chs {
 			lib.Chapters = append(lib.Chapters, ChapterEvent{
 				ID:       fmt.Sprintf("%s#%d", s.ID, ch.LabelPos),
 				Index:    ch.Index,
@@ -193,6 +221,36 @@ func Scan(root string) (*Library, error) {
 				Name:     ch.Name,
 			})
 		}
+		info.end = len(lib.Chapters)
+		sceneInfo[s.ID] = info
+	}
+
+	// ⑤ 章前段归属：按章节号找「末章 = 本章前首章 - 1」的场景，把后者的
+	// 章前段挂到前者的最后一个章节事件上（段落总数不变，只补演尾）。
+	// 找不到前序（首场景 01kuukou 的宏定义块等）就保持不挂 —— 它们多是
+	// 初始化指令，不进演出也有等价语义。
+	for _, s := range lib.Scenes {
+		info := sceneInfo[s.ID]
+		if info == nil || !info.hasPrefix {
+			continue
+		}
+		var prev *ChapterEvent
+		for _, p := range lib.Scenes {
+			pi := sceneInfo[p.ID]
+			if pi == nil || pi.last != info.first-1 {
+				continue
+			}
+			cand := &lib.Chapters[pi.end-1]
+			if cand.ContScript == "" { // 多个同号分支时取先出现者
+				prev = cand
+				break
+			}
+		}
+		if prev == nil {
+			continue
+		}
+		prev.ContScript = s.Script
+		prev.ContLabelPos = info.firstLabelPos
 	}
 	return lib, nil
 }
@@ -266,6 +324,37 @@ func (l *Library) FindChapter(id string) *ChapterEvent {
 		}
 	}
 	return nil
+}
+
+// BuildChapterEvent 构建章节 IR（含章跨文件补演的章前段）。
+//
+// 本段 = 本章区间；若 ContScript 非空，再接上下一场景脚本的章前段，
+// 其 TMs 从本段的末尾时刻起算，保证进度条单调。两个前端（cgreplay /
+// desktop 回放页）都走这里，不要直接调 BuildShowChapterFile。
+func BuildChapterEvent(root string, ch *ChapterEvent) (*ir.Event, error) {
+	sp := filepath.Join(root, filepath.FromSlash(ch.Script))
+	ev, err := kirikiri.BuildShowChapterFile(sp, ch.LabelPos)
+	if err != nil {
+		return nil, err
+	}
+	if ch.ContScript == "" {
+		return ev, nil
+	}
+	pre, err := kirikiri.BuildShowPrefixFile(filepath.Join(root, filepath.FromSlash(ch.ContScript)))
+	if err != nil {
+		return nil, fmt.Errorf("章节 %s 的跨文件章前段构建失败：%w", ch.ID, err)
+	}
+	if len(pre.Show) > 0 {
+		off := int64(0)
+		if n := len(ev.Show); n > 0 {
+			off = ev.Show[n-1].TMs
+		}
+		for i := range pre.Show {
+			pre.Show[i].TMs += off
+		}
+		ev.Show = append(ev.Show, pre.Show...)
+	}
+	return ev, nil
 }
 
 func tailDigits(s string) string {

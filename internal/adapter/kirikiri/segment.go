@@ -255,6 +255,35 @@ func BuildShowChapterFile(scriptPath string, labelPos int) (*ir.Event, error) {
 	return nil, fmt.Errorf("脚本 %s 里没有位于 %d 的演出段落", filepath.Base(scriptPath), labelPos)
 }
 
+// BuildShowPrefixFile 构建首个章节标记之前的「章前段」。
+//
+// 原作把一章的收尾写在下一个场景脚本的开头（首个 `*labelNN|显示名` 之前），
+// 例如 46uiza.ks 前 11 条演出后才是「荒野-重庆」label68。章前段没有自己的
+// 章节标记，只能由上一个场景的末章借道播放（见 library.BuildChapterEvent）。
+func BuildShowPrefixFile(scriptPath string) (*ir.Event, error) {
+	ast, err := ParseScriptFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	chs := Chapters(ast)
+	if len(chs) == 0 {
+		return nil, fmt.Errorf("脚本 %s 没有章节标记，无法定位章前段", filepath.Base(scriptPath))
+	}
+	seqEnd := chs[0].SeqStart
+	if seqEnd <= 0 {
+		return nil, fmt.Errorf("脚本 %s 没有章前段", filepath.Base(scriptPath))
+	}
+	base := strings.TrimSuffix(filepath.Base(scriptPath), filepath.Ext(scriptPath))
+	b := &irBuilder{}
+	seg := SegmentRange(ast, 0, seqEnd)
+	return &ir.Event{
+		EventID: base + "_prefix",
+		Kind:    ir.KindScene,
+		Title:   base + "·章前",
+		Show:    b.buildShow(seg),
+	}, nil
+}
+
 // SegmentImages 取标签段里 `[image]/[img]` 依次用到的 storage 名（用于 CG 鉴赏表）。
 func SegmentImages(ast *Ast, label string) []string {
 	seg := Segment(ast, label)

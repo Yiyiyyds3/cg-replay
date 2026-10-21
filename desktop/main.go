@@ -5,9 +5,11 @@
 //   - 本 M1 里程碑只做骨架打通：窗口 + React 前端 + 绑定桥验证。
 //   - 架构原则（上游 FINAL 1017 §10.1，docs/06）：内核与界面分离——
 //     摄入/去重/索引/合成是独立 Go core（仓库根模块），本壳只是它的一个前端。
+//
 // 构建方式（无需 wails CLI，直接 go build 即可）：
-//   cd desktop/frontend && npm install && npm run build
-//   cd desktop && go build -o ../bin/cgreplay-ui.exe .
+//
+//	cd desktop/frontend && npm install && npm run build
+//	cd desktop && go build -o ../bin/cgreplay-ui.exe .
 package main
 
 import (
