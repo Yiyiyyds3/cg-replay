@@ -250,9 +250,14 @@ function EventCard({
   onClick: () => void;
 }) {
   const [cover, setCover] = useState<string | null>(null);
+  const [miss, setMiss] = useState(false); // 封面缺失：角标可见，不静默
   useEffect(() => {
     let alive = true;
-    void lookup(card.kind, card.id).then((u) => alive && setCover(u));
+    void lookup(card.kind, card.id).then((u) => {
+      if (!alive) return;
+      setCover(u);
+      if (!u) setMiss(true);
+    });
     return () => {
       alive = false;
     };
@@ -270,6 +275,11 @@ function EventCard({
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-accent/40 text-muted-foreground/40">
             <Ship className="h-8 w-8" />
           </div>
+        )}
+        {miss && (
+          <span className="absolute left-1.5 top-1.5 rounded border border-amber-900 bg-amber-950/80 px-1 py-0.5 text-[10px] text-amber-400">
+            无封面
+          </span>
         )}
       </div>
       <div className="space-y-1 px-3 py-2">

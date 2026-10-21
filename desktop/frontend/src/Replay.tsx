@@ -4,13 +4,14 @@
 // 快捷键：Space/Enter 点击推进，D 调试抽屉，F 截图，Esc 返回，
 // A 自动推进，M 静音，←/→ ±5s，P 播放/暂停。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft,
   Camera,
   Bug,
+  Images,
   SkipBack,
   SkipForward,
   Play,
@@ -36,7 +37,9 @@ export default function Replay({
   const [f, setF] = useState<FrameDTO | null>(null);
   const [err, setErr] = useState("");
   const [showDbg, setShowDbg] = useState(false);
+  const [showInsp, setShowInsp] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const [shot, setShot] = useState(""); // 最近一次截图保存路径提示
 
   // 会话关闭不做在卸载清理里：React 18 dev StrictMode 双挂载
   // （mount→unmount→remount）会在首次卸载把正常会话关掉。
@@ -101,6 +104,10 @@ export default function Replay({
         case "D":
           setShowDbg((v) => !v);
           break;
+        case "i":
+        case "I":
+          setShowInsp((v) => !v);
+          break;
         case "f":
         case "F":
           screenshot();
@@ -135,6 +142,8 @@ export default function Replay({
     try {
       const p = await api.screenshot();
       console.info("[截图]", p);
+      setShot(p);
+      window.setTimeout(() => setShot(""), 4000);
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     }
@@ -144,8 +153,25 @@ export default function Replay({
   const dur = meta.duration_ms || 0;
   const pct = dur > 0 ? Math.min(1, (f?.now ?? 0) / dur) : 0;
 
+  // 资产检视器数据：ref 去重 + 使用状态（缺素材优先、未引用过的不出现）
+  const assetRefs = useMemo(() => {
+    const m = new Map<string, { ref: string; visible: boolean; missing: boolean }>();
+    for (const l of f?.layers ?? []) {
+      if (!l.ref) continue;
+      const cur = m.get(l.ref);
+      const vis = cur?.visible || l.visible;
+      const mis = cur?.missing || l.missing;
+      m.set(l.ref, { ref: l.ref, visible: vis, missing: mis });
+    }
+    const arr = [...m.values()];
+    arr.sort((a, b) =>
+      a.missing !== b.missing ? (a.missing ? -1 : 1) : a.ref.localeCompare(b.ref),
+    );
+    return arr;
+  }, [f]);
+
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="relative flex h-screen flex-col bg-background text-foreground">
       {/* 顶栏 */}
       <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-2">
         <Button variant="ghost" size="icon" onClick={onExit} title="返回（Esc）">
@@ -163,6 +189,14 @@ export default function Replay({
         )}
         <Button variant="ghost" size="icon" onClick={screenshot} title="截图（F）">
           <Camera className="h-5 w-5" />
+        </Button>
+        <Button
+          variant={showInsp ? "secondary" : "ghost"}
+          size="icon"
+          onClick={() => setShowInsp((v) => !v)}
+          title="资产检视器（I）"
+        >
+          <Images className="h-5 w-5" />
         </Button>
         <Button
           variant={showDbg ? "secondary" : "ghost"}
@@ -185,6 +219,12 @@ export default function Replay({
       {err && (
         <div className="border-b border-red-900 bg-red-950/80 px-4 py-1.5 text-xs text-red-300">
           {err}
+        </div>
+      )}
+      {/* 截图完成提示（路径可见，非静默） */}
+      {shot && (
+        <div className="absolute right-4 top-14 z-20 max-w-[80%] truncate rounded border border-border bg-card px-3 py-1.5 text-xs shadow">
+          已保存：{shot}
         </div>
       )}
 
@@ -326,6 +366,42 @@ export default function Replay({
             <div>刻度时长：{fmt(dur)}（速度=播放器策略，非脚本数据）</div>
             <div>帧：{f ? `${fmt(f.now)} · 缓存${f.cached ? "✓" : "✗"}` : "…"}</div>
           </div>
+        </aside>
+      )}
+
+      {/* 资产检视器 I：本会话引用过的素材 ref + 使用状态（E-mote 标注沿用徽标语义） */}
+      {showInsp && (
+        <aside className="fixed right-0 top-0 z-30 h-screen w-96 overflow-y-auto border-l border-border bg-background/95 p-3 text-xs shadow-2xl">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-medium">资产检视器</span>
+            <Button variant="ghost" size="sm" onClick={() => setShowInsp(false)}>
+              关闭
+            </Button>
+          </div>
+          <div className="mb-2 text-muted-foreground">
+            舞台 {meta.stage_w}×{meta.stage_h} · 引用 {assetRefs.length} 个素材
+          </div>
+          <ul className="space-y-1">
+            {assetRefs.map((r) => (
+              <li key={r.ref} className="flex items-center gap-2">
+                <span
+                  className={
+                    "inline-block h-1.5 w-1.5 shrink-0 rounded-full " +
+                    (r.missing ? "bg-red-500" : r.visible ? "bg-emerald-500" : "bg-muted-foreground/40")
+                  }
+                />
+                <span className={"truncate " + (r.missing ? "text-red-400" : "")}>{r.ref}</span>
+                <span className="ml-auto shrink-0 text-muted-foreground">
+                  {r.missing ? "缺" : r.visible ? "在用" : "后备"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {f && f.missing.length > 0 && (
+            <div className="mt-3 border-t border-border pt-2 text-red-400">
+              当前帧缺 {f.missing.length} 个素材（回放横幅同步常驻）。
+            </div>
+          )}
         </aside>
       )}
     </div>
