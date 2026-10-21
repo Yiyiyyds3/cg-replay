@@ -75,4 +75,8 @@ export function ToggleAuto():Promise<boolean>;
 
 export function TogglePlay():Promise<boolean>;
 
+export function UnpackImport(arg1:string):Promise<main.UnpackImportDTO>;
+
+export function UnpackPreview(arg1:string):Promise<main.UnpackPlanDTO>;
+
 export function Version():Promise<string>;

@@ -146,6 +146,14 @@ export function TogglePlay() {
   return window['go']['main']['App']['TogglePlay']();
 }
 
+export function UnpackImport(arg1) {
+  return window['go']['main']['App']['UnpackImport'](arg1);
+}
+
+export function UnpackPreview(arg1) {
+  return window['go']['main']['App']['UnpackPreview'](arg1);
+}
+
 export function Version() {
   return window['go']['main']['App']['Version']();
 }

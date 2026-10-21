@@ -37,6 +37,33 @@ export interface LibraryDTO {
   scenes: SceneEvent[];
   chapters?: ChapterEvent[];
 }
+/** 解包预览（desktop/unpack.go UnpackPlanDTO）。 */
+export interface UnpackPlanDTO {
+  engine_id: string;
+  kind: string; // loose=已解包目录 / xp3=XP3 归档
+  archives: string[];
+  scenario_files: number;
+  labels: number; // 预计的 CG 事件数
+  refs: number; // 预计引用到的素材数
+  encrypted: number;
+  notes: string[];
+  unsupported: boolean;
+  reason: string;
+}
+/** 解包导入结果（desktop/unpack.go UnpackImportDTO）。 */
+export interface UnpackImportDTO {
+  dest: string;
+  engine_id: string;
+  events: number;
+  files: number;
+  bytes: number;
+  missing: string[];
+  encrypted: string[];
+  warnings: string[];
+  game_id: string;
+  library: LibraryDTO;
+}
+
 export interface ConfDTO {
   root: string;
   library: string;
@@ -155,6 +182,10 @@ export const api = {
   pickDirectory: () => bridge().PickDirectory() as Promise<string>,
   listGames: () => bridge().ListGames() as Promise<GamesDTO>,
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
+  unpackPreview: (path: string) =>
+    bridge().UnpackPreview(path) as Promise<UnpackPlanDTO>,
+  unpackImport: (path: string) =>
+    bridge().UnpackImport(path) as Promise<UnpackImportDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,

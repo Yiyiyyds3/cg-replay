@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Gamepad2,
   Loader2,
+  PackageOpen,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
@@ -26,6 +27,8 @@ import {
   type GamesDTO,
   type LibraryDTO,
   type SpeakerDTO,
+  type UnpackImportDTO,
+  type UnpackPlanDTO,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +67,9 @@ export default function EventGrid({
   const [textIndexed, setTextIndexed] = useState(true);
   const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
   const [pruningRecent, setPruningRecent] = useState(false); // 清理 72h 前记录进行中
+  const [unpackPlan, setUnpackPlan] = useState<UnpackPlanDTO | null>(null); // 解包预览
+  const [unpackPath, setUnpackPath] = useState(""); // 待解包的源路径
+  const [unpacking, setUnpacking] = useState(false); // 解包进行中
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
       return window.localStorage.getItem(AUTOPRUNE_KEY) === "1";
@@ -459,6 +465,78 @@ export default function EventGrid({
     }
   };
 
+  // 解包导入：先预览（给用户看「会解出什么」），确认后再解。
+  const previewUnpack = async (path: string) => {
+    try {
+      setBusy(true);
+      const plan = await api.unpackPreview(path);
+      setUnpackPath(path);
+      setUnpackPlan(plan);
+      if (plan.unsupported) {
+        setAllWarnings((w) => [...w, `没法自动解包：${plan.reason}`]);
+      }
+    } catch (e: any) {
+      setAllWarnings((w) => [...w, `解包预览失败：${e?.message ?? String(e)}`]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 选目录 → 预览。
+  const pickAndUnpack = async () => {
+    try {
+      const dir = await api.pickDirectory();
+      if (!dir) return;
+      await previewUnpack(dir);
+    } catch (e: any) {
+      setAllWarnings((w) => [...w, `选择路径失败：${e?.message ?? String(e)}`]);
+    }
+  };
+
+  // 确认解包 → 解出最小集合 → 登记入库 → 切到该游戏。
+  const runUnpack = async () => {
+    if (!unpackPath) return;
+    setUnpacking(true);
+    setBusy(true);
+    try {
+      const r: UnpackImportDTO = await api.unpackImport(unpackPath);
+      const gs = await api.listGames();
+      setGames(gs);
+      covers.current.clear();
+      setLib(r.library);
+      setTab("cg");
+      setStatus({ state: "ready" });
+      setUnpackPlan(null);
+      setUnpackPath("");
+      setAllWarnings((w) => [
+        ...w,
+        `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个 CG 事件 → ${r.dest}` +
+          (r.missing.length ? ` · ${r.missing.length} 个素材没找到` : "") +
+          (r.encrypted.length ? ` · ${r.encrypted.length} 个加密条目未解出` : ""),
+      ]);
+      void refreshCatalog();
+    } catch (e: any) {
+      setAllWarnings((w) => [...w, `解包失败：${e?.message ?? String(e)}`]);
+    } finally {
+      setUnpacking(false);
+      setBusy(false);
+    }
+  };
+
+  // 拖放：Go 侧 OnFileDrop 收到路径后 emit 「unpack:drop」，这里接住并预览。
+  useEffect(() => {
+    const rt = (window as any).runtime;
+    if (!rt?.EventsOn) return;
+    const off = rt.EventsOn("unpack:drop", (e: any) => {
+      const p = e?.path ?? (Array.isArray(e) ? e[0] : "");
+      if (p) void previewUnpack(String(p));
+    });
+    return () => {
+      if (typeof off === "function") off();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const switchGame = async (id: string) => {
     if (!id || id === games?.active || busy) return;
     setBusy(true);
@@ -574,6 +652,7 @@ export default function EventGrid({
         onToggle={() => setCollapsed((v) => !v)}
         onSelect={(id) => void switchGame(id)}
         onAdd={() => void pickAndAdd()}
+        onUnpack={pickAndUnpack}
         onToggleGameFav={(id) => void toggleGameFav(id)}
       />
 
@@ -640,6 +719,48 @@ export default function EventGrid({
         {/* 错误横幅区：任何异常都常驻可见（对齐 FR-12） */}
         {banner && (
           <div className="shrink-0 bg-destructive px-5 py-1.5 text-sm">{banner}</div>
+        )}
+
+        {/* 解包预览（拖进来或选目录后：先看会解出什么，再确认） */}
+        {unpackPlan && (
+          <section className="rounded-md border border-primary/40 bg-primary/5 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="text-sm font-medium">
+                  {unpackPlan.unsupported ? "这个路径没法自动解包" : "可以自动解包"}
+                </div>
+                <div className="truncate text-[11px] text-muted-foreground" title={unpackPath}>
+                  {unpackPath}
+                </div>
+                {!unpackPlan.unsupported && (
+                  <div className="text-[11px] text-muted-foreground">
+                    引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
+                    预计 {unpackPlan.labels} 个 CG 事件 · 引用素材 {unpackPlan.refs} 个
+                    {unpackPlan.encrypted > 0 && ` · 加密条目 ${unpackPlan.encrypted} 个（需密钥，不会解出）`}
+                  </div>
+                )}
+                {unpackPlan.unsupported && (
+                  <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
+                )}
+                {unpackPlan.notes.map((n, i) => (
+                  <div key={i} className="text-[11px] text-amber-300">
+                    {n}
+                  </div>
+                ))}
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setUnpackPlan(null)} disabled={unpacking}>
+                  取消
+                </Button>
+                {!unpackPlan.unsupported && (
+                  <Button size="sm" onClick={() => void runUnpack()} disabled={unpacking || busy}>
+                    {unpacking ? "解包中…" : "开始解包"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </section>
         )}
 
         {/* 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 */}
@@ -714,6 +835,7 @@ function GameSidebar({
   onToggle,
   onSelect,
   onAdd,
+  onUnpack,
   onToggleGameFav,
 }: {
   games: GameDTO[];
@@ -727,6 +849,7 @@ function GameSidebar({
   onToggle: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onUnpack: () => void;
   onToggleGameFav: (id: string) => void;
 }) {
   const [filter, setFilter] = useState("");
@@ -976,7 +1099,7 @@ function GameSidebar({
         </div>
       </div>
 
-      <div className="border-t border-border p-2">
+      <div className="space-y-1 border-t border-border p-2">
         <Button
           variant="ghost"
           className="h-9 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
@@ -985,6 +1108,16 @@ function GameSidebar({
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           {busy ? "正在登记…" : "添加游戏"}
+        </Button>
+        <Button
+          variant="ghost"
+          className="h-9 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={onUnpack}
+          disabled={busy}
+          title="把 galgame 拖进窗口，或点这里选目录：自动解包并剪成「只够重演 CG 事件」的最小集合"
+        >
+          <PackageOpen className="h-4 w-4" />
+          导入游戏（自动解包）
         </Button>
       </div>
     </aside>

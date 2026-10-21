@@ -25,6 +25,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"ucgr/internal/catalog"
 	"ucgr/internal/scan"
@@ -61,6 +62,13 @@ func NewApp() *App { return &App{} }
 // startup 保存运行上下文（后续弹窗/全屏/剪贴板都从 ctx 取窗口）。
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// 拖放：把 galgame 拖进窗口 → 走解包预览（前端弹「会解出什么」）。
+	wruntime.OnFileDrop(ctx, func(x, y int, paths []string) {
+		if len(paths) == 0 {
+			return
+		}
+		wruntime.EventsEmit(ctx, "unpack:drop", map[string]string{"path": paths[0]})
+	})
 	// 一次性数据迁移：v0.2 及以前数据在 exe 同目录，装进 Program Files 后
 	// 非管理员写不动；搬到 dataDir()（只搬不删，目标存在不覆盖）。
 	migrateLegacyData(exeDir(), dataDir())
@@ -104,9 +112,11 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
-		Bind:       []interface{}{app},
+		OnStartup: app.startup,
+		// 拖放导入：把 galgame 拖进窗口即触发解包预览。
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
+		OnShutdown:  app.shutdown,
+		Bind:        []interface{}{app},
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
