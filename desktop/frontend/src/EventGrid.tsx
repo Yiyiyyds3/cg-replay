@@ -42,6 +42,8 @@ type Status =
 
 const SIDEBAR_KEY = "ucgr.sidebarCollapsed";
 const RECENT_LIMIT = 12; // 「全部」页签最近播放取多少条（清理后同量刷新）
+const AUTOPRUNE_KEY = "ucgr.autoPruneRecent"; // 启动自动清理 72h 前最近播放的开关（默认关）
+const PRUNE_DAYS = 3; // 冷归档窗口（与 UI 文案一致）
 
 // M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
 export default function EventGrid({
@@ -64,6 +66,25 @@ export default function EventGrid({
   const [textIndexed, setTextIndexed] = useState(true);
   const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
   const [pruningRecent, setPruningRecent] = useState(false); // 清理 72h 前记录进行中
+  const [autoPrune, setAutoPrune] = useState(() => {
+    try {
+      return window.localStorage.getItem(AUTOPRUNE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  // 切换「启动自动清理」：落 localStorage，并立刻手动跑一次让用户看到效果。
+  const toggleAutoPrune = async () => {
+    const next = !autoPrune;
+    setAutoPrune(next);
+    try {
+      window.localStorage.setItem(AUTOPRUNE_KEY, next ? "1" : "0");
+    } catch {
+      /* 隐私模式下写不了：本次会话内仍然生效 */
+    }
+    if (next) await pruneRecent();
+  };
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
   const [favItems, setFavItems] = useState<FavoriteDTO[]>([]); // 收藏区列表（含标题）
@@ -92,6 +113,7 @@ export default function EventGrid({
       const gs = await api.listGames();
       setGames(gs);
       void refreshFavs(); // 收藏状态/计数（失败不阻断主流程）
+      if (autoPrune) void pruneRecent(false); // 启动自动清理 72h 前记录（仅 N>0 才提示）
       if (!gs.active) {
         setStatus({ state: "setup" });
         return;
@@ -316,15 +338,22 @@ export default function EventGrid({
   };
 
   // 清理 72h（3 天）前的最近播放：删完顺手刷新，删除条数进提示（不静默）。
-  const pruneRecent = async () => {
+  const pruneRecent = async (alwaysReport = true) => {
     setPruningRecent(true);
     try {
-      const n = await api.catalogPruneRecent(3);
+      const n = await api.catalogPruneRecent(PRUNE_DAYS);
       setRecentItems(await api.catalogRecent(RECENT_LIMIT));
-      setAllWarnings((w) => [
-        ...w,
-        n > 0 ? `已清理 ${n} 条 3 天前的最近播放记录` : "没有 3 天前的最近播放记录可清理",
-      ]);
+      // 手点必报（0 条也算反馈）；启动自动清理只在真删了东西时报，避免每次启动刷屏。
+      if (alwaysReport || n > 0) {
+        setAllWarnings((w) => [
+          ...w,
+          alwaysReport
+            ? n > 0
+              ? `已清理 ${n} 条 ${PRUNE_DAYS} 天前的最近播放记录`
+              : `没有 ${PRUNE_DAYS} 天前的最近播放记录可清理`
+            : `启动自动清理：已清理 ${n} 条 ${PRUNE_DAYS} 天前的最近播放记录`,
+        ]);
+      }
     } catch (e: any) {
       setAllWarnings((w) => [
         ...w,
@@ -644,7 +673,9 @@ export default function EventGrid({
             indexing={indexing}
             recent={recentItems}
             pruningRecent={pruningRecent}
-            onPruneRecent={pruneRecent}
+            autoPrune={autoPrune}
+            onPruneRecent={() => pruneRecent(true)}
+            onToggleAutoPrune={() => void toggleAutoPrune()}
             favItems={favItems}
             favs={favs}
             speakers={speakers}
@@ -1046,7 +1077,9 @@ function AllGames({
   indexing,
   recent,
   pruningRecent,
+  autoPrune,
   onPruneRecent,
+  onToggleAutoPrune,
   favItems,
   favs,
   speakers,
@@ -1071,7 +1104,9 @@ function AllGames({
   indexing: { title: string; done: number; total: number } | null;
   recent: CatalogRecentDTO[];
   pruningRecent: boolean;
-  onPruneRecent: () => Promise<void>;
+  autoPrune: boolean;
+  onPruneRecent: () => void;
+  onToggleAutoPrune: () => void;
   favItems: FavoriteDTO[];
   favs: Set<string>;
   speakers: SpeakerDTO[];
@@ -1176,6 +1211,16 @@ function AllGames({
     gameID: string;
     name: string;
   } | null>(null);
+
+  // 每游戏说话人是否展开全部（默认仍 top 8；聚合是全量的，长列表按需展开）。
+  const [speakerExpanded, setSpeakerExpanded] = useState<Set<string>>(new Set());
+  const toggleSpeakerGroup = (gameID: string) =>
+    setSpeakerExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameID)) next.delete(gameID);
+      else next.add(gameID);
+      return next;
+    });
 
   if (!loaded) {
     return (
@@ -1343,6 +1388,23 @@ function AllGames({
               >
                 {pruningRecent ? "清理中…" : "清理 3 天前"}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 text-xs",
+                  autoPrune ? "text-amber-400" : "text-muted-foreground",
+                )}
+                disabled={busy}
+                title={
+                  autoPrune
+                    ? "启动时自动清理 3 天前的最近播放（点击关闭）"
+                    : "开启：每次启动自动清理 3 天前的最近播放"
+                }
+                onClick={onToggleAutoPrune}
+              >
+                自动清理 {autoPrune ? "开" : "关"}
+              </Button>
             </div>
             {recentGroups.map((g) => (
               <div key={g.label} className="space-y-1.5">
@@ -1377,13 +1439,16 @@ function AllGames({
               <Users className="h-3.5 w-3.5" />
               角色
             </h2>
-            {speakerGroups.map((sg) => (
+            {speakerGroups.map((sg) => {
+              const expanded = speakerExpanded.has(sg.game_id);
+              const shown = expanded ? sg.items : sg.items.slice(0, 8);
+              return (
               <div key={sg.game_id} className="space-y-1.5">
                 <div className="text-[10px] text-muted-foreground">
                   {sg.game_title} · {sg.items.length} 位
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {sg.items.slice(0, 8).map((s) => {
+                  {shown.map((s) => {
                     const fav = favChars.has(`character|${s.game_id}|${s.name}`);
                     const rated = charMeta.get(`${s.game_id}:${s.name}`)?.rating ?? 0;
                     return (
@@ -1425,14 +1490,18 @@ function AllGames({
                       </span>
                     );
                   })}
-                  {sg.items.length > 8 && (
-                    <span className="self-center text-[10px] text-muted-foreground">
-                      等 {sg.items.length} 位
-                    </span>
-                  )}
                 </div>
+                {sg.items.length > 8 && (
+                  <button
+                    onClick={() => toggleSpeakerGroup(sg.game_id)}
+                    className="text-[10px] text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
+                  >
+                    {expanded ? "收起（显示全部）" : `展开全部 ${sg.items.length} 位`}
+                  </button>
+                )}
               </div>
-            ))}
+              );
+            })}
           </section>
         )}
 
