@@ -114,6 +114,18 @@ export interface CatalogRecentDTO {
   played_at: string;
   play_count: number;
 }
+/** 收藏（desktop/catalog.go FavoriteDTO）。rating 0 = 未评分。 */
+export interface FavoriteDTO {
+  item_type: "game" | "event" | "character" | string;
+  game_id: string;
+  item_id: string;
+  rating: number;
+  note: string;
+  title: string;
+  game_title: string;
+  created_at: string;
+  updated_at: string;
+}
 
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
@@ -149,6 +161,13 @@ export const api = {
     bridge().CatalogIndexText(gameID) as Promise<CatalogIndexResultDTO>,
   catalogRecent: (limit: number) =>
     bridge().CatalogRecent(limit) as Promise<CatalogRecentDTO[]>,
+  // ---------- 收藏（event 级；game/character 级 API 已就绪、UI 后续） ----------
+  addFavorite: (itemType: string, gameID: string, itemID: string, rating: number, note: string) =>
+    bridge().AddFavorite(itemType, gameID, itemID, rating, note) as Promise<void>,
+  removeFavorite: (itemType: string, gameID: string, itemID: string) =>
+    bridge().RemoveFavorite(itemType, gameID, itemID) as Promise<void>,
+  listFavorites: (itemType: string) =>
+    bridge().ListFavorites(itemType) as Promise<FavoriteDTO[]>,
   getCoverForGame: (gameID: string, kind: string, id: string) =>
     bridge().GetCoverForGame(gameID, kind, id) as Promise<string>,
   // 兼容旧绑定；等价于 addGame
@@ -182,6 +201,7 @@ export interface SessionMeta {
   kind: string;
   id: string;
   title: string;
+  game_id: string; // 收藏/跨游戏定位用
   stage_w: number; // 目前固定 1600×1200
   stage_h: number;
   op_count: number;

@@ -20,6 +20,7 @@ import {
   VolumeX,
   FileImage,
   FileVideo,
+  Star,
 } from "lucide-react";
 import { api, type FrameDTO, type SessionMeta } from "@/lib/api";
 
@@ -45,6 +46,38 @@ export default function Replay({
   const [exporting, setExporting] = useState<"" | "gif" | "mp4">("");
   const [exportPct, setExportPct] = useState(0);
   const [expMsg, setExpMsg] = useState(""); // 导出结果（路径 + 摘要，非静默）
+  const [fav, setFav] = useState(false); // 本事件收藏状态（星标）
+  const [favBusy, setFavBusy] = useState(false);
+
+  // 进入回放：读收藏列表定位本事件星标（列表小，一次拉全）。
+  useEffect(() => {
+    let alive = true;
+    void api
+      .listFavorites("event")
+      .then((items) => {
+        if (!alive) return;
+        setFav(items.some((x) => x.game_id === meta.game_id && x.item_id === meta.id));
+      })
+      .catch(() => void 0); // 收藏查询失败不阻断回放（星标只是附加功能）
+    return () => {
+      alive = false;
+    };
+  }, [meta.game_id, meta.id]);
+
+  const toggleFav = async () => {
+    setFavBusy(true);
+    const had = fav;
+    setFav(!had); // 乐观更新
+    try {
+      if (had) await api.removeFavorite("event", meta.game_id, meta.id);
+      else await api.addFavorite("event", meta.game_id, meta.id, 0, "");
+    } catch (e: any) {
+      setFav(had); // 回滚
+      setErr(`${had ? "取消收藏" : "收藏"}失败：${e?.message ?? String(e)}`);
+    } finally {
+      setFavBusy(false);
+    }
+  };
 
   // 会话关闭不做在卸载清理里：React 18 dev StrictMode 双挂载
   // （mount→unmount→remount）会在首次卸载把正常会话关掉。
@@ -216,6 +249,16 @@ export default function Replay({
           {meta.title}
         </div>
         <Badge variant="secondary">{KIND_LABEL[meta.kind] ?? meta.kind}</Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={favBusy}
+          onClick={() => void toggleFav()}
+          title={fav ? "取消收藏（星标）" : "收藏本事件（星标）"}
+          className={fav ? "text-amber-400" : "text-muted-foreground"}
+        >
+          <Star className={fav ? "h-5 w-5 fill-current" : "h-5 w-5"} />
+        </Button>
         {showDbg && (
           <>
             <Badge variant="outline">{meta.op_count} op</Badge>

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   Ship,
+  Star,
 } from "lucide-react";
 import {
   api,
@@ -19,6 +20,7 @@ import {
   type CatalogRecentDTO,
   type CatalogStatsDTO,
   type CatalogTextHitDTO,
+  type FavoriteDTO,
   type GameDTO,
   type GamesDTO,
   type LibraryDTO,
@@ -58,6 +60,8 @@ export default function EventGrid({
   const [textIndexed, setTextIndexed] = useState(true);
   const [recentItems, setRecentItems] = useState<CatalogRecentDTO[]>([]);
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
+  const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
+  const [favItems, setFavItems] = useState<FavoriteDTO[]>([]); // 收藏区列表（含标题）
   const [indexing, setIndexing] = useState<{
     title: string;
     done: number;
@@ -151,19 +155,49 @@ export default function EventGrid({
     try {
       const gs = await api.listGames();
       setGames(gs);
-      const [ev, rc, tc] = await Promise.all([
+      const [ev, rc, tc, fv] = await Promise.all([
         api.catalogEvents("", 2000),
         api.catalogRecent(12),
         api.catalogTextCounts(),
+        api.listFavorites("event"),
       ]);
       setAllEvents(ev.events);
       setAllWarnings(ev.warnings);
       setRecentItems(rc);
       setTextCounts(tc);
+      setFavItems(fv);
+      setFavs(new Set(fv.map((f) => `event|${f.game_id}|${f.item_id}`)));
       const pending = gs.games.filter((g) => !tc[g.id]);
       if (pending.length > 0) await indexGames(pending);
     } catch (e: any) {
       setAllWarnings([e?.message ?? String(e)]);
+    }
+  };
+
+  // 收藏/取消收藏（event 级）：乐观更新，失败回滚 + 警告（FR-12 不静默）。
+  const toggleFav = async (gameID: string, _kind: string, id: string) => {
+    const key = `event|${gameID}|${id}`;
+    const had = favs.has(key);
+    setFavs((prev) => {
+      const next = new Set(prev);
+      if (had) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    try {
+      if (had) await api.removeFavorite("event", gameID, id);
+      else await api.addFavorite("event", gameID, id, 0, "");
+    } catch (e: any) {
+      setFavs((prev) => {
+        const next = new Set(prev);
+        if (had) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      setAllWarnings((w) => [
+        ...w,
+        `${had ? "取消收藏" : "收藏"}失败：${e?.message ?? String(e)}`,
+      ]);
     }
   };
 
@@ -472,12 +506,15 @@ export default function EventGrid({
             warnings={allWarnings}
             indexing={indexing}
             recent={recentItems}
+            favItems={favItems}
+            favs={favs}
             textHits={textHits}
             textIndexed={textIndexed}
             textCounts={textCounts}
             busy={busy}
             onOpen={openFromGame}
             onCover={coverFor}
+            onToggleFav={toggleFav}
             onIndexAll={() => {
               const pending = gameList.filter((g) => !textCounts[g.id]);
               if (pending.length > 0) void indexGames(pending);
@@ -800,12 +837,15 @@ function AllGames({
   warnings,
   indexing,
   recent,
+  favItems,
+  favs,
   textHits,
   textIndexed,
   textCounts,
   busy,
   onOpen,
   onCover,
+  onToggleFav,
   onIndexAll,
 }: {
   events: CatalogEventDTO[];
@@ -813,12 +853,15 @@ function AllGames({
   warnings: string[];
   indexing: { title: string; done: number; total: number } | null;
   recent: CatalogRecentDTO[];
+  favItems: FavoriteDTO[];
+  favs: Set<string>;
   textHits: CatalogTextHitDTO[] | null;
   textIndexed: boolean;
   textCounts: Record<string, number>;
   busy: boolean;
   onOpen: (gameID: string, kind: string, id: string, title: string) => void;
   onCover: (gameID: string, kind: string, id: string) => Promise<string | null>;
+  onToggleFav: (gameID: string, kind: string, id: string) => void;
   onIndexAll: () => void;
 }) {
   // 按游戏分组（后端按游戏标题排序，保持出现序即分组序）。
@@ -836,6 +879,11 @@ function AllGames({
     }
     return out;
   }, [events]);
+
+  // (game_id, item_id) → kind：收藏行打开事件时定位类型
+  //（favorites 不存 kind；item_id 在各作 library 内实际唯一）。
+  const kindOf = (gameID: string, id: string): string | null =>
+    events.find((e) => e.game_id === gameID && e.id === id)?.kind ?? null;
 
   // 台词行的事件标题：从已加载事件里查（查不到回落 event_id）。
   const titleOf = (gameID: string, kind: string, id: string) =>
@@ -870,6 +918,49 @@ function AllGames({
       )}
 
       <main className="flex-1 space-y-6 overflow-y-auto p-5">
+        {/* 收藏（event 级；星标同款数据） */}
+        {!textHits && favItems.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              收藏 {favItems.length}
+            </h2>
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {favItems.map((f) => {
+                const kind = kindOf(f.game_id, f.item_id);
+                const stale = kind === null; // 事件已不在库（重扫删/换目录）
+                return (
+                  <li key={`${f.game_id}:${f.item_id}`} className="flex items-center gap-3 px-4 py-2.5">
+                    <Star className="h-3.5 w-3.5 shrink-0 fill-current text-amber-400" />
+                    <button
+                      disabled={busy || stale}
+                      onClick={() => kind && onOpen(f.game_id, kind, f.item_id, f.title)}
+                      title={stale ? "事件已不在当前库中（可取消收藏）" : `${f.game_title}\n${f.title}`}
+                      className={cn(
+                        "min-w-0 flex-1 text-left text-sm",
+                        stale ? "cursor-not-allowed text-muted-foreground line-through" : "hover:text-primary",
+                      )}
+                    >
+                      <span className="block truncate">{f.title}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">{f.game_title}</span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-xs text-muted-foreground"
+                      disabled={busy}
+                      title="取消收藏"
+                      onClick={() => onToggleFav(f.game_id, kind ?? "cg", f.item_id)}
+                    >
+                      取消收藏
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         {/* 最近播放 */}
         {recent.length > 0 && !textHits && (
           <section className="space-y-2">
@@ -977,15 +1068,38 @@ function AllGames({
                   className="grid auto-rows-max gap-4"
                   style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
                 >
-                  {g.items.map((e) => (
-                    <EventCard
-                      key={`${e.game_id}:${e.kind}:${e.id}`}
-                      card={cardFor(e)}
-                      gameID={e.game_id}
-                      lookup={onCover}
-                      onClick={() => onOpen(e.game_id, e.kind, e.id, e.title)}
-                    />
-                  ))}
+                  {g.items.map((e) => {
+                    const fav = favs.has(`event|${e.game_id}|${e.id}`);
+                    return (
+                      <div key={`${e.game_id}:${e.kind}:${e.id}`} className="relative group">
+                        <EventCard
+                          card={cardFor(e)}
+                          gameID={e.game_id}
+                          lookup={onCover}
+                          onClick={() => onOpen(e.game_id, e.kind, e.id, e.title)}
+                        />
+                        {/* 星标是卡的兄弟节点（button 嵌 button 不合法）；默认隐显，
+                            hover/focus 可见，已收藏常驻（FR-12：状态不静默） */}
+                        <button
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onToggleFav(e.game_id, e.kind, e.id);
+                          }}
+                          disabled={busy}
+                          title={fav ? "取消收藏" : "收藏本事件"}
+                          className={cn(
+                            "absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-md border transition-opacity",
+                            fav
+                              ? "border-amber-700/60 bg-amber-950/80 text-amber-400 opacity-100"
+                              : "border-border/60 bg-background/70 text-muted-foreground/70 opacity-0 hover:text-amber-400 focus-visible:opacity-100 group-hover:opacity-100",
+                            busy && "cursor-not-allowed opacity-50",
+                          )}
+                        >
+                          <Star className={cn("h-3.5 w-3.5", fav && "fill-current")} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             );
