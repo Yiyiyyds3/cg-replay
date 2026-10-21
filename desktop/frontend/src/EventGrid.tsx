@@ -62,6 +62,7 @@ export default function EventGrid({
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
   const [favItems, setFavItems] = useState<FavoriteDTO[]>([]); // 收藏区列表（含标题）
+  const [favGames, setFavGames] = useState<Set<string>>(new Set()); // game 级收藏（游戏 id）
   const [indexing, setIndexing] = useState<{
     title: string;
     done: number;
@@ -82,6 +83,7 @@ export default function EventGrid({
     try {
       const gs = await api.listGames();
       setGames(gs);
+      void refreshFavs(); // 收藏状态/计数（失败不阻断主流程）
       if (!gs.active) {
         setStatus({ state: "setup" });
         return;
@@ -150,23 +152,36 @@ export default function EventGrid({
     }
   };
 
+  // 收藏全量刷新（event 列表 + game 星标集）；启动与「全部」页签进入时调。
+  const refreshFavs = async () => {
+    try {
+      const [ev, gm] = await Promise.all([
+        api.listFavorites("event"),
+        api.listFavorites("game"),
+      ]);
+      setFavItems(ev);
+      setFavs(new Set(ev.map((f) => `event|${f.game_id}|${f.item_id}`)));
+      setFavGames(new Set(gm.map((f) => f.item_id)));
+    } catch {
+      /* 收藏读取失败不阻断主流程（星标/计数保持空，FR-12 见操作时警告） */
+    }
+  };
+
   // 进入「全部」：查询前由后端逐游戏同步 catalog；0 台词游戏按需抽台词。
   const loadAll = async () => {
     try {
       const gs = await api.listGames();
       setGames(gs);
-      const [ev, rc, tc, fv] = await Promise.all([
+      const [ev, rc, tc] = await Promise.all([
         api.catalogEvents("", 2000),
         api.catalogRecent(12),
         api.catalogTextCounts(),
-        api.listFavorites("event"),
       ]);
       setAllEvents(ev.events);
       setAllWarnings(ev.warnings);
       setRecentItems(rc);
       setTextCounts(tc);
-      setFavItems(fv);
-      setFavs(new Set(fv.map((f) => `event|${f.game_id}|${f.item_id}`)));
+      await refreshFavs();
       const pending = gs.games.filter((g) => !tc[g.id]);
       if (pending.length > 0) await indexGames(pending);
     } catch (e: any) {
@@ -174,7 +189,8 @@ export default function EventGrid({
     }
   };
 
-  // 收藏/取消收藏（event 级）：乐观更新，失败回滚 + 警告（FR-12 不静默）。
+  // 收藏/取消收藏（event 级）：乐观更新，成功后重拉列表（收藏区要标题），
+  // 失败回滚 + 警告（FR-12 不静默）。
   const toggleFav = async (gameID: string, _kind: string, id: string) => {
     const key = `event|${gameID}|${id}`;
     const had = favs.has(key);
@@ -187,6 +203,7 @@ export default function EventGrid({
     try {
       if (had) await api.removeFavorite("event", gameID, id);
       else await api.addFavorite("event", gameID, id, 0, "");
+      await refreshFavs();
     } catch (e: any) {
       setFavs((prev) => {
         const next = new Set(prev);
@@ -197,6 +214,46 @@ export default function EventGrid({
       setAllWarnings((w) => [
         ...w,
         `${had ? "取消收藏" : "收藏"}失败：${e?.message ?? String(e)}`,
+      ]);
+    }
+  };
+
+  // 保存收藏的评分/备注（AddFavorite upsert；成功重拉，失败上抛让编辑态保持）。
+  const saveFavMeta = async (gameID: string, itemID: string, rating: number, note: string) => {
+    try {
+      await api.addFavorite("event", gameID, itemID, rating, note);
+      await refreshFavs();
+    } catch (e: any) {
+      setAllWarnings((w) => [
+        ...w,
+        `保存收藏信息失败：${e?.message ?? String(e)}`,
+      ]);
+      throw e;
+    }
+  };
+
+  // 收藏/取消收藏游戏（game 级：item_id = game_id）。乐观更新 + 失败回滚。
+  const toggleGameFav = async (gameID: string) => {
+    const had = favGames.has(gameID);
+    setFavGames((prev) => {
+      const next = new Set(prev);
+      if (had) next.delete(gameID);
+      else next.add(gameID);
+      return next;
+    });
+    try {
+      if (had) await api.removeFavorite("game", gameID, gameID);
+      else await api.addFavorite("game", gameID, gameID, 0, "");
+    } catch (e: any) {
+      setFavGames((prev) => {
+        const next = new Set(prev);
+        if (had) next.add(gameID);
+        else next.delete(gameID);
+        return next;
+      });
+      setAllWarnings((w) => [
+        ...w,
+        `${had ? "取消收藏游戏" : "收藏游戏"}失败：${e?.message ?? String(e)}`,
       ]);
     }
   };
@@ -428,9 +485,12 @@ export default function EventGrid({
         busyGame={busyGame}
         collapsed={collapsed}
         catalog={catalog}
+        favGames={favGames}
+        favEventCount={favItems.length}
         onToggle={() => setCollapsed((v) => !v)}
         onSelect={(id) => void switchGame(id)}
         onAdd={() => void pickAndAdd()}
+        onToggleGameFav={(id) => void toggleGameFav(id)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -515,6 +575,7 @@ export default function EventGrid({
             onOpen={openFromGame}
             onCover={coverFor}
             onToggleFav={toggleFav}
+            onSaveFavMeta={saveFavMeta}
             onIndexAll={() => {
               const pending = gameList.filter((g) => !textCounts[g.id]);
               if (pending.length > 0) void indexGames(pending);
@@ -555,9 +616,12 @@ function GameSidebar({
   busyGame,
   collapsed,
   catalog,
+  favGames,
+  favEventCount,
   onToggle,
   onSelect,
   onAdd,
+  onToggleGameFav,
 }: {
   games: GameDTO[];
   active: string;
@@ -565,9 +629,12 @@ function GameSidebar({
   busyGame: string;
   collapsed: boolean;
   catalog: CatalogStatsDTO | null;
+  favGames: Set<string>;
+  favEventCount: number;
   onToggle: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onToggleGameFav: (id: string) => void;
 }) {
   const [filter, setFilter] = useState("");
   const q = filter.trim().toLowerCase();
@@ -578,6 +645,75 @@ function GameSidebar({
       g.root.toLowerCase().includes(q) ||
       g.id.toLowerCase().includes(q),
   );
+  const shownFav = shown.filter((g) => favGames.has(g.id));
+  const shownRest = shown.filter((g) => !favGames.has(g.id));
+
+  // 一行游戏：主点击区（选择/切换）+ 行尾星标（game 级收藏）。
+  // 星标是主 button 的兄弟节点——button 嵌 button 不合法。
+  const renderRow = (g: GameDTO) => {
+    const isActive = g.id === active;
+    const pending = busyGame === g.id;
+    const fav = favGames.has(g.id);
+    return (
+      <div
+        key={g.id}
+        className={cn(
+          "group relative flex items-center gap-1 rounded-md pr-1 transition-colors",
+          isActive
+            ? "bg-secondary text-foreground"
+            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          busy && "cursor-not-allowed opacity-60",
+        )}
+      >
+        {isActive && (
+          <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+        )}
+        <button
+          onClick={() => onSelect(g.id)}
+          disabled={busy}
+          aria-current={isActive ? "page" : undefined}
+          title={`${g.title}\n${g.root}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-left"
+        >
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
+              isActive
+                ? "border-primary/40 bg-primary/15 text-primary"
+                : "border-border bg-background/40",
+            )}
+          >
+            <Gamepad2 className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-medium">{g.title}</span>
+            <span className="block truncate text-[10px] text-muted-foreground">
+              {shortRoot(g.root)}
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={() => onToggleGameFav(g.id)}
+          disabled={busy}
+          title={fav ? "取消收藏游戏" : "收藏游戏"}
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-opacity",
+            fav
+              ? "text-amber-400 opacity-100"
+              : "text-muted-foreground/60 opacity-0 hover:text-amber-400 focus-visible:opacity-100 group-hover:opacity-100",
+            busy && "cursor-not-allowed opacity-50",
+          )}
+        >
+          <Star className={cn("h-3.5 w-3.5", fav && "fill-current")} />
+        </button>
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        ) : isActive ? (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+        ) : null}
+      </div>
+    );
+  };
 
   if (collapsed) {
     return (
@@ -688,51 +824,29 @@ function GameSidebar({
       )}
 
       <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-        {shown.map((g) => {
-          const isActive = g.id === active;
-          const pending = busyGame === g.id;
-          return (
-            <button
-              key={g.id}
-              onClick={() => onSelect(g.id)}
-              disabled={busy}
-              aria-current={isActive ? "page" : undefined}
-              title={`${g.title}\n${g.root}`}
-              className={cn(
-                "group relative flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
-                isActive
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                busy && "cursor-not-allowed opacity-60",
-              )}
-            >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-              )}
-              <span
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
-                  isActive
-                    ? "border-primary/40 bg-primary/15 text-primary"
-                    : "border-border bg-background/40",
-                )}
-              >
-                <Gamepad2 className="h-4 w-4" />
+        {/* 收藏的游戏置顶（game 级收藏；星标在行尾，hover 显现/已收藏常驻） */}
+        {shownFav.length > 0 && (
+          <>
+            <div className="flex items-center justify-between px-1 pb-1 pt-1">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400/80">
+                收藏的游戏
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium">{g.title}</span>
-                <span className="block truncate text-[10px] text-muted-foreground">
-                  {shortRoot(g.root)}
-                </span>
-              </span>
-              {pending ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-              ) : isActive ? (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-              ) : null}
-            </button>
-          );
-        })}
+              <Badge variant="secondary" className="px-1.5 text-[10px]">
+                {shownFav.length}
+              </Badge>
+            </div>
+            {shownFav.map(renderRow)}
+          </>
+        )}
+        <div className="flex items-center justify-between px-1 pb-1 pt-1">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            游戏库
+          </span>
+          <Badge variant="secondary" className="px-1.5 text-[10px]">
+            {games.length}
+          </Badge>
+        </div>
+        {shownRest.map(renderRow)}
         {shown.length === 0 && (
           <div className="px-2 py-6 text-center text-xs text-muted-foreground">
             没有匹配的游戏
@@ -740,8 +854,8 @@ function GameSidebar({
         )}
       </div>
 
-      <div className="border-t border-border px-3 py-2" title={catalogTitle(catalog)}>
-        <div className="flex items-center gap-1.5 text-[10px]">
+      <div className="space-y-1 border-t border-border px-3 py-2">
+        <div className="flex items-center gap-1.5 text-[10px]" title={catalogTitle(catalog)}>
           <Database
             className={cn(
               "h-3.5 w-3.5 shrink-0",
@@ -757,6 +871,15 @@ function GameSidebar({
           ) : (
             <span className="truncate text-muted-foreground">索引检查中…</span>
           )}
+        </div>
+        <div
+          className="flex items-center gap-1.5 text-[10px]"
+          title={`收藏 ${favGames.size} 个游戏 / ${favEventCount} 个事件\n游戏星标在行尾；事件星标在「全部」页签卡片与回放页。`}
+        >
+          <Star className="h-3.5 w-3.5 shrink-0 text-amber-400/80" />
+          <span className="truncate text-muted-foreground">
+            收藏 {favGames.size} 游戏 · {favEventCount} 事件
+          </span>
         </div>
       </div>
 
@@ -846,6 +969,7 @@ function AllGames({
   onOpen,
   onCover,
   onToggleFav,
+  onSaveFavMeta,
   onIndexAll,
 }: {
   events: CatalogEventDTO[];
@@ -862,6 +986,7 @@ function AllGames({
   onOpen: (gameID: string, kind: string, id: string, title: string) => void;
   onCover: (gameID: string, kind: string, id: string) => Promise<string | null>;
   onToggleFav: (gameID: string, kind: string, id: string) => void;
+  onSaveFavMeta: (gameID: string, itemID: string, rating: number, note: string) => Promise<void>;
   onIndexAll: () => void;
 }) {
   // 按游戏分组（后端按游戏标题排序，保持出现序即分组序）。
@@ -926,37 +1051,20 @@ function AllGames({
               收藏 {favItems.length}
             </h2>
             <ul className="divide-y divide-border rounded-md border border-border">
-              {favItems.map((f) => {
-                const kind = kindOf(f.game_id, f.item_id);
-                const stale = kind === null; // 事件已不在库（重扫删/换目录）
-                return (
-                  <li key={`${f.game_id}:${f.item_id}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <Star className="h-3.5 w-3.5 shrink-0 fill-current text-amber-400" />
-                    <button
-                      disabled={busy || stale}
-                      onClick={() => kind && onOpen(f.game_id, kind, f.item_id, f.title)}
-                      title={stale ? "事件已不在当前库中（可取消收藏）" : `${f.game_title}\n${f.title}`}
-                      className={cn(
-                        "min-w-0 flex-1 text-left text-sm",
-                        stale ? "cursor-not-allowed text-muted-foreground line-through" : "hover:text-primary",
-                      )}
-                    >
-                      <span className="block truncate">{f.title}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">{f.game_title}</span>
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-xs text-muted-foreground"
-                      disabled={busy}
-                      title="取消收藏"
-                      onClick={() => onToggleFav(f.game_id, kind ?? "cg", f.item_id)}
-                    >
-                      取消收藏
-                    </Button>
-                  </li>
-                );
-              })}
+              {favItems.map((f) => (
+                <FavRow
+                  key={`${f.game_id}:${f.item_id}`}
+                  fav={f}
+                  stale={kindOf(f.game_id, f.item_id) === null}
+                  busy={busy}
+                  onOpen={() => {
+                    const kind = kindOf(f.game_id, f.item_id);
+                    if (kind) onOpen(f.game_id, kind, f.item_id, f.title);
+                  }}
+                  onUnfav={() => onToggleFav(f.game_id, kindOf(f.game_id, f.item_id) ?? "cg", f.item_id)}
+                  onSaveMeta={(rating, note) => onSaveFavMeta(f.game_id, f.item_id, rating, note)}
+                />
+              ))}
             </ul>
           </section>
         )}
@@ -1107,6 +1215,139 @@ function AllGames({
         )}
       </main>
     </div>
+  );
+}
+
+// ---------- 收藏行（评分 / 备注行内编辑） ----------
+
+/** 一行收藏：打开 / 评分（1~5，再点当前星清零）/ 备注 / 取消收藏。 */
+function FavRow({
+  fav,
+  stale,
+  busy,
+  onOpen,
+  onUnfav,
+  onSaveMeta,
+}: {
+  fav: FavoriteDTO;
+  stale: boolean;
+  busy: boolean;
+  onOpen: () => void;
+  onUnfav: () => void;
+  onSaveMeta: (rating: number, note: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [rating, setRating] = useState(fav.rating);
+  const [note, setNote] = useState(fav.note);
+  const [saving, setSaving] = useState(false);
+
+  const openEditor = () => {
+    setRating(fav.rating);
+    setNote(fav.note);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSaveMeta(rating, note);
+      setEditing(false); // 失败会 reject → 停在本页继续改（错误由上层 warnings 展示）
+    } catch {
+      /* 上层已记 warning */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <li className="px-4 py-2.5">
+      <div className="flex items-center gap-3">
+        <Star className="h-3.5 w-3.5 shrink-0 fill-current text-amber-400" />
+        <button
+          disabled={busy || stale}
+          onClick={onOpen}
+          title={stale ? "事件已不在当前库中（可取消收藏）" : `${fav.game_title}\n${fav.title}`}
+          className={cn(
+            "min-w-0 flex-1 text-left text-sm",
+            stale ? "cursor-not-allowed text-muted-foreground line-through" : "hover:text-primary",
+          )}
+        >
+          <span className="block truncate">{fav.title}</span>
+          <span className="block truncate text-[10px] text-muted-foreground">{fav.game_title}</span>
+        </button>
+        {fav.rating > 0 && (
+          <span className="shrink-0 text-[11px] leading-none" title={`评分 ${fav.rating}/5`}>
+            <span className="text-amber-400">{"★".repeat(fav.rating)}</span>
+            <span className="text-muted-foreground/40">{"★".repeat(5 - fav.rating)}</span>
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 text-xs text-muted-foreground"
+          disabled={busy}
+          title="评分 / 备注"
+          onClick={openEditor}
+        >
+          编辑
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shrink-0 text-xs text-muted-foreground"
+          disabled={busy}
+          title="取消收藏"
+          onClick={onUnfav}
+        >
+          取消收藏
+        </Button>
+      </div>
+      {fav.note && !editing && (
+        <p className="mt-1 truncate pl-6 text-[11px] text-muted-foreground" title={fav.note}>
+          备注：{fav.note}
+        </p>
+      )}
+      {editing && (
+        <div className="mt-2 space-y-2 rounded-md border border-border bg-background/40 p-3">
+          <div className="flex items-center gap-1">
+            <span className="mr-2 text-[11px] text-muted-foreground">评分</span>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                disabled={saving}
+                onClick={() => setRating((r) => (r === n ? 0 : n))} // 再点当前星 = 取消评分
+                title={n === rating ? "再点一次取消评分" : `${n} 星`}
+                className="p-0.5"
+              >
+                <Star
+                  className={cn(
+                    "h-4 w-4",
+                    n <= rating ? "fill-current text-amber-400" : "text-muted-foreground/40",
+                  )}
+                />
+              </button>
+            ))}
+            <span className="ml-2 text-[11px] text-muted-foreground">
+              {rating > 0 ? `${rating}/5` : "未评分"}
+            </span>
+          </div>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="备注（可选，如「海边结局」）"
+            className="h-8 w-full rounded-md border border-input bg-input/40 px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" disabled={saving} onClick={() => setEditing(false)}>
+              取消
+            </Button>
+            <Button size="sm" disabled={saving} onClick={() => void save()}>
+              {saving ? "保存中…" : "保存"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
 
