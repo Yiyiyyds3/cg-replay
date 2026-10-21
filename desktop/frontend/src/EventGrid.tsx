@@ -7,6 +7,7 @@ import {
   Loader2,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -295,6 +296,20 @@ export default function EventGrid({
         ...w,
         `${had ? "取消收藏角色" : "收藏角色"}失败：${e?.message ?? String(e)}`,
       ]);
+    }
+  };
+
+  // 保存角色收藏的评分/备注（AddFavorite upsert；成功重拉，失败上抛让编辑态保持）。
+  const saveCharMeta = async (gameID: string, name: string, rating: number, note: string) => {
+    try {
+      await api.addFavorite("character", gameID, name, rating, note);
+      await refreshFavs();
+    } catch (e: any) {
+      setAllWarnings((w) => [
+        ...w,
+        `保存角色收藏信息失败：${e?.message ?? String(e)}`,
+      ]);
+      throw e;
     }
   };
 
@@ -620,6 +635,7 @@ export default function EventGrid({
             onToggleFav={toggleFav}
             onSaveFavMeta={saveFavMeta}
             onToggleCharFav={toggleCharFav}
+            onSaveCharMeta={saveCharMeta}
             onSearchSpeaker={(name) => setQ(name)}
             onIndexAll={() => {
               const pending = gameList.filter((g) => !textCounts[g.id]);
@@ -1019,6 +1035,7 @@ function AllGames({
   onToggleFav,
   onSaveFavMeta,
   onToggleCharFav,
+  onSaveCharMeta,
   onSearchSpeaker,
   onIndexAll,
 }: {
@@ -1041,6 +1058,7 @@ function AllGames({
   onToggleFav: (gameID: string, kind: string, id: string) => void;
   onSaveFavMeta: (gameID: string, itemID: string, rating: number, note: string) => Promise<void>;
   onToggleCharFav: (gameID: string, name: string) => void;
+  onSaveCharMeta: (gameID: string, name: string, rating: number, note: string) => Promise<void>;
   onSearchSpeaker: (name: string) => void;
   onIndexAll: () => void;
 }) {
@@ -1084,6 +1102,19 @@ function AllGames({
     }
     return out;
   }, [speakers]);
+
+  // 角色收藏的评分/备注（key = gameID:name）；chips 显示 ★N、编辑器回显。
+  const charMeta = useMemo(() => {
+    const m = new Map<string, FavoriteDTO>();
+    for (const f of favCharItems) m.set(`${f.game_id}:${f.item_id}`, f);
+    return m;
+  }, [favCharItems]);
+
+  // 正在编辑评分/备注的角色（同一时刻只开一个；chips 下方渲染编辑器）。
+  const [editingChar, setEditingChar] = useState<{
+    gameID: string;
+    name: string;
+  } | null>(null);
 
   if (!loaded) {
     return (
@@ -1140,7 +1171,7 @@ function AllGames({
           </section>
         )}
 
-        {/* 收藏的角色（character 级：点名字搜该角色台词） */}
+        {/* 收藏的角色（character 级：点名字搜该角色台词；铅笔编辑评分/备注） */}
         {!textHits && favCharItems.length > 0 && (
           <section className="space-y-2">
             <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -1148,31 +1179,88 @@ function AllGames({
               收藏的角色 {favCharItems.length}
             </h2>
             <div className="flex flex-wrap gap-2">
-              {favCharItems.map((f) => (
-                <span
-                  key={`${f.game_id}:${f.item_id}`}
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-card py-1.5 pl-3 pr-1.5 text-xs"
-                  title={`${f.game_title} · ${f.item_id}`}
-                >
-                  <button
-                    disabled={busy}
-                    onClick={() => onSearchSpeaker(f.item_id)}
-                    className="max-w-[180px] truncate hover:text-primary"
+              {favCharItems.map((f) => {
+                const meta = charMeta.get(`${f.game_id}:${f.item_id}`);
+                return (
+                  <span
+                    key={`${f.game_id}:${f.item_id}`}
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-card py-1.5 pl-3 pr-1.5 text-xs"
+                    title={`${f.game_title} · ${f.item_id}${meta?.note ? `\n备注：${meta.note}` : ""}`}
                   >
-                    {f.title}
-                  </button>
-                  <span className="text-[10px] text-muted-foreground">{f.game_title}</span>
-                  <button
-                    disabled={busy}
-                    title="取消收藏角色"
-                    onClick={() => onToggleCharFav(f.game_id, f.item_id)}
-                    className="flex h-6 w-6 items-center justify-center rounded text-amber-400 hover:text-foreground"
-                  >
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                  </button>
-                </span>
-              ))}
+                    <button
+                      disabled={busy}
+                      onClick={() => onSearchSpeaker(f.item_id)}
+                      className="max-w-[180px] truncate hover:text-primary"
+                    >
+                      {f.title}
+                    </button>
+                    {(meta?.rating ?? 0) > 0 && (
+                      <span className="text-[11px] leading-none text-amber-400" title={`评分 ${meta?.rating}/5`}>
+                        ★{meta?.rating}
+                      </span>
+                    )}
+                    {meta?.note && (
+                      <span className="max-w-[120px] truncate text-[10px] text-muted-foreground" title={meta.note}>
+                        {meta.note}
+                      </span>
+                    )}
+                    <button
+                      disabled={busy}
+                      title="评分 / 备注"
+                      onClick={() =>
+                        setEditingChar((cur) =>
+                          cur?.gameID === f.game_id && cur?.name === f.item_id
+                            ? null
+                            : { gameID: f.game_id, name: f.item_id },
+                        )
+                      }
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded transition-colors",
+                        editingChar?.gameID === f.game_id && editingChar?.name === f.item_id
+                          ? "bg-secondary text-foreground"
+                          : "text-muted-foreground/60 hover:text-foreground",
+                      )}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      disabled={busy}
+                      title="取消收藏角色"
+                      onClick={() => onToggleCharFav(f.game_id, f.item_id)}
+                      className="flex h-6 w-6 items-center justify-center rounded text-amber-400 hover:text-foreground"
+                    >
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                    </button>
+                  </span>
+                );
+              })}
             </div>
+            {/* 角色评分/备注编辑器（FavMetaEditor 与事件收藏共用；一次一个） */}
+            {editingChar && (
+              <div className="rounded-md border border-border bg-card/40 p-3">
+                <div className="mb-2 text-xs text-muted-foreground">
+                  编辑角色收藏：
+                  <span className="text-foreground">{editingChar.name}</span>
+                  {charMeta.get(`${editingChar.gameID}:${editingChar.name}`) && (
+                    <span>
+                      {" · "}
+                      {charMeta.get(`${editingChar.gameID}:${editingChar.name}`)!.game_title}
+                    </span>
+                  )}
+                </div>
+                <FavMetaEditor
+                  rating={charMeta.get(`${editingChar.gameID}:${editingChar.name}`)?.rating ?? 0}
+                  note={charMeta.get(`${editingChar.gameID}:${editingChar.name}`)?.note ?? ""}
+                  placeholder="备注（可选，如「最喜欢的角色」）"
+                  busy={busy}
+                  onSave={async (r, n) => {
+                    await onSaveCharMeta(editingChar.gameID, editingChar.name, r, n);
+                    setEditingChar(null); // 失败 reject → 保持打开（内容不丢）
+                  }}
+                  onCancel={() => setEditingChar(null)}
+                />
+              </div>
+            )}
           </section>
         )}
 
@@ -1217,6 +1305,7 @@ function AllGames({
                 <div className="flex flex-wrap gap-2">
                   {sg.items.slice(0, 8).map((s) => {
                     const fav = favChars.has(`character|${s.game_id}|${s.name}`);
+                    const rated = charMeta.get(`${s.game_id}:${s.name}`)?.rating ?? 0;
                     return (
                       <span
                         key={s.name}
@@ -1231,6 +1320,14 @@ function AllGames({
                           {s.name}
                         </button>
                         <span className="text-[10px] text-muted-foreground">×{s.lines}</span>
+                        {rated > 0 && (
+                          <span
+                            className="text-[11px] leading-none text-amber-400"
+                            title={`我的评分 ${rated}/5`}
+                          >
+                            ★{rated}
+                          </span>
+                        )}
                         <button
                           disabled={busy}
                           title={fav ? "取消收藏角色" : "收藏角色"}
@@ -1401,27 +1498,6 @@ function FavRow({
   onSaveMeta: (rating: number, note: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [rating, setRating] = useState(fav.rating);
-  const [note, setNote] = useState(fav.note);
-  const [saving, setSaving] = useState(false);
-
-  const openEditor = () => {
-    setRating(fav.rating);
-    setNote(fav.note);
-    setEditing(true);
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await onSaveMeta(rating, note);
-      setEditing(false); // 失败会 reject → 停在本页继续改（错误由上层 warnings 展示）
-    } catch {
-      /* 上层已记 warning */
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <li className="px-4 py-2.5">
@@ -1451,7 +1527,7 @@ function FavRow({
           className="shrink-0 text-xs text-muted-foreground"
           disabled={busy}
           title="评分 / 备注"
-          onClick={openEditor}
+          onClick={() => setEditing(true)}
         >
           编辑
         </Button>
@@ -1472,46 +1548,98 @@ function FavRow({
         </p>
       )}
       {editing && (
-        <div className="mt-2 space-y-2 rounded-md border border-border bg-background/40 p-3">
-          <div className="flex items-center gap-1">
-            <span className="mr-2 text-[11px] text-muted-foreground">评分</span>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                disabled={saving}
-                onClick={() => setRating((r) => (r === n ? 0 : n))} // 再点当前星 = 取消评分
-                title={n === rating ? "再点一次取消评分" : `${n} 星`}
-                className="p-0.5"
-              >
-                <Star
-                  className={cn(
-                    "h-4 w-4",
-                    n <= rating ? "fill-current text-amber-400" : "text-muted-foreground/40",
-                  )}
-                />
-              </button>
-            ))}
-            <span className="ml-2 text-[11px] text-muted-foreground">
-              {rating > 0 ? `${rating}/5` : "未评分"}
-            </span>
-          </div>
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="备注（可选，如「海边结局」）"
-            className="h-8 w-full rounded-md border border-input bg-input/40 px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" disabled={saving} onClick={() => setEditing(false)}>
-              取消
-            </Button>
-            <Button size="sm" disabled={saving} onClick={() => void save()}>
-              {saving ? "保存中…" : "保存"}
-            </Button>
-          </div>
-        </div>
+        <FavMetaEditor
+          rating={fav.rating}
+          note={fav.note}
+          placeholder="备注（可选，如「海边结局」）"
+          busy={busy}
+          onSave={async (r, n) => {
+            await onSaveMeta(r, n);
+            setEditing(false); // 失败会 reject → 保持编辑态继续改（错误由上层 warnings 展示）
+          }}
+          onCancel={() => setEditing(false)}
+        />
       )}
     </li>
+  );
+}
+
+// ---------- 收藏元数据编辑器（事件/角色通用） ----------
+
+/**
+ * 评分 + 备注行内编辑器：5 星点选（再点当前星清零 = 未评分）、备注输入。
+ * onSave reject 时**不自动关闭**（由调用方决定：失败应保持编辑态，
+ * 用户刚填的内容不丢；错误由上层 warnings 横幅展示）。
+ */
+function FavMetaEditor({
+  rating: initRating,
+  note: initNote,
+  placeholder,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  rating: number;
+  note: string;
+  placeholder: string;
+  busy: boolean;
+  onSave: (rating: number, note: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [rating, setRating] = useState(initRating);
+  const [note, setNote] = useState(initNote);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSave(rating, note);
+    } catch {
+      /* 上层已记 warning；保持编辑态 */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-1">
+        <span className="mr-2 text-[11px] text-muted-foreground">评分</span>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            disabled={busy || saving}
+            onClick={() => setRating((r) => (r === n ? 0 : n))} // 再点当前星 = 取消评分
+            title={n === rating ? "再点一次取消评分" : `${n} 星`}
+            className="p-0.5"
+          >
+            <Star
+              className={cn(
+                "h-4 w-4",
+                n <= rating ? "fill-current text-amber-400" : "text-muted-foreground/40",
+              )}
+            />
+          </button>
+        ))}
+        <span className="ml-2 text-[11px] text-muted-foreground">
+          {rating > 0 ? `${rating}/5` : "未评分"}
+        </span>
+      </div>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={placeholder}
+        className="h-8 w-full rounded-md border border-input bg-input/40 px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+      />
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" disabled={saving} onClick={onCancel}>
+          取消
+        </Button>
+        <Button size="sm" disabled={busy || saving} onClick={() => void save()}>
+          {saving ? "保存中…" : "保存"}
+        </Button>
+      </div>
+    </div>
   );
 }
 
