@@ -61,7 +61,7 @@ export interface UnpackImportDTO {
   encrypted: string[];
   warnings: string[];
   game_id: string;
-  /** false = 已解包但事件库未接入（目前只支持 KiriKiri），产物仍保留在 dest。 */
+  /** false = 已解包但事件库接入失败（例如扫描不到事件），产物仍保留在 dest。 */
   connected: boolean;
   reason?: string;
   hint?: string;

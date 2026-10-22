@@ -42,7 +42,7 @@ type UnpackImportDTO struct {
 	Encrypted []string `json:"encrypted"`
 	Warnings  []string `json:"warnings"`
 	GameID    string   `json:"game_id"`
-	// Connected=false 表示素材已解出，但事件库还未接入（目前只支持 KiriKiri）。
+	// Connected=false 表示素材已解出，但事件库接入失败（例如该引擎扫描不到事件）。
 	// 这不是解包失败：产物保留在 Dest，前端要给打开目录/手动退路，不能只弹一句错。
 	Connected bool   `json:"connected"`
 	Reason    string `json:"reason,omitempty"`
@@ -123,30 +123,25 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 	}
 
 	// 登记进游戏库（以解包产物为根目录）。
-	// 注意：事件库切分（library.Scan）目前是 KiriKiri 形状的——别的引擎
-	// 解出来了也接不进事件库，这种要**明说**，不能报一个含糊的错。
+	// 事件库接入失败不是解包失败：用结果 DTO 返回，前端保留产物路径与手动退路。
 	lib, err := a.AddGame(dest)
 	if err != nil {
-		if res.EngineID != "kirikiri" {
-			// 解包本身成功，只是事件库接不上；用结果 DTO 返回而不是错误字符串，
-			// 前端才能保留产物路径、给「打开目录」和手动退路。
-			return &UnpackImportDTO{
-				Dest:      res.Dest,
-				EngineID:  res.EngineID,
-				Events:    res.Events,
-				Files:     res.Files,
-				Bytes:     res.Bytes,
-				Missing:   res.Missing,
-				Encrypted: res.Encrypted,
-				Warnings:  res.Warnings,
-				Connected: false,
-				Reason:    err.Error(),
-				Hint: fmt.Sprintf(
-					"事件库目前只支持 KiriKiri。解出的最小集合已保存在 %s；"+
-						"可以打开目录检查，或等引擎泛化后重新导入。", dest),
-			}, nil
-		}
-		return nil, fmt.Errorf("解包成功但登记失败：%w", err)
+		return &UnpackImportDTO{
+			Dest:      res.Dest,
+			EngineID:  res.EngineID,
+			Events:    res.Events,
+			Files:     res.Files,
+			Bytes:     res.Bytes,
+			Missing:   res.Missing,
+			Encrypted: res.Encrypted,
+			Warnings:  res.Warnings,
+			GameID:    registry.IDFor(filepath.Clean(dest)),
+			Connected: false,
+			Reason:    err.Error(),
+			Hint: fmt.Sprintf(
+				"解包产物已保存在 %s。可以打开目录检查；修复上述原因后，"+
+					"也能用「添加游戏」把这个目录手动登记。", dest),
+		}, nil
 	}
 	return &UnpackImportDTO{
 		Dest:      res.Dest,
@@ -157,7 +152,7 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 		Missing:   res.Missing,
 		Encrypted: res.Encrypted,
 		Warnings:  res.Warnings,
-		GameID:    id,
+		GameID:    registry.IDFor(filepath.Clean(dest)),
 		Connected: true,
 		Library:   lib,
 	}, nil

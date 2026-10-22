@@ -71,6 +71,8 @@ export default function EventGrid({
   const [unpackPath, setUnpackPath] = useState(""); // 待解包的源路径
   const [unpacking, setUnpacking] = useState(false); // 解包进行中
   const [unpackResult, setUnpackResult] = useState<UnpackImportDTO | null>(null); // 已解包但未接入
+  const [unpackScheme, setUnpackScheme] = useState(""); // XP3 解密方案；空 = 不解密
+  const [unpackKey, setUnpackKey] = useState("0"); // xor 固定密钥（0-255）
 
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
@@ -475,6 +477,8 @@ export default function EventGrid({
       setUnpackPath(path);
       setUnpackPlan(plan);
       setUnpackResult(null);
+      setUnpackScheme("");
+      setUnpackKey("0");
       if (plan.unsupported) {
         setAllWarnings((w) => [...w, `没法自动解包：${plan.reason}`]);
       }
@@ -508,10 +512,23 @@ export default function EventGrid({
   // 确认解包 → 解出最小集合 → 登记入库 → 切到该游戏。
   const runUnpack = async () => {
     if (!unpackPath) return;
+    const scheme = unpackScheme.trim();
+    let key = 0;
+    if (scheme === "xor") {
+      const raw = unpackKey.trim().toLowerCase();
+      const n = raw.startsWith("0x") ? parseInt(raw.slice(2), 16) : parseInt(raw, 10);
+      if (!Number.isInteger(n) || n < 0 || n > 255) {
+        setAllWarnings((w) => [...w, "xor 密钥必须是 0-255（支持十进制或 0x 十六进制）"]);
+        return;
+      }
+      key = n;
+    }
     setUnpacking(true);
     setBusy(true);
     try {
-      const r: UnpackImportDTO = await api.unpackImport(unpackPath);
+      const r: UnpackImportDTO = scheme
+        ? await api.unpackImportDecrypt(unpackPath, scheme, key)
+        : await api.unpackImport(unpackPath);
       setUnpackPlan(null);
       setUnpackPath("");
       if (!r.connected || !r.library) {
@@ -742,6 +759,17 @@ export default function EventGrid({
         {banner && (
           <div className="shrink-0 bg-destructive px-5 py-1.5 text-sm">{banner}</div>
         )}
+        {/* 非致命警告：CG/场景页也要可见（「全部」页有自己的警告区，避免重复） */}
+        {tab !== "all" && allWarnings.length > 0 && (
+          <div className="max-h-24 shrink-0 overflow-y-auto border-b border-amber-900/60 bg-amber-950/30 px-5 py-1.5 text-xs text-amber-200">
+            {allWarnings.map((w, i) => (
+              <div key={i} className="flex gap-2">
+                <span aria-hidden>•</span>
+                <span className="min-w-0 break-words">{w}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 解包预览（拖进来或选目录后：先看会解出什么，再确认） */}
         {unpackPlan && (
@@ -759,7 +787,39 @@ export default function EventGrid({
                   <div className="text-[11px] text-muted-foreground">
                     引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
                     预计 {unpackPlan.labels} 个 CG 事件 · 引用素材 {unpackPlan.refs} 个
-                    {unpackPlan.encrypted > 0 && ` · 加密条目 ${unpackPlan.encrypted} 个（需密钥，不会解出）`}
+                    {unpackPlan.encrypted > 0 &&
+                      ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`}
+                  </div>
+                )}
+                {unpackPlan.kind === "archive" && unpackPlan.engine_id === "kirikiri" && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                    <span className="text-muted-foreground">解密方案</span>
+                    <select
+                      value={unpackScheme}
+                      onChange={(e) => setUnpackScheme(e.target.value)}
+                      disabled={unpacking}
+                      aria-label="XP3 解密方案"
+                      className="h-7 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                    >
+                      <option value="">不解密（推荐先试）</option>
+                      <option value="hash">hash（adlr 派生）</option>
+                      <option value="natsupochi">natsupochi</option>
+                      <option value="poringsoft">poringsoft</option>
+                      <option value="sourire">sourire</option>
+                      <option value="haikuo">haikuo</option>
+                      <option value="xor">xor（固定密钥）</option>
+                    </select>
+                    {unpackScheme === "xor" && (
+                      <input
+                        value={unpackKey}
+                        onChange={(e) => setUnpackKey(e.target.value)}
+                        disabled={unpacking}
+                        aria-label="xor 固定密钥"
+                        placeholder="0-255 或 0x5A"
+                        className="h-7 w-28 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
+                      />
+                    )}
+                    <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
                   </div>
                 )}
                 {unpackPlan.unsupported && (
