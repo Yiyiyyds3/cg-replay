@@ -20,10 +20,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"ucgr/internal/adapter/artemis"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
@@ -166,6 +168,19 @@ func (s *replaySession) stageLoader(base player.Loader) player.Loader {
 	}
 }
 
+// buildArtemisShow 构建 Artemis 的 block 演出（事件 Label = block 序号）。
+func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
+	idx, err := strconv.Atoi(strings.TrimSpace(block))
+	if err != nil {
+		return nil, fmt.Errorf("Artemis 事件缺 block 序号（%q）", block)
+	}
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	return artemis.BuildShowBlock(data, filepath.Base(scriptPath), idx)
+}
+
 // confAuto 读 conf 里的 auto（与旧 CLI 同字段）。
 func (a *App) confAuto() bool {
 	c, ok := a.loadConf()
@@ -221,10 +236,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	}
 	sp := filepath.Join(root, filepath.FromSlash(script))
 	var ev *ir.Event
-	if chapterPos >= 0 && chEvent != nil {
-		// 走 library 入口：章跨文件时自动补演下一场景的章前段。
+	switch {
+	case chapterPos >= 0 && chEvent != nil:
+		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)
-	} else {
+	case strings.EqualFold(g.Engine, "artemis"):
+		// Artemis：事件单位是剧本里的 block，Label 记 block 序号。
+		ev, err = buildArtemisShow(sp, label)
+	default:
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}
 	if err != nil {

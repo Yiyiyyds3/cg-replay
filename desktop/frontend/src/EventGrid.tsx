@@ -70,6 +70,8 @@ export default function EventGrid({
   const [unpackPlan, setUnpackPlan] = useState<UnpackPlanDTO | null>(null); // 解包预览
   const [unpackPath, setUnpackPath] = useState(""); // 待解包的源路径
   const [unpacking, setUnpacking] = useState(false); // 解包进行中
+  const [unpackResult, setUnpackResult] = useState<UnpackImportDTO | null>(null); // 已解包但未接入
+
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
       return window.localStorage.getItem(AUTOPRUNE_KEY) === "1";
@@ -472,6 +474,7 @@ export default function EventGrid({
       const plan = await api.unpackPreview(path);
       setUnpackPath(path);
       setUnpackPlan(plan);
+      setUnpackResult(null);
       if (plan.unsupported) {
         setAllWarnings((w) => [...w, `没法自动解包：${plan.reason}`]);
       }
@@ -479,6 +482,15 @@ export default function EventGrid({
       setAllWarnings((w) => [...w, `解包预览失败：${e?.message ?? String(e)}`]);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // 阶段 4 手动退路：打开解包产物/源目录（失败进常驻横幅）。
+  const openLocalPath = async (path: string) => {
+    try {
+      await api.openPath(path);
+    } catch (e: any) {
+      setAllWarnings((w) => [...w, `打开目录失败：${e?.message ?? String(e)}`]);
     }
   };
 
@@ -500,14 +512,24 @@ export default function EventGrid({
     setBusy(true);
     try {
       const r: UnpackImportDTO = await api.unpackImport(unpackPath);
+      setUnpackPlan(null);
+      setUnpackPath("");
+      if (!r.connected || !r.library) {
+        // 解包成功但事件库还接不上：保留结果卡，给产物路径和手动退路。
+        setUnpackResult(r);
+        setAllWarnings((w) => [
+          ...w,
+          `已解包，但事件库还未接入：${r.reason ?? "未知原因"}`,
+        ]);
+        return;
+      }
       const gs = await api.listGames();
       setGames(gs);
       covers.current.clear();
       setLib(r.library);
       setTab("cg");
       setStatus({ state: "ready" });
-      setUnpackPlan(null);
-      setUnpackPath("");
+      setUnpackResult(null);
       setAllWarnings((w) => [
         ...w,
         `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个 CG 事件 → ${r.dest}` +
@@ -750,6 +772,9 @@ export default function EventGrid({
                 ))}
               </div>
               <div className="flex shrink-0 gap-2">
+                <Button variant="ghost" size="sm" onClick={() => void openLocalPath(unpackPath)}>
+                  打开位置
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setUnpackPlan(null)} disabled={unpacking}>
                   取消
                 </Button>
@@ -758,6 +783,46 @@ export default function EventGrid({
                     {unpacking ? "解包中…" : "开始解包"}
                   </Button>
                 )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 已解包但事件库未接入：产物保留，给打开目录/手动退路（阶段 4） */}
+        {unpackResult && (
+          <section className="border-y border-amber-900/60 bg-amber-950/20 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="text-sm font-medium text-amber-200">
+                  已解包，但还不能进事件库
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  引擎 {unpackResult.engine_id || "?"} · 解出 {unpackResult.files} 个文件（
+                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个 CG 事件
+                  {unpackResult.missing.length ? ` · ${unpackResult.missing.length} 个素材没找到` : ""}
+                  {unpackResult.encrypted.length ? ` · ${unpackResult.encrypted.length} 个加密条目未解出` : ""}
+                </div>
+                <div className="truncate text-[11px] text-muted-foreground" title={unpackResult.dest}>
+                  {unpackResult.dest}
+                </div>
+                {unpackResult.reason && (
+                  <div className="text-[11px] text-amber-300">{unpackResult.reason}</div>
+                )}
+                {unpackResult.hint && (
+                  <div className="text-[11px] leading-relaxed text-muted-foreground">
+                    {unpackResult.hint}
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => void openLocalPath(unpackResult.dest)}>
+                  <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                  打开目录
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setUnpackResult(null)}>
+                  关闭
+                </Button>
               </div>
             </div>
           </section>

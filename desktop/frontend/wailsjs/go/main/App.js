@@ -86,6 +86,10 @@ export function OpenEvent(arg1, arg2) {
   return window['go']['main']['App']['OpenEvent'](arg1, arg2);
 }
 
+export function OpenPath(arg1) {
+  return window['go']['main']['App']['OpenPath'](arg1);
+}
+
 export function Pause() {
   return window['go']['main']['App']['Pause']();
 }

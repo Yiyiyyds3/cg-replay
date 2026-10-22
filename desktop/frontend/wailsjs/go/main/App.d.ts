@@ -45,6 +45,8 @@ export function ListGames():Promise<main.GamesDTO>;
 
 export function OpenEvent(arg1:string,arg2:string):Promise<main.SessionMeta>;
 
+export function OpenPath(arg1:string):Promise<void>;
+
 export function Pause():Promise<void>;
 
 export function PickDirectory():Promise<string>;

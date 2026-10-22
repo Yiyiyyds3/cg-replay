@@ -61,7 +61,11 @@ export interface UnpackImportDTO {
   encrypted: string[];
   warnings: string[];
   game_id: string;
-  library: LibraryDTO;
+  /** false = 已解包但事件库未接入（目前只支持 KiriKiri），产物仍保留在 dest。 */
+  connected: boolean;
+  reason?: string;
+  hint?: string;
+  library?: LibraryDTO;
 }
 
 export interface ConfDTO {
@@ -180,6 +184,7 @@ export const api = {
   pingVersion: () => bridge().Version() as Promise<string>,
   getConf: () => bridge().GetConf() as Promise<ConfDTO>,
   pickDirectory: () => bridge().PickDirectory() as Promise<string>,
+  openPath: (path: string) => bridge().OpenPath(path) as Promise<void>,
   listGames: () => bridge().ListGames() as Promise<GamesDTO>,
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
   unpackPreview: (path: string) =>

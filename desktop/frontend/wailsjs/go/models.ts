@@ -56,6 +56,7 @@ export namespace library {
 	    id: string;
 	    title: string;
 	    script: string;
+	    label?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SceneEvent(source);
@@ -66,6 +67,7 @@ export namespace library {
 	        this.id = source["id"];
 	        this.title = source["title"];
 	        this.script = source["script"];
+	        this.label = source["label"];
 	    }
 	}
 	export class Library {
@@ -620,6 +622,9 @@ export namespace main {
 	    encrypted: string[];
 	    warnings: string[];
 	    game_id: string;
+	    connected: boolean;
+	    reason?: string;
+	    hint?: string;
 	    library?: library.Library;
 	
 	    static createFrom(source: any = {}) {
@@ -637,6 +642,9 @@ export namespace main {
 	        this.encrypted = source["encrypted"];
 	        this.warnings = source["warnings"];
 	        this.game_id = source["game_id"];
+	        this.connected = source["connected"];
+	        this.reason = source["reason"];
+	        this.hint = source["hint"];
 	        this.library = this.convertValues(source["library"], library.Library);
 	    }
 	

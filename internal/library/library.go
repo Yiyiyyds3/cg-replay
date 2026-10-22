@@ -37,6 +37,8 @@ type SceneEvent struct {
 	ID     string `json:"id"`
 	Title  string `json:"title"`
 	Script string `json:"script"` // 相对 root 的脚本路径
+	// Label 引擎内的定位串（KiriKiri 不用；Artemis = block 序号）。
+	Label string `json:"label,omitempty"`
 }
 
 // ChapterEvent 一个「演出段落」= 原作自己的章节标记 `*labelNN|显示名`。
@@ -108,6 +110,11 @@ func Scan(root string) (*Library, error) {
 func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())
+	}
+	// 事件切分是引擎专属的：Artemis 的事件单位是剧本里的 block，
+	// KiriKiri 是画廊槽位 + 场景 + 章节。约定里的 engine_id 决定走哪条。
+	if strings.EqualFold(conv.EngineID, "artemis") {
+		return ScanArtemis(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)

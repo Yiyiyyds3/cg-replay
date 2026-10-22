@@ -42,8 +42,13 @@ type UnpackImportDTO struct {
 	Encrypted []string `json:"encrypted"`
 	Warnings  []string `json:"warnings"`
 	GameID    string   `json:"game_id"`
+	// Connected=false 表示素材已解出，但事件库还未接入（目前只支持 KiriKiri）。
+	// 这不是解包失败：产物保留在 Dest，前端要给打开目录/手动退路，不能只弹一句错。
+	Connected bool   `json:"connected"`
+	Reason    string `json:"reason,omitempty"`
+	Hint      string `json:"hint,omitempty"`
 	// Library 登记后的事件库（形状与 library.Library 一致，前端直接当 LibraryDTO 用）。
-	Library *library.Library `json:"library"`
+	Library *library.Library `json:"library,omitempty"`
 }
 
 // UnpackPreview 预览一个游戏目录/归档的解包计划（不落盘）。
@@ -104,10 +109,23 @@ func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
 	lib, err := a.AddGame(dest)
 	if err != nil {
 		if res.EngineID != "kirikiri" {
-			return nil, fmt.Errorf(
-				"已解包（%d 个文件 → %s），但事件库接入目前只支持 KiriKiri：%v；"+
-					"解出的最小集合已就位，等事件库按引擎泛化后即可直接使用",
-				res.Files, dest, err)
+			// 解包本身成功，只是事件库接不上；用结果 DTO 返回而不是错误字符串，
+			// 前端才能保留产物路径、给「打开目录」和手动退路。
+			return &UnpackImportDTO{
+				Dest:      res.Dest,
+				EngineID:  res.EngineID,
+				Events:    res.Events,
+				Files:     res.Files,
+				Bytes:     res.Bytes,
+				Missing:   res.Missing,
+				Encrypted: res.Encrypted,
+				Warnings:  res.Warnings,
+				Connected: false,
+				Reason:    err.Error(),
+				Hint: fmt.Sprintf(
+					"事件库目前只支持 KiriKiri。解出的最小集合已保存在 %s；"+
+						"可以打开目录检查，或等引擎泛化后重新导入。", dest),
+			}, nil
 		}
 		return nil, fmt.Errorf("解包成功但登记失败：%w", err)
 	}
@@ -121,6 +139,7 @@ func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
 		Encrypted: res.Encrypted,
 		Warnings:  res.Warnings,
 		GameID:    id,
+		Connected: true,
 		Library:   lib,
 	}, nil
 }
