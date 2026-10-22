@@ -5,7 +5,7 @@
 | 日期 | 2026-10-15 |
 | 执行 | 接手 agent（接 Trae Agent 交接文档 §4 第 2 条） |
 | 方法 | 只读扫描。①③口径见下；②按归档扩展名分类；「47 款 ↔ 原始目录」映射由各解包目录 `.md`、gar_tool 脚本路径、名称匹配三源交叉确认 |
-| 脚本 | `gar_tool/m0_census.py`（可复跑）；数据 `gar_tool/m0_census.json` + `gar_tool/engine_dist_verify.json` |
+| 脚本 | `m0/m0_census.py`（可复跑）；数据 `m0/m0_census.json` + `m0/engine_dist_verify.json` |
 | 状态 | **v2a**：④（CG 事件实际引用资源）未测——依赖 P0 解析器，按冻结规则**此刻不得承诺降幅** |
 
 ---
@@ -115,7 +115,7 @@
 | 海市蜃楼之馆 | KiriKiri | 0.01 | 0.49 | 0.05 | 0.55 | 0.30 | PC_海市蜃楼之馆 |
 | 灰色的有闲 | CatSystem2 | — | — | — | — | 0.47 | **源目录缺失** |
 
-（单位为 GB，按「源+③」总足迹降序；完整机器可读数据见 `gar_tool/m0_census.json`，逐文件扩展名直方图见 `gar_tool/engine_dist_verify.json`。）
+（单位为 GB，按「源+③」总足迹降序；完整机器可读数据见 `m0/m0_census.json`，逐文件扩展名直方图见 `m0/engine_dist_verify.json`。）
 
 ---
 

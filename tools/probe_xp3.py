@@ -21,7 +21,7 @@ XP3 探查器（只读，不写文件）
       "hnfn"(0x6E666E68):   u32 hash + u16 name_len + name(UTF-16LE)
 
 用法:
-    python gar_tool/probe_xp3.py <xxx.xp3> [--samples 8] [--head 32]
+    python tools/probe_xp3.py <xxx.xp3> [--samples 8] [--head 32]
 """
 import argparse
 import os

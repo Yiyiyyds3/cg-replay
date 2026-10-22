@@ -1,7 +1,7 @@
 // Package catsystem2 实现 CatSystem2 引擎适配器。
 //
 // 对应 docs/04 引擎适配器接口规范；格式要点（2026-10-16/17 实测，
-// 见 gar_tool/cst_refs.py 与 P2_原型报告_CatSystem2引用提取.md）：
+// 见 tools/cst_refs.py 与 P2_原型报告_CatSystem2引用提取.md）：
 //
 //	剧本 .cst：CatScene 魔数 + u32 压缩长 + zlib 数据；
 //	  解压后条目为 01 <type> <bytes> 00（00 分隔），

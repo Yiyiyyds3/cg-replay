@@ -4,8 +4,8 @@
 |---|---|
 | 日期 | 2026-10-16（v4 更新：收益顺序第③项前半——G線上の魔王全解锁；Monkeys!! 判定需二进制逆向） |
 | 执行 | 接手 agent（M0 v2a 之后的流程下一项，按收益顺序第①项） |
-| 脚本 | `gar_tool/ks_refs.py`（引用提取）、`ks_fix9.py`（9nine 补解）、`ks_reextract.py`（G線 重提取，新增） |
-| 数据 | `gar_tool/ks_refs_out.json`、各游戏 `<游戏>_脚本修复/` 目录 |
+| 脚本 | `tools/ks_refs.py`（引用提取）、`ks_fix9.py`（9nine 补解）、`ks_reextract.py`（G線 重提取，新增） |
+| 数据 | `tools/ks_refs_out.json`、各游戏 `<游戏>_脚本修复/` 目录 |
 | 对应 | 05 文档 P0-4 / P0-7 的最小可跑版本；**未做** IR/回放器/打包 |
 | 结论 | KiriKiri 11 款 raw 池 24.21 GB → **实测口径可裁 17.06 GB（70.5%）**；**诚实口径可裁 14.62 GB（60.4%）**（v1→v4：18.64 / 5.02 → 17.06 / 14.62 GB；G線 从保守全留变为可测算，另累计 1.03 GB 动态映射保守保留防误裁） |
 
@@ -20,7 +20,7 @@
 
 ### 1.2 解法（三层，按序尝试）
 
-1. **CxEncryption VM**（`gar_tool/peel.py` + `mod_all.json` 方案表）：春/天色/九次九日匹配到 MOD(518,77) 方案，VM 密钥流直接完美解开大多数顽固文件（freecamera/sysmenu/version/maplist 全部 0 坏字节）。
+1. **CxEncryption VM**（`peel.py` + `mod_all.json` 方案表；两者均未入库）：春/天色/九次九日匹配到 MOD(518,77) 方案，VM 密钥流直接完美解开大多数顽固文件（freecamera/sysmenu/version/maplist 全部 0 坏字节）。
 2. **结构分常量模型**（新章/雪色参数 (0x204,1211) 在 MOD 无条目）：头/尾密钥均以 **KAG 结构分**选取——关键教训：**坏字数对尾段无效**（半角假名永远"合法"），必须用 `[tag]`/`storage=`/ASCII 结构密度打分。
 3. **小文件首字节启发式**：bo≥n 的 <512B 小文件结构分不可靠，要求解密结果首字节为 `*`/`;`/`[`/`@` 且坏字符≤1（dummy_scene.ks 由此以 kh=0xEA 解开，内容为 `*dummy| シーン回想ダミー @msgoff @endrecollection`，**零引用存根**）。
 
@@ -78,7 +78,7 @@
 ### 解法：`ks_reextract.py` 按归档真实结构重提取
 
 ```bash
-python gar_tool/ks_reextract.py "G線上の魔王解包"   # 解压段原样落地，不涂任何东西
+python tools/ks_reextract.py "G線上の魔王解包"   # 解压段原样落地，不涂任何东西
 ```
 **118/118 全部成功**（116 强解码 + 2 个 `@iscript` 重的文件弱接受），输出到 `G線上の魔王解包_脚本修复/`。
 
@@ -191,10 +191,10 @@ G線 用自定义宏集且**调用不带括号**（行尾即止），TAG_RE 要�
 
 ```bash
 # 1) 补解 9nine 加密脚本（只读原归档，输出 <游戏>_脚本修复/）
-python gar_tool/ks_fix9.py
+python tools/ks_fix9.py
 # 2) G線 重提取（假加密，按归档真实结构取明文）
-python gar_tool/ks_reextract.py "G線上の魔王解包"
+python tools/ks_reextract.py "G線上の魔王解包"
 # 3) 引用提取 + ④ 测算（自动回退读取各 _脚本修复/ 目录）
-python gar_tool/ks_refs.py --all --json gar_tool/ks_refs_out.json
-python gar_tool/ks_refs.py "<某个解包目录>"     # 单款
+python tools/ks_refs.py --all --json tools/ks_refs_out.json
+python tools/ks_refs.py "<某个解包目录>"     # 单款
 ```

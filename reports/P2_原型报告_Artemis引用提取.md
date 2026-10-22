@@ -4,8 +4,8 @@
 |---|---|
 | 日期 | 2026-10-16 |
 | 执行 | 接手 agent（P2 第二个引擎；按体积 ROI 排序第二个） |
-| 脚本 | `gar_tool/ast_refs.py`（新增；复用 ks_refs 匹配/保守保留，CS2 的 E-mote 口径） |
-| 数据 | `gar_tool/ast_refs_out.json` |
+| 脚本 | `tools/ast_refs.py`（新增；复用 ks_refs 匹配/保守保留，CS2 的 E-mote 口径） |
+| 数据 | `tools/ast_refs_out.json` |
 | 对应 | 05 文档 P2；**未做** IR/回放器/打包 |
 | 结论 | Artemis 3 款池 39.67 GB → **④ 23.25 GB（58.6%），可裁 16.42 GB**；另剥出 E-mote **4.78 GB**（不复刻，可删） |
 
@@ -94,6 +94,6 @@ BGM 0.66 + 音效 0.05；たねつみ＝图片 3.51 + 语音 0.38 + BGM 0.13。
 ## 8. 复跑方式
 
 ```bash
-python gar_tool/ast_refs.py --all --json gar_tool/ast_refs_out.json
-python gar_tool/ast_refs.py "<某个解包目录>"
+python tools/ast_refs.py --all --json tools/ast_refs_out.json
+python tools/ast_refs.py "<某个解包目录>"
 ```

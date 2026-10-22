@@ -1,7 +1,7 @@
 // Package kirikiri 实现 KiriKiri / XP3 引擎适配器。
 //
 // 对应 docs/04 引擎适配器接口规范 与 P0 任务（KiriKiri 脚本解析 + 引用裁剪）。
-// 格式要点（2026-10 实测，见 gar_tool/probe_xp3.py 与各 README_解包说明.md）：
+// 格式要点（2026-10 实测，见 tools/probe_xp3.py 与各 README_解包说明.md）：
 //
 //	XP3 归档：
 //	  头部 11 字节魔数 "XP3\r\n \n\x1a\x8bg\x01"，0x0B 处 int64 LE 为索引偏移；

@@ -1,6 +1,6 @@
 // Package prune 引用裁剪器：把脚本引用匹配到解包树真实文件。
 //
-// 对应 docs/05 阶段 C。匹配规则（P0 实测驱动，同 gar_tool/ks_refs.py）：
+// 对应 docs/05 阶段 C。匹配规则（P0 实测驱动，同 tools/ks_refs.py）：
 //  1. 精确 relpath 命中
 //  2. 补全常见扩展名（tlg/png/ogg/hg3…）
 //  3. basename 唯一命中
