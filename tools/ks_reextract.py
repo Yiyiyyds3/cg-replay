@@ -19,6 +19,7 @@ import zlib
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 except Exception:
     pass
 
@@ -27,7 +28,7 @@ import probe_xp3 as P
 from ks_refs import decode_ks, weak_ok
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-G = r"<GAMES_ROOT>"
+G = os.environ.get("UCGR_GAME_ROOT", "")
 
 
 def entry_raw(f, e):
@@ -84,8 +85,10 @@ def run_game(game, arc_base):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("game", help="游戏解包目录名，如 G線上の魔王解包")
-    ap.add_argument("--base", help="归档根目录（默认 <GAMES_ROOT>/<同名无解包后缀>）")
+    ap.add_argument("--base", help="归档根目录（默认 UCGR_GAME_ROOT/<同名无解包后缀>）")
     args = ap.parse_args()
+    if not args.base and not G:
+        ap.error("未指定归档根目录：请用 --base 或设置环境变量 UCGR_GAME_ROOT")
     base = args.base or os.path.join(G, args.game.replace("解包", ""))
     if not os.path.isdir(base):
         print("归档目录不存在: %s" % base)

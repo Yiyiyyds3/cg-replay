@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """ks_fix9.py v2 —— 修复 9nine 五章中「解密不完整」的 .ks 脚本（只读原归档，输出到新目录）
 
+状态：暂存。依赖未入库的 tools/peel.py（本地也没有），当前无法运行；保留原位以便恢复。
+
 2026-10-15 实证结论：
   * 前人管线按「bo 分段常量 XOR」解密了大部分 .ks，但文本无例外点修复、
     尾段密钥常选错（maplist.ks 正确 kt=0x02，前人选了 0x27 → bo 后全文乱码）。
@@ -28,6 +30,7 @@ import zlib
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 except Exception:
     pass
 
@@ -37,7 +40,7 @@ from ks_refs import decode_ks, _kag_score, _sjis_repair, weak_ok
 from peel import Layer, M32
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-G = r"<GAMES_ROOT>"
+G = os.environ.get("UCGR_GAME_ROOT", "")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # 游戏 → (归档根, MASK, OFFSET, 卷, MOD匹配标题或None)
@@ -237,6 +240,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("game", nargs="?", help="只跑某一章")
     args = ap.parse_args()
+    if not G:
+        ap.error("未设置环境变量 UCGR_GAME_ROOT（游戏库根目录）")
     games = [args.game] if args.game else list(CHAPTERS)
     tf = tl = 0
     for g in games:

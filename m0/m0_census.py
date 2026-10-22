@@ -10,7 +10,7 @@
   其它      ：存档 / 补丁备份 / 散落影片 / 说明文本 / 安装包等（不计入三类）
 另flag：源目录内的「解包输出/原始归档解包/_分类」重复解包树（避免与③重复计数）。
 
-③解包产物取自 gar_tool/engine_dist_verify.json（上一轮已测）。
+③解包产物取自 m0/engine_dist_verify.json（上一轮已测）。
 灰色的有闲源目录已不在盘上 → ①②缺失，仅③。
 """
 import json
@@ -19,10 +19,11 @@ import sys
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 except Exception:
     pass
 
-G = r"<GAMES_ROOT>"
+G = os.environ.get("UCGR_GAME_ROOT", "")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DIST_JSON = os.path.join(HERE, "engine_dist_verify.json")
 GB = 1024.0 ** 3
@@ -119,6 +120,10 @@ def measure(src):
 
 
 def main():
+    if not G:
+        sys.exit("未设置环境变量 UCGR_GAME_ROOT（游戏库根目录）")
+    if not os.path.isfile(DIST_JSON):
+        sys.exit("缺少 m0/engine_dist_verify.json（本地生成，未入库）：请先运行 python tools/verify_engine_dist.py --root <解包根目录> --json m0/engine_dist_verify.json")
     dist = json.load(open(DIST_JSON, encoding="utf-8"))["games"]
     rows = []
     missing = []

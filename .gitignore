@@ -124,6 +124,9 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
+# 本地生成的分析数据：engine_dist 的 JSON 含本机解包根路径，不入库（需要时在本地重新生成）
+m0/engine_dist_verify.json
+tools/*_out.json
 
 # ------------------------------------------------------------
 # 9. 大型测试样本（仅允许 <1MB 脱敏样本入库）

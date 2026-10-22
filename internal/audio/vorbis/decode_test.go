@@ -9,10 +9,6 @@ import (
 	"testing"
 )
 
-// refDir 是 PyAV 生成的参考 PCM 目录。
-const refDir = `<TMP>\ref`
-
-// TestDecodeRogoAgainstReference 解码 rogo.ogg 并与 PyAV 的 s16 参考逐样本对比。
 // TestDecodeCorpus 解码目录下所有 .ogg，验证真实语料不 panic、帧数非 0。
 // 需要设置 UCGR_OGG_DIR 指向语料根；默认跳过。
 func TestDecodeCorpus(t *testing.T) {
@@ -68,10 +64,16 @@ func TestDecodeCorpus(t *testing.T) {
 		len(files), short, failed, channels)
 }
 
+// TestDecodeRogoAgainstReference 解码 rogo.ogg 并与 PyAV 的 s16 参考逐样本对比。
+// 需要设置 UCGR_OGG 与 UCGR_REF_DIR；默认跳过。
 func TestDecodeRogoAgainstReference(t *testing.T) {
 	ogg := os.Getenv("UCGR_OGG")
 	if ogg == "" {
 		t.Skip("未设置 UCGR_OGG")
+	}
+	refDir := os.Getenv("UCGR_REF_DIR")
+	if refDir == "" {
+		t.Skip("未设置 UCGR_REF_DIR（PyAV 生成的参考 PCM 目录）")
 	}
 	refPath := filepath.Join(refDir, "rogo.s16")
 	ref, err := os.ReadFile(refPath)

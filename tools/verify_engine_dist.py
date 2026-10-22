@@ -17,9 +17,9 @@
   Kid(AFS)   : .afs / .bip / .t2p
   Siglus(Aug): 以 exe/dll 线索在原始目录才有；解包产物按 .arc(SIG) 由人工复核
 
-用法：
-  python verify_engine_dist.py                 # 扫描并打印汇总
-  python verify_engine_dist.py --json out.json # 同时落盘 JSON
+用法（解包根目录取自 --root，缺省读取环境变量 UCGR_UNPACK_ROOT）：
+  python verify_engine_dist.py --root <解包根目录>                 # 扫描并打印汇总
+  python verify_engine_dist.py --root <解包根目录> --json out.json # 同时落盘 JSON
 """
 import argparse
 import json
@@ -29,11 +29,9 @@ from collections import Counter
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 except Exception:
     pass
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 6ab13... 任务目录
-ROOT = r"<TRAE_TASK_DIR>"
 
 # 引擎 → 签名扩展名（强证据）
 SIG_EXT = {
@@ -130,11 +128,16 @@ def decide(rec):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=os.environ.get("UCGR_UNPACK_ROOT"),
+                    help="解包根目录（其下为 *解包 子目录）；缺省读取环境变量 UCGR_UNPACK_ROOT")
     ap.add_argument("--json", dest="json_path", default=None)
     args = ap.parse_args()
+    if not args.root:
+        ap.error("未指定解包根目录：请用 --root 或设置环境变量 UCGR_UNPACK_ROOT")
+    root = args.root
 
-    names = sorted(d for d in os.listdir(ROOT)
-                   if os.path.isdir(os.path.join(ROOT, d)) and d.endswith("解包"))
+    names = sorted(d for d in os.listdir(root)
+                   if os.path.isdir(os.path.join(root, d)) and d.endswith("解包"))
     print("解包目录数: %d" % len(names))
     print()
 
@@ -142,7 +145,7 @@ def main():
     dist = Counter()
     amb = []
     for name in names:
-        gdir = os.path.join(ROOT, name)
+        gdir = os.path.join(root, name)
         rec = scan_game(gdir)
         eng, why = decide(rec)
         rec["engine"] = eng
@@ -176,7 +179,7 @@ def main():
 
     if args.json_path:
         out = {
-            "root": ROOT,
+            "root": root,
             "games": {nm: {k: v for k, v in rec.items()} for nm, rec in rows},
             "distribution": dict(dist),
         }
