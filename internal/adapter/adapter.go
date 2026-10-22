@@ -30,6 +30,10 @@ type ArchiveEntry struct {
 	UncompressedSize int64       `json:"uncompressed_size"`  // 解压后大小（未压缩时同 Size）
 	Encrypted        bool        `json:"encrypted"`          // 是否加密
 	KeyHint          string      `json:"key_hint,omitempty"` // 加密算法线索（如 XP3 的 adlr）
+	// Hash XP3 的 adlr 块：条目名的 Adler32。**它只是校验和，不等于加密**——
+	// 很多游戏带 adlr 但数据是明文。加密方案（HashCrypt 等）用它派生 XOR 密钥。
+	Hash    uint32 `json:"hash,omitempty"`
+	HasHash bool   `json:"has_hash,omitempty"`
 }
 
 // ScriptCtx 脚本解析上下文。

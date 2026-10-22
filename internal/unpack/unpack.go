@@ -122,15 +122,27 @@ func Preview(root string) (*Plan, error) {
 	return planEngine(engine, archives)
 }
 
+// Options 解包选项（解密方案等）。
+type Options struct {
+	Scope   Scope  // 取材范围
+	Decrypt Scheme // 解密方案（空 = 不解密）
+	Key     byte   // 固定密钥（SchemeXor 用）
+}
+
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
 func Extract(root, dest string, scope Scope) (*Result, error) {
+	return ExtractWith(root, dest, Options{Scope: scope})
+}
+
+// ExtractWith 按选项解包。
+func ExtractWith(root, dest string, opts Options) (*Result, error) {
 	root = strings.TrimSpace(root)
 	dest = strings.TrimSpace(dest)
 	if root == "" || dest == "" {
 		return nil, fmt.Errorf("解包需要源路径与目标目录")
 	}
-	if scope == "" {
-		scope = ScopeCG
+	if opts.Scope == "" {
+		opts.Scope = ScopeCG
 	}
 	st, err := os.Stat(root)
 	if err != nil {
@@ -155,13 +167,13 @@ func Extract(root, dest string, scope Scope) (*Result, error) {
 		if len(archives) == 0 {
 			return nil, fmt.Errorf("没找到 %s 引擎的归档文件", engine)
 		}
-		return extractEngine(engine, archives, dest, scope)
+		return extractEngine(engine, archives, dest, opts)
 	}
 	engine := detectEngine(root)
 	if engine == "" {
 		return nil, fmt.Errorf("认不出 %s 的引擎", filepath.Base(root))
 	}
-	return extractEngine(engine, []string{root}, dest, scope)
+	return extractEngine(engine, []string{root}, dest, opts)
 }
 
 // planEngine 按引擎预览。
@@ -216,7 +228,9 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 	}
 	p.Refs = len(refs)
 	if p.Encrypted > 0 {
-		p.Notes = append(p.Notes, fmt.Sprintf("有 %d 个加密条目（需要该作密钥），这部分不会被解出", p.Encrypted))
+		p.Notes = append(p.Notes, fmt.Sprintf(
+			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
+			p.Encrypted))
 	}
 	if p.Unsupported {
 		p.Notes = append(p.Notes, p.Reason)
@@ -225,7 +239,8 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 }
 
 // extractEngine 按引擎解包并写出最小集合。
-func extractEngine(engine string, archives []string, dest string, scope Scope) (*Result, error) {
+func extractEngine(engine string, archives []string, dest string, opts Options) (*Result, error) {
+	scope := opts.Scope
 	deps, ok := engineFor(engine)
 	if !ok {
 		return nil, fmt.Errorf("引擎 %s 暂不支持自动解包", engine)
@@ -236,7 +251,9 @@ func extractEngine(engine string, archives []string, dest string, scope Scope) (
 	}
 	defer assets.close()
 
-	res := &Result{Dest: dest, EngineID: engine, Encrypted: assets.encrypted}
+	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
+	// 也可能只是校验和（解出来是乱码时再选解密方案）。
+	res := &Result{Dest: dest, EngineID: engine}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
 		if !deps.IsScript(path) {
@@ -246,6 +263,16 @@ func extractEngine(engine string, archives []string, dest string, scope Scope) (
 		if err != nil {
 			res.Warnings = append(res.Warnings, fmt.Sprintf("读 %s 失败：%v", e.base(), err))
 			continue
+		}
+		// 解密（解压之后，与 arc_unpacker 同口径）。adlr 只是校验和，
+		// 没选方案时按明文处理——很多游戏带 adlr 但内容是明文。
+		if opts.Decrypt != SchemeNone {
+			plain, derr := ApplyDecrypt(opts.Decrypt, e.segs[0], data, opts.Key)
+			if derr != nil {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("%s 解密失败：%v", e.base(), derr))
+				continue
+			}
+			data = plain
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
@@ -285,13 +312,23 @@ func extractEngine(engine string, archives []string, dest string, scope Scope) (
 			res.Missing = append(res.Missing, ref)
 			continue
 		}
-		if e.encrypted {
-			continue // 已在 Encrypted 里报告
+		if e.encrypted && opts.Decrypt == SchemeNone {
+			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
+			// 真解不开时上面的解析失败告警会指出。
+			res.Encrypted = append(res.Encrypted, e.path)
 		}
 		data, err := assets.read(e)
 		if err != nil {
 			res.Warnings = append(res.Warnings, fmt.Sprintf("读素材 %s 失败：%v", e.base(), err))
 			continue
+		}
+		if opts.Decrypt != SchemeNone {
+			plain, derr := ApplyDecrypt(opts.Decrypt, e.segs[0], data, opts.Key)
+			if derr != nil {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("%s 解密失败：%v", e.base(), derr))
+				continue
+			}
+			data = plain
 		}
 		p := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

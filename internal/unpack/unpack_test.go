@@ -18,7 +18,8 @@ import (
 type xp3File struct {
 	path string
 	data []byte
-	enc  bool // 标记为加密条目（阶段 1 不解，跳过并报告）
+	enc  bool   // 写 adlr 块（真实 XP3 里 adlr = 条目名的 Adler32 校验和）
+	hash uint32 // adlr 里的哈希值（默认按名字算 Adler32）
 }
 
 // writeXP3 写一个最小可解析的 XP3 归档。
@@ -63,6 +64,16 @@ func writeXP3(t *testing.T, path string, files []xp3File) {
 			binary.Write(&segm, binary.LittleEndian, uint64(len(f.data)))
 			binary.Write(&segm, binary.LittleEndian, uint64(len(f.data)))
 			writeChunk(&fileChunk, sigSegm, segm.Bytes())
+			if f.enc {
+				// adlr 块：u32 哈希（真实 XP3 里是条目名的 Adler32）。
+				h := f.hash
+				if h == 0 {
+					h = adler32(f.path)
+				}
+				var adlr bytes.Buffer
+				binary.Write(&adlr, binary.LittleEndian, h)
+				writeChunk(&fileChunk, sigAdlr, adlr.Bytes())
+			}
 			writeChunk(&table, sigFile, fileChunk.Bytes())
 		}
 		return table, data.Bytes()
@@ -103,7 +114,28 @@ const (
 	sigFile = 0x656C6946 // "File"
 	sigInfo = 0x6F666E69 // "info"
 	sigSegm = 0x6D676573 // "segm"
+	sigAdlr = 0x726C6461 // "adlr"
 )
+
+// adler32 计算条目名的 Adler32（XP3 的 adlr 块内容）。
+func adler32(s string) uint32 {
+	const mod = 65521
+	var a, b uint32 = 1, 0
+	for i := 0; i < len(s); i++ {
+		a = (a + uint32(s[i])) % mod
+		b = (b + a) % mod
+	}
+	return (b << 16) | a
+}
+
+// xorBytes 用单字节密钥 XOR（造加密夹具用）。
+func xorBytes(data []byte, key byte) []byte {
+	out := make([]byte, len(data))
+	for i := range data {
+		out[i] = data[i] ^ key
+	}
+	return out
+}
 
 func writeChunk(buf *bytes.Buffer, magic uint32, payload []byte) {
 	binary.Write(buf, binary.LittleEndian, magic)
@@ -255,7 +287,7 @@ func TestUnpackScopeAllIncludesSceneRefs(t *testing.T) {
 	}
 }
 
-func TestUnpackEncryptedEntryReportedNotFatal(t *testing.T) {
+func TestUnpackAdlrEntryTreatedAsPlaintext(t *testing.T) {
 	dir := t.TempDir()
 	xp3 := filepath.Join(dir, "data.xp3")
 	writeXP3(t, xp3, []xp3File{
@@ -263,28 +295,72 @@ func TestUnpackEncryptedEntryReportedNotFatal(t *testing.T) {
 		{path: "data/image/cg001_a.png", data: []byte("PNG-1"), enc: true},
 		{path: "data/image/cg002_a.png", data: []byte("PNG-2")},
 	})
-	// 预览要报出加密条目数。
+	// 预览要报出带 adlr 的条目数（它是校验和，不等于加密）。
 	p, err := Preview(dir)
 	if err != nil {
-		t.Fatalf("Plan: %v", err)
+		t.Fatalf("Preview: %v", err)
 	}
 	if p.Encrypted != 1 {
-		t.Fatalf("加密条目数 = %d, want 1", p.Encrypted)
+		t.Fatalf("带 adlr 的条目数 = %d, want 1", p.Encrypted)
 	}
-	if len(p.Notes) == 0 {
-		t.Fatal("预览应说明有加密条目（不静默）")
-	}
-	// 解包：加密条目跳过但整体成功，其余照解。
+	// 默认（不选方案）：带 adlr 的条目**照常按明文解出**（不能因为有 adlr 就跳过）。
 	dest := filepath.Join(t.TempDir(), "game")
 	res, err := Extract(dir, dest, ScopeCG)
 	if err != nil {
-		t.Fatalf("加密条目不应让整体失败：%v", err)
+		t.Fatalf("解包不应失败：%v", err)
 	}
+	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "cg001_a.png")); err != nil {
+		t.Fatalf("带 adlr 的条目应照常解出（adlr 只是校验和）：%v", err)
+	}
+	// 但要记下来提示「若解出的是乱码可选解密方案」。
 	if len(res.Encrypted) != 1 {
-		t.Fatalf("应报告 1 个加密条目：%+v", res)
+		t.Fatalf("应记录 1 个带 adlr 的条目：%+v", res)
 	}
-	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "cg002_a.png")); err != nil {
-		t.Fatalf("未加密的图应解出：%v", err)
+}
+
+// TestUnpackDecryptScheme 选对方案时，加密条目能解出正确内容。
+func TestUnpackDecryptScheme(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	// 剧本被「用 adlr 哈希派生的单字节密钥」加密（HashCrypt 家族的做法）。
+	hash := adler32("data/scenario/cgrai00.ks")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/cgrai00.ks", data: xorBytes([]byte(galleryKS), byte(hash)), enc: true, hash: hash},
+		{path: "data/image/cg001_a.png", data: []byte("PNG-1")},
+	})
+
+	// 不选方案：解析失败（乱码），要有告警而不是静默。
+	destPlain := filepath.Join(t.TempDir(), "plain")
+	resPlain, err := Extract(dir, destPlain, ScopeCG)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	if len(resPlain.Warnings) == 0 {
+		t.Fatal("未解密时应告警（脚本解析失败），不能静默")
+	}
+
+	// 选 hash 方案：解出正确内容，事件数与明文一致。
+	scheme, err := SchemeFromString("hash")
+	if err != nil {
+		t.Fatalf("SchemeFromString: %v", err)
+	}
+	dest := filepath.Join(t.TempDir(), "dec")
+	res, err := ExtractWith(dir, dest, Options{Scope: ScopeCG, Decrypt: scheme})
+	if err != nil {
+		t.Fatalf("ExtractWith: %v", err)
+	}
+	if res.Events != 2 {
+		t.Fatalf("解密后事件数 = %d, want 2：%+v", res.Events, res)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("解密后不应有告警：%+v", res.Warnings)
+	}
+	got, err := os.ReadFile(filepath.Join(dest, "raw", "data", "scenario", "cgrai00.ks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, []byte(galleryKS)) {
+		t.Fatalf("解密后的剧本内容与明文不一致")
 	}
 }
 

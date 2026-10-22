@@ -191,6 +191,8 @@ export const api = {
     bridge().UnpackPreview(path) as Promise<UnpackPlanDTO>,
   unpackImport: (path: string) =>
     bridge().UnpackImport(path) as Promise<UnpackImportDTO>,
+  unpackImportDecrypt: (path: string, scheme: string, key: number) =>
+    bridge().UnpackImportDecrypt(path, scheme, key) as Promise<UnpackImportDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,

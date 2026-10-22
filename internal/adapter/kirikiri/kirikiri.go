@@ -269,7 +269,11 @@ func parseIndexTable(table []byte) ([]adapter.ArchiveEntry, error) {
 		for _, s := range r.segs {
 			s.Path = name
 			s.Encrypted = r.enc
+			s.Hash = r.hash
+			s.HasHash = r.hasHash
 			if r.enc {
+				// adlr 块 = 条目名的 Adler32 校验和，**不保证数据被加密**
+				// （很多游戏带 adlr 但内容是明文）。是否加密要看解包时选的方案。
 				s.KeyHint = "adlr"
 			}
 			out = append(out, s)

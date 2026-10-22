@@ -71,12 +71,31 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 	}, nil
 }
 
+// UnpackImportDecrypt 带解密方案地解包（方案名见 unpack.SchemeFromString；
+// 固定密钥 key 供 "xor" 方案用；其余方案由条目自身的 adlr 派生密钥）。
+func (a *App) UnpackImportDecrypt(path, scheme string, key int) (*UnpackImportDTO, error) {
+	sc, err := unpack.SchemeFromString(scheme)
+	if err != nil {
+		return nil, err
+	}
+	return a.unpackImport(path, unpack.Options{
+		Scope:   unpack.ScopeCG,
+		Decrypt: sc,
+		Key:     byte(key),
+	})
+}
+
 // UnpackImport 解包并登记：解出最小集合 → 写进每用户数据目录 → 登记为游戏。
 //
 // 目标目录固定为 `%LOCALAPPDATA%\cgreplay-ui\games\<源路径 id>`，同一份源
 // 重复导入落在同一处（幂等）。登记时以**解包产物目录**为游戏根目录，
 // 播放器直接就能读。
 func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
+	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG})
+}
+
+// unpackImport 真正的解包 + 登记流程（两种入口共用）。
+func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, error) {
 	src := strings.TrimSpace(path)
 	if src == "" {
 		return nil, fmt.Errorf("没有选择要导入的路径")
@@ -95,7 +114,7 @@ func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
 	// 目标目录：按源路径 id 固定，重复导入幂等。
 	id := registry.IDFor(src)
 	dest := filepath.Join(dataDir(), "games", id)
-	res, err := unpack.Extract(src, dest, unpack.ScopeCG)
+	res, err := unpack.ExtractWith(src, dest, opts)
 	if err != nil {
 		return nil, err
 	}

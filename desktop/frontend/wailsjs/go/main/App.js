@@ -154,6 +154,10 @@ export function UnpackImport(arg1) {
   return window['go']['main']['App']['UnpackImport'](arg1);
 }
 
+export function UnpackImportDecrypt(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UnpackImportDecrypt'](arg1, arg2, arg3);
+}
+
 export function UnpackPreview(arg1) {
   return window['go']['main']['App']['UnpackPreview'](arg1);
 }
