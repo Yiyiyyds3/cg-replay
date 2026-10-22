@@ -3,28 +3,37 @@
 // 目标（用户提出的方向）：拖一个 galgame 进来 → 自动识别引擎 → 解出
 // **只够重演 CG 事件**的最小集合 → 写成现有加载器能直接吃的目录 → 登记入库。
 //
-// 阶段 1 覆盖 KiriKiri（XP3）：
-//   - 未加密的 XP3：完整支持（多段拼接 + zlib 解压 + 依赖闭包 + 落盘）。
+// 引擎支持现状（阶段 1/2）：
+//   - KiriKiri（XP3）：完整支持（多段拼接 + zlib 解压 + 依赖闭包 + 落盘）。
+//   - Artemis（PFS + 明文 Lua .ast）/ BGI（ARC + .bs）：能解出最小集合，
+//     但**事件库接入（登记进游戏库）仍只支持 KiriKiri**（library.Scan 是
+//     KiriKiri 形状的）。
+//   - CatSystem2：脚本格式尚未接入解析 → 无从算闭包，明确报「暂不支持」。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
-//   - 已解包目录：无需解包，直接登记。
 //
 // 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
 // 所以解包产物能直接被 library.Scan + replay.GameLoader 消费，不需要改加载侧。
 package unpack
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"ucgr/internal/adapter"
 )
+
+// errNoScriptParser 引擎没有脚本解析能力（算不出依赖闭包 → 不能做最小集合）。
+var errNoScriptParser = errors.New("该引擎的剧本格式尚未接入解析，无法计算「只够重演」的依赖闭包")
 
 // Scope 最小集合的取材范围。
 type Scope string
 
 const (
-	// ScopeCG 只要重演 CG 事件所需（默认）：画廊脚本 + 它们引用的图。
+	// ScopeCG 只要重演 CG 事件所需（默认）：事件脚本 + 它们引用的图。
 	ScopeCG Scope = "cg"
 	// ScopeAll 全部事件所需：所有场景/段落脚本引用到的素材。
 	ScopeAll Scope = "all"
@@ -34,7 +43,7 @@ const (
 type Plan struct {
 	EngineID      string   `json:"engine_id"`
 	Root          string   `json:"root"`
-	Kind          string   `json:"kind"`           // loose=已是解包目录 / xp3=XP3 归档
+	Kind          string   `json:"kind"`           // loose=已是解包目录 / archive=归档
 	Archives      []string `json:"archives"`       // 发现的归档
 	ScenarioFiles int      `json:"scenario_files"` // 剧本文件数
 	Labels        int      `json:"labels"`         // 事件（标签）数
@@ -68,16 +77,16 @@ func Preview(root string) (*Plan, error) {
 		return nil, fmt.Errorf("读不到 %s：%w", root, err)
 	}
 	if !st.IsDir() {
-		// 单个归档文件。
-		if strings.EqualFold(filepath.Ext(root), ".xp3") {
-			return kirikiriPlan([]string{root})
+		engine := detectEngine(root)
+		if engine == "" {
+			return &Plan{
+				Root:        root,
+				Kind:        "file",
+				Unsupported: true,
+				Reason:      fmt.Sprintf("认不出 %s 的引擎（支持的归档后缀：%s）", filepath.Base(root), archiveExtsHint()),
+			}, nil
 		}
-		return &Plan{
-			Root:        root,
-			Kind:        "file",
-			Unsupported: true,
-			Reason:      fmt.Sprintf("暂不支持直接解 %s 这样的单文件（阶段 1 只做 XP3 与已解包目录）", filepath.Ext(root)),
-		}, nil
+		return planEngine(engine, []string{root})
 	}
 	// 已是解包目录？
 	if st, err := os.Stat(filepath.Join(root, "raw", "data", "scenario")); err == nil && st.IsDir() {
@@ -88,7 +97,16 @@ func Preview(root string) (*Plan, error) {
 			Notes:    []string{"这已经是解包目录，直接登记即可（无需解包）"},
 		}, nil
 	}
-	archives, err := findXP3(root)
+	engine := detectEngine(root)
+	if engine == "" {
+		return &Plan{
+			Root:        root,
+			Kind:        "unknown",
+			Unsupported: true,
+			Reason:      "这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）",
+		}, nil
+	}
+	archives, err := findArchives(root, engine)
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +114,12 @@ func Preview(root string) (*Plan, error) {
 		return &Plan{
 			Root:        root,
 			Kind:        "unknown",
+			EngineID:    engine,
 			Unsupported: true,
-			Reason:      "这个目录里没找到 .xp3 归档，也没找到已解包结构（raw/data/scenario）",
+			Reason:      fmt.Sprintf("认出是 %s 引擎，但目录里没有它的归档文件", engine),
 		}, nil
 	}
-	return kirikiriPlan(archives)
+	return planEngine(engine, archives)
 }
 
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
@@ -125,23 +144,190 @@ func Extract(root, dest string, scope Scope) (*Result, error) {
 				Warnings: []string{"源目录已是解包结构，未做复制（直接登记即可）"},
 			}, nil
 		}
-		archives, err := findXP3(root)
+		engine := detectEngine(root)
+		if engine == "" {
+			return nil, fmt.Errorf("认不出这个目录的引擎")
+		}
+		archives, err := findArchives(root, engine)
 		if err != nil {
 			return nil, err
 		}
 		if len(archives) == 0 {
-			return nil, fmt.Errorf("没找到 .xp3 归档")
+			return nil, fmt.Errorf("没找到 %s 引擎的归档文件", engine)
 		}
-		return kirikiriExtract(archives, dest, scope)
+		return extractEngine(engine, archives, dest, scope)
 	}
-	if strings.EqualFold(filepath.Ext(root), ".xp3") {
-		return kirikiriExtract([]string{root}, dest, scope)
+	engine := detectEngine(root)
+	if engine == "" {
+		return nil, fmt.Errorf("认不出 %s 的引擎", filepath.Base(root))
 	}
-	return nil, fmt.Errorf("暂不支持解 %s（阶段 1 只做 XP3 与已解包目录）", filepath.Ext(root))
+	return extractEngine(engine, []string{root}, dest, scope)
 }
 
-// findXP3 在目录里找 XP3 归档（顶层 + 两层子目录，避免扫全盘）。
-func findXP3(root string) ([]string, error) {
+// planEngine 按引擎预览。
+func planEngine(engine string, archives []string) (*Plan, error) {
+	deps, ok := engineFor(engine)
+	if !ok {
+		return &Plan{
+			Root:        strings.Join(archives, " "),
+			Kind:        "archive",
+			Unsupported: true,
+			Reason:      fmt.Sprintf("引擎 %s 暂不支持自动解包", engine),
+		}, nil
+	}
+	assets, err := openArchives(archives, deps.ParseArchive)
+	if err != nil {
+		return nil, err
+	}
+	defer assets.close()
+
+	p := &Plan{
+		EngineID:  engine,
+		Root:      strings.Join(archives, " "),
+		Kind:      "archive",
+		Archives:  archives,
+		Encrypted: len(assets.encrypted),
+	}
+	refs := map[string]bool{}
+	for path, e := range assets.entries {
+		if !deps.IsScript(path) {
+			continue
+		}
+		p.ScenarioFiles++
+		data, err := assets.read(e)
+		if err != nil {
+			p.Notes = append(p.Notes, fmt.Sprintf("读 %s 失败：%v", e.base(), err))
+			continue
+		}
+		info, err := deps.ParseScript(data, e.base())
+		if err != nil {
+			if errors.Is(err, errNoScriptParser) {
+				p.Unsupported = true
+				p.Reason = fmt.Sprintf("%s 引擎的剧本格式尚未接入解析，无法算「只够重演」的依赖闭包；可手动解包后用「添加游戏」登记", engine)
+				continue
+			}
+			p.Notes = append(p.Notes, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
+			continue
+		}
+		p.Labels += len(info.Labels)
+		for _, r := range info.Refs {
+			refs[r] = true
+		}
+	}
+	p.Refs = len(refs)
+	if p.Encrypted > 0 {
+		p.Notes = append(p.Notes, fmt.Sprintf("有 %d 个加密条目（需要该作密钥），这部分不会被解出", p.Encrypted))
+	}
+	if p.Unsupported {
+		p.Notes = append(p.Notes, p.Reason)
+	}
+	return p, nil
+}
+
+// extractEngine 按引擎解包并写出最小集合。
+func extractEngine(engine string, archives []string, dest string, scope Scope) (*Result, error) {
+	deps, ok := engineFor(engine)
+	if !ok {
+		return nil, fmt.Errorf("引擎 %s 暂不支持自动解包", engine)
+	}
+	assets, err := openArchives(archives, deps.ParseArchive)
+	if err != nil {
+		return nil, err
+	}
+	defer assets.close()
+
+	res := &Result{Dest: dest, EngineID: engine, Encrypted: assets.encrypted}
+	refSet := map[string]bool{}
+	for path, e := range assets.entries {
+		if !deps.IsScript(path) {
+			continue
+		}
+		data, err := assets.read(e)
+		if err != nil {
+			res.Warnings = append(res.Warnings, fmt.Sprintf("读 %s 失败：%v", e.base(), err))
+			continue
+		}
+		info, err := deps.ParseScript(data, e.base())
+		if err != nil {
+			if errors.Is(err, errNoScriptParser) {
+				return nil, fmt.Errorf("%s 引擎的剧本格式尚未接入解析，无法算依赖闭包；请手动解包后用「添加游戏」登记", engine)
+			}
+			res.Warnings = append(res.Warnings, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
+			continue
+		}
+		if info.Dynamic {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("%s 里有动态素材引用（运行时拼文件名），这部分无法静态收集", e.base()))
+		}
+		refs := info.Refs
+		if scope == ScopeAll {
+			refs = info.AllRefs
+		}
+		for _, r := range refs {
+			refSet[r] = true
+		}
+		// 剧本落盘
+		p := filepath.Join(dest, filepath.FromSlash(deps.ScriptDir), e.base())
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			return nil, err
+		}
+		res.Files++
+		res.Bytes += int64(len(data))
+		res.Events += len(info.Labels)
+	}
+	// 素材落盘（只解被引用的）。
+	for ref := range refSet {
+		e, ok := assets.lookup(ref)
+		if !ok {
+			res.Missing = append(res.Missing, ref)
+			continue
+		}
+		if e.encrypted {
+			continue // 已在 Encrypted 里报告
+		}
+		data, err := assets.read(e)
+		if err != nil {
+			res.Warnings = append(res.Warnings, fmt.Sprintf("读素材 %s 失败：%v", e.base(), err))
+			continue
+		}
+		p := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			return nil, err
+		}
+		res.Files++
+		res.Bytes += int64(len(data))
+	}
+	sort.Strings(res.Missing)
+
+	// 写约定文件（加载器按它找剧本目录）。非 KiriKiri 引擎的画廊/标签规则
+	// 与 KiriKiri 不同，置空——那些字段只在 KiriKiri 的事件切分里用。
+	conv := adapter.Convention{
+		EngineID:    engine,
+		ScenarioDir: deps.ScriptDir,
+		ScriptExt:   deps.ScriptExt,
+	}
+	if engine == "kirikiri" {
+		conv = adapter.DefaultKiriKiri()
+		conv.ScenarioDir = deps.ScriptDir
+	}
+	if err := adapter.SaveConventionFile(dest, conv); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("写约定文件失败：%v", err))
+	}
+	return res, nil
+}
+
+// findArchives 在目录里找某引擎的归档（顶层 + 两层子目录，避免扫全盘）。
+func findArchives(root, engine string) ([]string, error) {
+	deps, ok := engineFor(engine)
+	if !ok {
+		return nil, nil
+	}
 	var out []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -154,8 +340,12 @@ func findXP3(root string) ([]string, error) {
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(path), ".xp3") {
-			out = append(out, path)
+		ext := strings.ToLower(filepath.Ext(path))
+		for _, ae := range deps.ArchiveExts {
+			if ext == strings.ToLower(ae) {
+				out = append(out, path)
+				break
+			}
 		}
 		return nil
 	})
@@ -164,4 +354,14 @@ func findXP3(root string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// archiveExtsHint 支持的归档后缀（给用户看的提示）。
+func archiveExtsHint() string {
+	var exts []string
+	for _, d := range engineRegistry {
+		exts = append(exts, d.ArchiveExts...)
+	}
+	sort.Strings(exts)
+	return strings.Join(exts, " / ")
 }

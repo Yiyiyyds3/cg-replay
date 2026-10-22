@@ -178,7 +178,7 @@ func TestUnpackXP3MinimalSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	if p.Kind != "xp3" || p.EngineID != "kirikiri" {
+	if p.Kind != "archive" || p.EngineID != "kirikiri" {
 		t.Fatalf("Plan = %+v", p)
 	}
 	if p.ScenarioFiles != 2 {

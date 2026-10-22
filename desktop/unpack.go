@@ -99,8 +99,16 @@ func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
 	}
 
 	// 登记进游戏库（以解包产物为根目录）。
+	// 注意：事件库切分（library.Scan）目前是 KiriKiri 形状的——别的引擎
+	// 解出来了也接不进事件库，这种要**明说**，不能报一个含糊的错。
 	lib, err := a.AddGame(dest)
 	if err != nil {
+		if res.EngineID != "kirikiri" {
+			return nil, fmt.Errorf(
+				"已解包（%d 个文件 → %s），但事件库接入目前只支持 KiriKiri：%v；"+
+					"解出的最小集合已就位，等事件库按引擎泛化后即可直接使用",
+				res.Files, dest, err)
+		}
 		return nil, fmt.Errorf("解包成功但登记失败：%w", err)
 	}
 	return &UnpackImportDTO{
