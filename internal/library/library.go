@@ -116,6 +116,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	if strings.EqualFold(conv.EngineID, "artemis") {
 		return ScanArtemis(root, conv)
 	}
+	if strings.EqualFold(conv.EngineID, "bgi") {
+		return ScanBGI(root, conv)
+	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
 	galleryRe := conventionRe(conv.GalleryRe)

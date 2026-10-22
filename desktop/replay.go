@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"ucgr/internal/adapter/artemis"
+	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
@@ -181,6 +182,15 @@ func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
 	return artemis.BuildShowBlock(data, filepath.Base(scriptPath), idx)
 }
 
+// buildBGIShow 构建 BGI 的第 n 个事件演出（Label = 事件序号）。
+func buildBGIShow(scriptPath, ordinal string) (*ir.Event, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(ordinal))
+	if err != nil {
+		return nil, fmt.Errorf("BGI 事件缺序号（%q）", ordinal)
+	}
+	return bgi.BuildShowEventFile(scriptPath, n)
+}
+
 // confAuto 读 conf 里的 auto（与旧 CLI 同字段）。
 func (a *App) confAuto() bool {
 	c, ok := a.loadConf()
@@ -243,6 +253,10 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	case strings.EqualFold(g.Engine, "artemis"):
 		// Artemis：事件单位是剧本里的 block，Label 记 block 序号。
 		ev, err = buildArtemisShow(sp, label)
+	case strings.EqualFold(g.Engine, "bgi"):
+		// BGI：事件由适配器按换背景/换事件切出，Label 记事件序号；
+		// builder 已经产好 Show 台本，直接用。
+		ev, err = buildBGIShow(sp, label)
 	default:
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}
