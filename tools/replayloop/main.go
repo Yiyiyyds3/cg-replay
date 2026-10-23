@@ -1,6 +1,8 @@
 // replayloop：脱离 Wails 桥复现回放会话的压力形态，定位 mutex 长持。
 // 用法：go run ./tools/replayloop <root|.conf> <script> <pos> <secs>
-//   pos>=0 用 BuildShowChapterFile(sp,pos)；-1 用 BuildShowSegment(sp,"")。
+//
+//	pos>=0 用 BuildShowChapterFile(sp,pos)；-1 用 BuildShowSegment(sp,"")。
+//
 // 节奏：60/main 毫秒一次「Advance(墙钟上限200ms)+RenderFrame(1600×1200)+JPEG编码」，
 // 每 2500ms 在 waiting 时注入一次点击推进（与壳层 auto 一致）。
 // 输出：每步耗时、>500ms 步打点、结束时统计 max/p99/持锁最长。

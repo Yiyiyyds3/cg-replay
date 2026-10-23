@@ -37,7 +37,20 @@ except Exception:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import probe_xp3 as P
 from ks_refs import decode_ks, _kag_score, _sjis_repair, weak_ok
-from peel import Layer, M32
+
+# peel.py 未入库（本机也没有）：它是 CxEncryption VM 的参考实现，这里只用来取
+# 密钥流。缺失时明确说明并退出，不抛 traceback——本脚本是「暂存」状态，
+# 代码保留以便日后恢复，但当前不可运行（见 docs/10_本地环境配置.md）。
+try:
+    from peel import Layer, M32
+except ModuleNotFoundError:
+    print(
+        "ks_fix9.py 暂不可用：缺少 tools/peel.py（CxEncryption VM 参考实现，未入库）。\n"
+        "该脚本保留原位以便日后恢复，当前请勿依赖它；"
+        "环境变量与占位符见 docs/10_本地环境配置.md。",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.environ.get("UCGR_GAME_ROOT", "")

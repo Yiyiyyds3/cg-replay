@@ -1,10 +1,11 @@
 // framedump：把一个事件的 n 个采样点 Compose 后做像素 SHA-256 清单。
 // 用途：内核渲染优化前后 diff=0 回归（逐位一致验证）。
 // 用法：go run ./tools/framedump <root|conf> <script> <pos> <label|-> <n>
-//   pos>=0   → BuildShowChapterFile(sp, pos)   // 演出章节
-//   pos ==-1 → BuildShowSegment(sp, "")        // 主线场景
-//   pos ==-2 → BuildShowSegment(sp, label)     // CG
-//   第一参数以 .conf 结尾时从配置文件读 root（避免控制台编码问题）。
+//
+//	pos>=0   → BuildShowChapterFile(sp, pos)   // 演出章节
+//	pos ==-1 → BuildShowSegment(sp, "")        // 主线场景
+//	pos ==-2 → BuildShowSegment(sp, label)     // CG
+//	第一参数以 .conf 结尾时从配置文件读 root（避免控制台编码问题）。
 package main
 
 import (

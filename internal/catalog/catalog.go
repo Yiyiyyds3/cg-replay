@@ -168,6 +168,14 @@ func Open(path string) (*Catalog, error) {
 			_ = db.Close()
 			return nil, fmt.Errorf("catalog 开启 WAL 失败：%w", err)
 		}
+		// 启动时把上次会话残留的 WAL 合并回主库（TRUNCATE）。
+		// 强杀/崩溃退出时 SQLite 不会 checkpoint，WAL 会随每次启动累积
+		// （2026-10-23 体检实测：生产 exe 每次启动 +约 74 KB，主库 139 KB
+		// 一直没并进去）。启动期收敛一次即可，与「优雅退出时 Close」互补。
+		// best-effort：合并失败不影响可用性（WAL 本身是持久的），故忽略错误。
+		// 注意 wal_checkpoint 会返回一行结果，用 QueryRow 取掉，避免 Exec 报错。
+		var busy, logFrames, done int
+		_ = db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logFrames, &done)
 	}
 	if err := migrate(db); err != nil {
 		_ = db.Close()
