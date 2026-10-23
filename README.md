@@ -1,7 +1,7 @@
 # 统一 CG 演出回放库（Unified CG Replay Library）
 
 > 实现仓库 · 架构冻结版 v1.1 · 2026-10-17
-> **技术栈：Wails v3（Go 后端 + 系统 WebView）+ Go 核心 CLI**（2026-10-17 由 Tauri+Rust 切换，AC-2026-1017-01）
+> **技术栈：Wails v2（Go 后端 + 系统 WebView）+ Go 核心 CLI**（2026-10-17 由 Tauri+Rust 切换，AC-2026-1017-01）
 
 ## 这是什么
 
@@ -25,7 +25,7 @@ Unified_CG_Replay_Library/
 │   └── adapter/
 │       ├── adapter.go                 # EngineAdapter 五方法接口 + 注册表
 │       └── kirikiri/kirikiri.go       # KiriKiri 适配器（XP3 解析 + 脚本解码 + 引用提取）
-├── desktop/                           # Wails v3 桌面壳（独立子模块）
+├── desktop/                           # Wails v2 桌面壳（独立子模块）
 │   ├── go.mod                         # replace 指向根模块；就绪后 go mod tidy + wails build
 │   ├── main.go / wails.json
 │   └── frontend/                      # Vite 前端骨架
@@ -76,11 +76,11 @@ bin/ucgr prune <解包目录> <脚本|目录...> --out <目标目录>
 bin/ucgr engines
 ```
 
-桌面壳（Wails v3）：
+桌面壳（Wails v2）：
 
 ```bash
 cd desktop
-go mod tidy        # 拉取 github.com/wailsapp/wails/v3（需网络）
+go mod tidy        # 拉取 github.com/wailsapp/wails/v2（需网络）
 wails build
 ```
 
