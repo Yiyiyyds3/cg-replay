@@ -30,10 +30,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 	"unicode/utf16"
 	"unicode/utf8"
-	"unsafe"
 
 	"ucgr/internal/adapter"
 )
@@ -617,19 +615,12 @@ func decodeSJIS(data []byte) string {
 	if runtime.GOOS != "windows" || len(data) == 0 {
 		return string(data)
 	}
-	k32 := syscall.NewLazyDLL("kernel32.dll")
-	proc := k32.NewProc("MultiByteToWideChar")
 	const cpSJIS = 932
-	n, _, _ := proc.Call(cpSJIS, 0,
-		uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)), 0, 0)
-	if n == 0 {
+	s, err := mbToWide(data, cpSJIS)
+	if err != nil {
 		return string(data)
 	}
-	w := make([]uint16, n)
-	proc.Call(cpSJIS, 0,
-		uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)),
-		uintptr(unsafe.Pointer(&w[0])), uintptr(n))
-	return string(utf16.Decode(w))
+	return s
 }
 
 func tryDecodeSJIS(data []byte) (string, bool) {
