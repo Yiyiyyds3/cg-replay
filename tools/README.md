@@ -43,3 +43,5 @@
 | `m0/engine_dist_verify.json` | `python tools/verify_engine_dist.py --root <解包根目录> --json m0/engine_dist_verify.json` |
 
 `peel.py` 与 `mod_all.json` 未入库，因此 `ks_fix9.py` 标为暂存。
+
+环境变量与占位符（运行上述脚本前需要设置）见 [docs/10_本地环境配置.md](../docs/10_本地环境配置.md)。
