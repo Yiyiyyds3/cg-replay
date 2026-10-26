@@ -27,6 +27,7 @@ import (
 
 	"ucgr/internal/adapter/artemis"
 	"ucgr/internal/adapter/bgi"
+	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
@@ -191,6 +192,15 @@ func buildBGIShow(scriptPath, ordinal string) (*ir.Event, error) {
 	return bgi.BuildShowEventFile(scriptPath, n)
 }
 
+// buildCS2Show 构建 CatSystem2 的 .cst 演出（一份脚本一个事件）。
+func buildCS2Show(scriptPath string) (*ir.Event, error) {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	return catsystem2.BuildShowScript(data, filepath.Base(scriptPath))
+}
+
 // confAuto 读 conf 里的 auto（与旧 CLI 同字段）。
 func (a *App) confAuto() bool {
 	c, ok := a.loadConf()
@@ -257,6 +267,9 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		// BGI：事件由适配器按换背景/换事件切出，Label 记事件序号；
 		// builder 已经产好 Show 台本，直接用。
 		ev, err = buildBGIShow(sp, label)
+	case strings.EqualFold(g.Engine, "catsystem2"):
+		// CS2：一份 .cst 一个事件（无 Label），构建时把 Timeline 转成 Show。
+		ev, err = buildCS2Show(sp)
 	default:
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}

@@ -119,6 +119,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	if strings.EqualFold(conv.EngineID, "bgi") {
 		return ScanBGI(root, conv)
 	}
+	if strings.EqualFold(conv.EngineID, "catsystem2") {
+		return ScanCS2(root, conv)
+	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
 	galleryRe := conventionRe(conv.GalleryRe)
