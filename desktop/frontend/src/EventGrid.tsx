@@ -549,7 +549,7 @@ export default function EventGrid({
       setUnpackResult(null);
       setAllWarnings((w) => [
         ...w,
-        `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个 CG 事件 → ${r.dest}` +
+        `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个事件 → ${r.dest}` +
           (r.missing.length ? ` · ${r.missing.length} 个素材没找到` : "") +
           (r.encrypted.length ? ` · ${r.encrypted.length} 个加密条目未解出` : ""),
       ]);
@@ -786,7 +786,7 @@ export default function EventGrid({
                 {!unpackPlan.unsupported && (
                   <div className="text-[11px] text-muted-foreground">
                     引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
-                    预计 {unpackPlan.labels} 个 CG 事件 · 引用素材 {unpackPlan.refs} 个
+                    预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
                     {unpackPlan.encrypted > 0 &&
                       ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`}
                   </div>
@@ -859,7 +859,7 @@ export default function EventGrid({
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   引擎 {unpackResult.engine_id || "?"} · 解出 {unpackResult.files} 个文件（
-                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个 CG 事件
+                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个事件
                   {unpackResult.missing.length ? ` · ${unpackResult.missing.length} 个素材没找到` : ""}
                   {unpackResult.encrypted.length ? ` · ${unpackResult.encrypted.length} 个加密条目未解出` : ""}
                 </div>
