@@ -1,36 +1,53 @@
-// catsystem2.go —— CatSystem2（KIF 归档 / .cst）：**暂不支持自动解包**。
+// catsystem2.go —— CatSystem2（.int/.kif 归档 + .cst 剧本）解包。
 //
-// 原因（要说清楚，不能只说失败）：CatSystem2 的适配器实现了归档列举
-// （ParseArchive）与 CST 解压（DecompressCST），但**没有脚本解析**——
-// 而「只够重演的最小集合」必须靠解析演出脚本算出资源引用闭包，没有脚本
-// 解析就没有闭包，只能解出整个游戏（那就不叫最小集合了）。
+// 修正（2026-10-26）：此前这里写着「CatSystem2 没有脚本解析」并返回
+// errNoScriptParser —— **那是错的**。适配器从移植时（`2831e19`）就实现了
+// `ParseScript`（CatScene 魔数 + zlib + 条目流）、`(*Ast).ExtractRefs` 与
+// `BuildIR`。本轮把它接进解包流程，四个引擎至此全部可解。
 //
-// 因此这里只注册引擎身份与归档后缀，让 Preview 能认出「这是 CatSystem2」，
-// 并给出可走的退路：手动解包后用「添加游戏」登记（事件库接入见 §4 说明）。
+// 事件粒度：CS2 的 `BuildIR` 是「一份 .cst = 一个事件」（脚本里没有可靠的
+// 场景切换标记），解包侧沿用同一口径 —— 只影响「预计事件数」的展示，不影响
+// 依赖闭包（闭包按整份脚本算）。
 package unpack
 
 import (
 	"path/filepath"
 	"strings"
 
+	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/catsystem2"
 )
 
 func init() {
 	a := &catsystem2.Adapter{}
 	registerEngine(engineDeps{
-		ID:           "catsystem2",
-		ArchiveExts:  []string{".cst"},
+		ID: "catsystem2",
+		// 归档是 KIF（.int 内部包 / .kif 明文包）；.cst 剧本通常在归档里。
+		ArchiveExts:  []string{".int", ".kif"},
 		ParseArchive: a.ParseArchive,
 		IsScript: func(p string) bool {
-			// CatSystem2 的剧本是 .ns2/mit 一类，适配器尚未解析。
-			ext := strings.ToLower(filepath.Ext(p))
-			return ext == ".ns2" || ext == ".mit"
+			return strings.EqualFold(filepath.Ext(p), ".cst")
 		},
 		ParseScript: func(data []byte, name string) (scriptInfo, error) {
-			return scriptInfo{}, errNoScriptParser
+			obj, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: name})
+			if err != nil {
+				return scriptInfo{}, err
+			}
+			ast, ok := obj.(*catsystem2.Ast)
+			if !ok {
+				return scriptInfo{}, errTypeMismatch
+			}
+			refs := dedupSorted(ast.ExtractRefs())
+			// 一脚本一事件（与 BuildIR 口径一致）。
+			return scriptInfo{
+				Labels:  []string{"script"},
+				Refs:    refs,
+				AllRefs: refs,
+			}, nil
 		},
-		ScriptDir: "scenario",
+		ScriptExt: ".cst",
+		// CS2 解包树里剧本在 scene/ 下，素材在 image/ 下。
+		ScriptDir: "scene",
 		ImageDir:  "image",
 	})
 }

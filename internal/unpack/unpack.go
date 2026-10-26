@@ -8,7 +8,8 @@
 //   - Artemis（PFS + 明文 Lua .ast）/ BGI（ARC + .bs）：能解出最小集合，
 //     但**事件库接入（登记进游戏库）仍只支持 KiriKiri**（library.Scan 是
 //     KiriKiri 形状的）。
-//   - CatSystem2：脚本格式尚未接入解析 → 无从算闭包，明确报「暂不支持」。
+//   - CatSystem2（.int/.kif + .cst）：完整支持（2026-10-26 接上；此前误判为
+//     「无脚本解析」）。事件粒度 = 一份 .cst 一个事件（与 BuildIR 同口径）。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
 //
 // 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
@@ -16,7 +17,6 @@
 package unpack
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,9 +25,6 @@ import (
 
 	"ucgr/internal/adapter"
 )
-
-// errNoScriptParser 引擎没有脚本解析能力（算不出依赖闭包 → 不能做最小集合）。
-var errNoScriptParser = errors.New("该引擎的剧本格式尚未接入解析，无法计算「只够重演」的依赖闭包")
 
 // Scope 最小集合的取材范围。
 type Scope string
@@ -213,11 +210,6 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				p.Unsupported = true
-				p.Reason = fmt.Sprintf("%s 引擎的剧本格式尚未接入解析，无法算「只够重演」的依赖闭包；可手动解包后用「添加游戏」登记", engine)
-				continue
-			}
 			p.Notes = append(p.Notes, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
@@ -276,9 +268,6 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				return nil, fmt.Errorf("%s 引擎的剧本格式尚未接入解析，无法算依赖闭包；请手动解包后用「添加游戏」登记", engine)
-			}
 			res.Warnings = append(res.Warnings, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
