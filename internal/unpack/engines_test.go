@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -235,6 +236,37 @@ func TestCatSystem2DetectByArchiveExt(t *testing.T) {
 	for _, name := range []string{"scene.int", "update01.kif"} {
 		if got := detectEngine(name); got != "catsystem2" {
 			t.Errorf("detectEngine(%q) = %q, want catsystem2", name, got)
+		}
+	}
+}
+
+// TestUnpackExplainsWrongContainer 扩展名骗人时要说清「它到底是什么」。
+//
+// 实测踩到：ambitious_mission/update.xp3 其实是 ZIP，Monkeys!!_cn.xp3 其实是
+// EVB（E-mote 产物）。解析器拒绝是对的，但必须给人一句可用的话。
+func TestUnpackExplainsWrongContainer(t *testing.T) {
+	cases := []struct {
+		name string
+		head []byte
+		want string
+	}{
+		{"update.xp3", []byte("PK\x03\x04fake zip body"), "ZIP"},
+		{"Monkeys_cn.xp3", []byte("EVB\x00\x40\x00\x00\x00rest"), "EVB"},
+	}
+	for _, c := range cases {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, c.name), c.head, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		plan, err := Preview(dir)
+		if err != nil {
+			t.Fatalf("%s: Preview 应返回计划而不是错误: %v", c.name, err)
+		}
+		if !plan.Unsupported {
+			t.Fatalf("%s: 应为不支持（%+v）", c.name, plan)
+		}
+		if !strings.Contains(plan.Reason, c.want) {
+			t.Fatalf("%s: 原因里应提到 %s，实际 %q", c.name, c.want, plan.Reason)
 		}
 	}
 }

@@ -186,7 +186,23 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 	}
 	assets, err := openArchives(archives, deps.ParseArchive)
 	if err != nil {
-		return nil, err
+		// 解析失败要说清「它其实是什么」——实测有 .xp3 里装着 ZIP / EVB。
+		hint := ""
+		if len(archives) > 0 {
+			hint = sniffHint(archives[0])
+		}
+		reason := err.Error()
+		if hint != "" {
+			reason += "；" + hint
+		}
+		return &Plan{
+			Root:        strings.Join(archives, " "),
+			Kind:        "archive",
+			EngineID:    engine,
+			Archives:    archives,
+			Unsupported: true,
+			Reason:      reason,
+		}, nil
 	}
 	defer assets.close()
 
@@ -239,6 +255,13 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	}
 	assets, err := openArchives(archives, deps.ParseArchive)
 	if err != nil {
+		hint := ""
+		if len(archives) > 0 {
+			hint = sniffHint(archives[0])
+		}
+		if hint != "" {
+			return nil, fmt.Errorf("%w；%s", err, hint)
+		}
 		return nil, err
 	}
 	defer assets.close()
