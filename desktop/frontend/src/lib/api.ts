@@ -45,6 +45,8 @@ export interface UnpackPlanDTO {
   scenario_files: number;
   labels: number; // 预计的 CG 事件数
   refs: number; // 预计引用到的素材数
+  videos: number; // 其中影片（OP/ED）条目数
+  video_bytes: number; // 影片原始体积（估算）
   encrypted: number;
   notes: string[];
   unsupported: boolean;
@@ -60,6 +62,8 @@ export interface UnpackImportDTO {
   missing: string[];
   encrypted: string[];
   warnings: string[];
+  /** 按「不提取影片」选项跳过的数量 */
+  skipped_video?: number;
   game_id: string;
   /** false = 已解包但事件库接入失败（例如扫描不到事件），产物仍保留在 dest。 */
   connected: boolean;
@@ -189,10 +193,10 @@ export const api = {
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
   unpackPreview: (path: string) =>
     bridge().UnpackPreview(path) as Promise<UnpackPlanDTO>,
-  unpackImport: (path: string) =>
-    bridge().UnpackImport(path) as Promise<UnpackImportDTO>,
-  unpackImportDecrypt: (path: string, scheme: string, key: number) =>
-    bridge().UnpackImportDecrypt(path, scheme, key) as Promise<UnpackImportDTO>,
+  unpackImport: (path: string, skipVideo: boolean) =>
+    bridge().UnpackImport(path, skipVideo) as Promise<UnpackImportDTO>,
+  unpackImportDecrypt: (path: string, scheme: string, key: number, skipVideo: boolean) =>
+    bridge().UnpackImportDecrypt(path, scheme, key, skipVideo) as Promise<UnpackImportDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,

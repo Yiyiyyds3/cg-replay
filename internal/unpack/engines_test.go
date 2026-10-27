@@ -270,3 +270,53 @@ func TestUnpackExplainsWrongContainer(t *testing.T) {
 		}
 	}
 }
+
+// TestUnpackSkipVideo 「不提取影片」开关：影片条目不落盘，其余照常。
+//
+// 动机：单个 OP/ED 就 100~300 MB，全解出来很占盘；很多用户只想看剧情 CG。
+func TestUnpackSkipVideo(t *testing.T) {
+	makeArchive := func(t *testing.T) string {
+		dir := t.TempDir()
+		xp3 := filepath.Join(dir, "data.xp3")
+		ks := "[movie storage=\"op_demo.mpg\"]\n[wait time=100]\n[image storage=\"cg001_a.png\"]\n"
+		writeXP3(t, xp3, []xp3File{
+			{path: "data/scenario/01_movie.ks", data: []byte(ks)},
+			{path: "data/image/cg001_a.png", data: []byte("PNG-1")},
+			{path: "data/movie/op_demo.mpg", data: []byte("MPG-DATA")},
+		})
+		return xp3
+	}
+
+	// 预览要能算出「影片有几个、多大」，用户据此决定。
+	if plan, err := Preview(makeArchive(t)); err != nil {
+		t.Fatalf("Preview: %v", err)
+	} else if plan.Videos != 1 || plan.VideoBytes <= 0 {
+		t.Fatalf("预览应报出影片数与体积，实际 videos=%d bytes=%d", plan.Videos, plan.VideoBytes)
+	}
+
+	for _, skip := range []bool{true, false} {
+		xp3 := makeArchive(t)
+		dest := t.TempDir()
+		res, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll, SkipVideo: skip})
+		if err != nil {
+			t.Fatalf("ExtractWith(skip=%v): %v", skip, err)
+		}
+		movie := filepath.Join(dest, "raw", "data", "image", "op_demo.mpg")
+		_, statErr := os.Stat(movie)
+		if skip {
+			if statErr == nil {
+				t.Fatal("skip=true 时影片不应落盘")
+			}
+			if res.SkippedVideo == 0 {
+				t.Fatal("应统计出被跳过的影片数")
+			}
+		} else {
+			if statErr != nil {
+				t.Fatalf("skip=false 时影片应落盘：%v", statErr)
+			}
+			if res.SkippedVideo != 0 {
+				t.Fatalf("skip=false 时不该有跳过计数（%d）", res.SkippedVideo)
+			}
+		}
+	}
+}

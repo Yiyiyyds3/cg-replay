@@ -73,6 +73,7 @@ export default function EventGrid({
   const [unpackResult, setUnpackResult] = useState<UnpackImportDTO | null>(null); // 已解包但未接入
   const [unpackScheme, setUnpackScheme] = useState(""); // XP3 解密方案；空 = 不解密
   const [unpackKey, setUnpackKey] = useState("0"); // xor 固定密钥（0-255）
+  const [skipVideo, setSkipVideo] = useState(false); // 不提取 OP/ED 影片（省盘）
 
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
@@ -527,8 +528,8 @@ export default function EventGrid({
     setBusy(true);
     try {
       const r: UnpackImportDTO = scheme
-        ? await api.unpackImportDecrypt(unpackPath, scheme, key)
-        : await api.unpackImport(unpackPath);
+        ? await api.unpackImportDecrypt(unpackPath, scheme, key, skipVideo)
+        : await api.unpackImport(unpackPath, skipVideo);
       setUnpackPlan(null);
       setUnpackPath("");
       if (!r.connected || !r.library) {
@@ -821,6 +822,21 @@ export default function EventGrid({
                     )}
                     <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
                   </div>
+                )}
+                {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
+                  <label className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={skipVideo}
+                      onChange={(e) => setSkipVideo(e.target.checked)}
+                      disabled={unpacking}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    <span>
+                      不提取 OP/ED 影片（省 {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB，共{" "}
+                      {unpackPlan.videos} 个；去掉后这些事件播放时会缺素材）
+                    </span>
+                  </label>
                 )}
                 {unpackPlan.unsupported && (
                   <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>

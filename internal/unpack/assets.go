@@ -42,6 +42,9 @@ type archiveSet struct {
 	entries   map[string]archiveEntry
 	owner     map[string]string // 条目路径 → 所属归档
 	encrypted []string
+
+	// 名字索引只建一次：lookup 原来每次调用都重建，条目上万时是 O(n²)。
+	byBase, byStem map[string]archiveEntry
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
@@ -122,6 +125,9 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 // nameIndex 按文件名与「无扩展名」各建一份索引——演出脚本里的 storage 名
 // 常常不带扩展名，两份索引都要有才找得到。
 func (s *archiveSet) nameIndex() (map[string]archiveEntry, map[string]archiveEntry) {
+	if s.byBase != nil {
+		return s.byBase, s.byStem
+	}
 	byBase := map[string]archiveEntry{}
 	byStem := map[string]archiveEntry{}
 	for _, e := range s.entries {
@@ -134,6 +140,7 @@ func (s *archiveSet) nameIndex() (map[string]archiveEntry, map[string]archiveEnt
 			byStem[ls] = e
 		}
 	}
+	s.byBase, s.byStem = byBase, byStem
 	return byBase, byStem
 }
 

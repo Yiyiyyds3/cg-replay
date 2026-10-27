@@ -25,6 +25,8 @@ type UnpackPlanDTO struct {
 	ScenarioFiles int      `json:"scenario_files"`
 	Labels        int      `json:"labels"` // 预计事件数（KiriKiri=画廊槽位；其它引擎=脚本事件）
 	Refs          int      `json:"refs"`   // 预计引用到的素材数
+	Videos        int      `json:"videos"` // 其中影片（OP/ED）条目数
+	VideoBytes    int64    `json:"video_bytes"`
 	Encrypted     int      `json:"encrypted"`
 	Notes         []string `json:"notes"`
 	Unsupported   bool     `json:"unsupported"`
@@ -41,7 +43,9 @@ type UnpackImportDTO struct {
 	Missing   []string `json:"missing"`
 	Encrypted []string `json:"encrypted"`
 	Warnings  []string `json:"warnings"`
-	GameID    string   `json:"game_id"`
+	// SkippedVideo 按「不提取影片」选项跳过的数量
+	SkippedVideo int    `json:"skipped_video,omitempty"`
+	GameID       string `json:"game_id"`
 	// Connected=false 表示素材已解出，但事件库接入失败（例如该引擎扫描不到事件）。
 	// 这不是解包失败：产物保留在 Dest，前端要给打开目录/手动退路，不能只弹一句错。
 	Connected bool   `json:"connected"`
@@ -64,6 +68,8 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 		ScenarioFiles: plan.ScenarioFiles,
 		Labels:        plan.Labels,
 		Refs:          plan.Refs,
+		Videos:        plan.Videos,
+		VideoBytes:    plan.VideoBytes,
 		Encrypted:     plan.Encrypted,
 		Notes:         plan.Notes,
 		Unsupported:   plan.Unsupported,
@@ -73,15 +79,16 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 
 // UnpackImportDecrypt 带解密方案地解包（方案名见 unpack.SchemeFromString；
 // 固定密钥 key 供 "xor" 方案用；其余方案由条目自身的 adlr 派生密钥）。
-func (a *App) UnpackImportDecrypt(path, scheme string, key int) (*UnpackImportDTO, error) {
+func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo bool) (*UnpackImportDTO, error) {
 	sc, err := unpack.SchemeFromString(scheme)
 	if err != nil {
 		return nil, err
 	}
 	return a.unpackImport(path, unpack.Options{
-		Scope:   unpack.ScopeCG,
-		Decrypt: sc,
-		Key:     byte(key),
+		Scope:     unpack.ScopeCG,
+		Decrypt:   sc,
+		Key:       byte(key),
+		SkipVideo: skipVideo,
 	})
 }
 
@@ -90,8 +97,8 @@ func (a *App) UnpackImportDecrypt(path, scheme string, key int) (*UnpackImportDT
 // 目标目录固定为 `%LOCALAPPDATA%\cgreplay-ui\games\<源路径 id>`，同一份源
 // 重复导入落在同一处（幂等）。登记时以**解包产物目录**为游戏根目录，
 // 播放器直接就能读。
-func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
-	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG})
+func (a *App) UnpackImport(path string, skipVideo bool) (*UnpackImportDTO, error) {
+	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG, SkipVideo: skipVideo})
 }
 
 // unpackImport 真正的解包 + 登记流程（两种入口共用）。
@@ -127,33 +134,35 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 	lib, err := a.AddGame(dest)
 	if err != nil {
 		return &UnpackImportDTO{
-			Dest:      res.Dest,
-			EngineID:  res.EngineID,
-			Events:    res.Events,
-			Files:     res.Files,
-			Bytes:     res.Bytes,
-			Missing:   res.Missing,
-			Encrypted: res.Encrypted,
-			Warnings:  res.Warnings,
-			GameID:    registry.IDFor(filepath.Clean(dest)),
-			Connected: false,
-			Reason:    err.Error(),
+			Dest:         res.Dest,
+			EngineID:     res.EngineID,
+			Events:       res.Events,
+			Files:        res.Files,
+			Bytes:        res.Bytes,
+			Missing:      res.Missing,
+			Encrypted:    res.Encrypted,
+			SkippedVideo: res.SkippedVideo,
+			Warnings:     res.Warnings,
+			GameID:       registry.IDFor(filepath.Clean(dest)),
+			Connected:    false,
+			Reason:       err.Error(),
 			Hint: fmt.Sprintf(
 				"解包产物已保存在 %s。可以打开目录检查；修复上述原因后，"+
 					"也能用「添加游戏」把这个目录手动登记。", dest),
 		}, nil
 	}
 	return &UnpackImportDTO{
-		Dest:      res.Dest,
-		EngineID:  res.EngineID,
-		Events:    res.Events,
-		Files:     res.Files,
-		Bytes:     res.Bytes,
-		Missing:   res.Missing,
-		Encrypted: res.Encrypted,
-		Warnings:  res.Warnings,
-		GameID:    registry.IDFor(filepath.Clean(dest)),
-		Connected: true,
-		Library:   lib,
+		Dest:         res.Dest,
+		EngineID:     res.EngineID,
+		Events:       res.Events,
+		Files:        res.Files,
+		Bytes:        res.Bytes,
+		Missing:      res.Missing,
+		Encrypted:    res.Encrypted,
+		SkippedVideo: res.SkippedVideo,
+		Warnings:     res.Warnings,
+		GameID:       registry.IDFor(filepath.Clean(dest)),
+		Connected:    true,
+		Library:      lib,
 	}, nil
 }

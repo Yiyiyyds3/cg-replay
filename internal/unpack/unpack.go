@@ -45,6 +45,8 @@ type Plan struct {
 	ScenarioFiles int      `json:"scenario_files"` // 剧本文件数
 	Labels        int      `json:"labels"`         // 事件（标签）数
 	Refs          int      `json:"refs"`           // 引用到的素材数
+	Videos        int      `json:"videos"`         // 其中影片（OP/ED）条目数
+	VideoBytes    int64    `json:"video_bytes"`    // 影片原始体积（估算）
 	Encrypted     int      `json:"encrypted"`      // 加密条目数（不解，要密钥）
 	Notes         []string `json:"notes"`
 	Unsupported   bool     `json:"unsupported"` // 引擎暂不支持自动解包
@@ -61,6 +63,8 @@ type Result struct {
 	Missing   []string `json:"missing"`   // 引用了但归档里找不到的素材
 	Encrypted []string `json:"encrypted"` // 加密条目（跳过）
 	Warnings  []string `json:"warnings"`
+	// SkippedVideo 按选项跳过的影片数
+	SkippedVideo int `json:"skipped_video,omitempty"`
 }
 
 // Preview 预览一个游戏目录/归档，不落盘（解包前先给用户看「会解出什么」）。
@@ -124,6 +128,9 @@ type Options struct {
 	Scope   Scope  // 取材范围
 	Decrypt Scheme // 解密方案（空 = 不解密）
 	Key     byte   // 固定密钥（SchemeXor 用）
+	// SkipVideo 不提取影片（OP/ED）。单个影片就 100~300 MB，全解出来很占盘；
+	// 关掉后视频事件仍在事件库里，只是播放时缺素材（零值 = 提取，向后兼容）。
+	SkipVideo bool
 }
 
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
@@ -233,8 +240,22 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		for _, r := range info.Refs {
 			refs[r] = true
 		}
+		for _, r := range info.VideoRefs {
+			refs[r] = true
+		}
 	}
 	p.Refs = len(refs)
+	// 顺便数出影片条目与体积：用户据此决定「要不要把它们一起解出来」。
+	for r := range refs {
+		e, ok := assets.lookup(r)
+		if !ok || !isVideoPath(e.path) {
+			continue
+		}
+		p.Videos++
+		for _, sg := range e.segs {
+			p.VideoBytes += sg.Size
+		}
+	}
 	if p.Encrypted > 0 {
 		p.Notes = append(p.Notes, fmt.Sprintf(
 			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
@@ -305,6 +326,12 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		for _, r := range refs {
 			refSet[r] = true
 		}
+		// 影片总是并入（OP/ED 不在 CG 画廊引用里）；SkipVideo 时反而不并。
+		if !opts.SkipVideo {
+			for _, r := range info.VideoRefs {
+				refSet[r] = true
+			}
+		}
 		// 剧本落盘
 		p := filepath.Join(dest, filepath.FromSlash(deps.ScriptDir), e.base())
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -322,6 +349,10 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		e, ok := assets.lookup(ref)
 		if !ok {
 			res.Missing = append(res.Missing, ref)
+			continue
+		}
+		if opts.SkipVideo && isVideoPath(e.path) {
+			res.SkippedVideo++
 			continue
 		}
 		if e.encrypted && opts.Decrypt == SchemeNone {
@@ -413,4 +444,15 @@ func archiveExtsHint() string {
 	}
 	sort.Strings(exts)
 	return strings.Join(exts, " / ")
+}
+
+// videoExts 影片扩展名。解包层只关心「要不要提取」，
+// 不需要依赖解码实现（internal/video 是 ffmpeg 提帧那一层）。
+var videoExts = map[string]bool{
+	".mpg": true, ".mpeg": true, ".wmv": true, ".mp4": true,
+	".avi": true, ".webm": true, ".mov": true, ".mkv": true,
+}
+
+func isVideoPath(p string) bool {
+	return videoExts[strings.ToLower(filepath.Ext(p))]
 }

@@ -77,9 +77,9 @@ export function ToggleAuto():Promise<boolean>;
 
 export function TogglePlay():Promise<boolean>;
 
-export function UnpackImport(arg1:string):Promise<main.UnpackImportDTO>;
+export function UnpackImport(arg1:string,arg2:boolean):Promise<main.UnpackImportDTO>;
 
-export function UnpackImportDecrypt(arg1:string,arg2:string,arg3:number):Promise<main.UnpackImportDTO>;
+export function UnpackImportDecrypt(arg1:string,arg2:string,arg3:number,arg4:boolean):Promise<main.UnpackImportDTO>;
 
 export function UnpackPreview(arg1:string):Promise<main.UnpackPlanDTO>;
 
