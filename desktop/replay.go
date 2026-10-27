@@ -296,6 +296,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		missing: map[string]string{},
 	}
 	s.opts.FontSize = 48
+	// 影片时长：台本里通常不写，靠 ffprobe 查；查不到就按「未知」处理。
+	s.opts.VideoDur = func(ref string) int64 {
+		p, err := replay.AssetPath(root, ref)
+		if err != nil {
+			return 0
+		}
+		return video.Duration(p)
+	}
 	s.load = s.stageLoader(player.Cached(player.Loader(replay.GameLoader(root))))
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {

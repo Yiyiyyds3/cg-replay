@@ -306,3 +306,32 @@ func TestDrawBoxBackgroundFrameAndColor(t *testing.T) {
 		t.Fatalf("框外不该被改：%+v", got)
 	}
 }
+
+// TestVideoPlayBlocksForDuration 影片没有台本时长时按 ffprobe 查到的时长阻塞。
+//
+// 不这样做的话，OP/ED 只有 3 条指令（movie + next），播放器会立刻走完，
+// 影片一帧都显示不出来。
+func TestVideoPlayBlocksForDuration(t *testing.T) {
+	ev := &ir.Event{Show: []ir.ShowOp{
+		{TMs: 0, Kind: ir.ShowVideoPlay, Layer: "video", Ref: "op"},
+	}}
+	opt := DefaultOptions()
+	opt.VideoDur = func(ref string) int64 { return 2000 }
+	p := New(ev, opt)
+
+	for i := 0; i < 50; i++ { // ≈800ms
+		p.Advance(16, Input{})
+	}
+	if p.Done() {
+		t.Fatal("影片时长 2s，800ms 时不应结束")
+	}
+	if f := p.Frame(); f.Video == nil || f.Video.Ref != "op" {
+		t.Fatalf("帧里应带影片信息：%+v", f.Video)
+	}
+	for i := 0; i < 100; i++ { // 推进到 ≈2.4s
+		p.Advance(16, Input{})
+	}
+	if !p.Done() {
+		t.Fatal("超过影片时长后应结束")
+	}
+}

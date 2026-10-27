@@ -21,6 +21,7 @@ type Stream struct {
 	fps  int
 	cur  int // 已读到的帧号（0 = 尚未读）
 	buf  []byte
+	last *image.RGBA // 最后一帧（读到片尾时冻住它，不报错）
 }
 
 // OpenStream 按目标尺寸与帧率开一条流（缩放在 ffmpeg 侧做）。
@@ -83,12 +84,19 @@ func (s *Stream) Frame(tMs int64) (image.Image, error) {
 	}
 	for s.cur <= target {
 		if _, err := io.ReadFull(s.out, s.buf); err != nil {
-			// 流结束（或读失败）：返回最后一帧的样子 —— 用黑帧兜底不如直接报错清楚
+			// 读到片尾：冻在最后一帧（播放器的正常行为），别报错打断演出。
+			if s.last != nil {
+				return s.last, nil
+			}
 			return nil, fmt.Errorf("视频读帧失败（t=%dms）：%w", tMs, err)
 		}
 		s.cur++
+		s.last = pixelsToRGBA(s.buf, s.w, s.h)
 	}
-	return pixelsToRGBA(s.buf, s.w, s.h), nil
+	if s.last != nil {
+		return s.last, nil
+	}
+	return nil, fmt.Errorf("视频还没有可用帧")
 }
 
 // Close 结束进程。

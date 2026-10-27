@@ -130,12 +130,27 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 	t.Logf("事件库：%d 个事件", len(lib.Scenes))
 
 	load := player.Cached(player.Loader(replay.GameLoader(root)))
+	// 与桌面端同一条路径：流式解码（一条 ffmpeg 进程连续出帧）
+	streams := map[string]*video.Stream{}
+	defer func() {
+		for _, st := range streams {
+			_ = st.Close()
+		}
+	}()
 	videoProv := func(ref string, tMs int64) (image.Image, error) {
-		p, err := replay.AssetPath(root, ref)
+		pth, err := replay.AssetPath(root, ref)
 		if err != nil {
 			return nil, err
 		}
-		return video.Frame(p, tMs)
+		st := streams[pth]
+		if st == nil {
+			st, err = video.OpenStream(pth, 1280, 720, 20)
+			if err != nil {
+				return nil, err
+			}
+			streams[pth] = st
+		}
+		return st.Frame(tMs)
 	}
 	var rendered, blank, tried int
 	for i := 0; i < len(lib.Scenes) && tried < 30; i++ {
@@ -148,21 +163,31 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 		if err != nil || len(ev.Show) == 0 {
 			continue
 		}
-		p := player.New(ev, player.DefaultOptions())
-		p.SetSkip(true) // 快进等待，只为看画面
-		// 按步数扫全程取最大可见度：SkipWaits 下脚本几秒就跑完，
-		// 按墙钟采样只会采到「结尾的黑幕」，会误判成整段黑屏。
+		// **不能**用 SkipWaits：它会把脚本一口气推到末尾，采到的永远是终态
+		//（真机上就因此把「结尾黑幕」误判成整段黑屏）。改为正常推进 + 把
+		// 文字阅读时间压到最低，按时间步进采样，取全程最大可见度。
+		opt := player.DefaultOptions()
+		opt.CharMs, opt.BaseMs, opt.MinWaitMs, opt.MaxWaitMs = 1, 1, 1, 1
+		// 影片时长（台本里不写）——与桌面端一致，用 ffprobe 查
+		opt.VideoDur = func(ref string) int64 {
+			pth, err := replay.AssetPath(root, ref)
+			if err != nil {
+				return 0
+			}
+			return video.Duration(pth)
+		}
+		p := player.New(ev, opt)
 		best := 0.0
-		for step := 0; step < 4000; step++ {
+		for step := 0; step < 12000; step++ {
 			p.Advance(16, player.Input{})
-			if step%20 == 0 || p.Done() {
+			if step%100 == 0 || p.Done() {
 				if img, _, err := player.RenderFrameWithVideo(p, load, videoProv, 1280, 720); err == nil {
 					if r := nonBlackRatio(img); r > best {
 						best = r
 					}
 				}
 			}
-			if p.Done() && step%20 == 0 {
+			if p.Done() {
 				break
 			}
 		}

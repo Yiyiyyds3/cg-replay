@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 )
 
@@ -135,4 +136,47 @@ func toRGBA(img image.Image) *image.RGBA {
 		}
 	}
 	return dst
+}
+
+// Duration 用 ffprobe 取时长（毫秒）；失败返回 0（调用方按「未知」处理）。
+// 结果按路径缓存 —— 影片时长不会变。
+var durMu sync.Mutex
+var durCache = map[string]int64{}
+
+func Duration(path string) int64 {
+	durMu.Lock()
+	if d, ok := durCache[path]; ok {
+		durMu.Unlock()
+		return d
+	}
+	durMu.Unlock()
+
+	exe := Locate()
+	if exe == "" {
+		return 0
+	}
+	probe := filepath.Join(filepath.Dir(exe), "ffprobe.exe")
+	if st, err := os.Stat(probe); err != nil || st.IsDir() {
+		if p, err := exec.LookPath("ffprobe"); err == nil {
+			probe = p
+		} else {
+			return 0
+		}
+	}
+	cmd := exec.Command(probe, "-v", "error",
+		"-show_entries", "format=duration", "-of", "csv=p=0", path)
+	hideConsole(cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	secs, err := strconv.ParseFloat(string(bytes.TrimSpace(out)), 64)
+	if err != nil || secs <= 0 {
+		return 0
+	}
+	ms := int64(secs * 1000)
+	durMu.Lock()
+	durCache[path] = ms
+	durMu.Unlock()
+	return ms
 }

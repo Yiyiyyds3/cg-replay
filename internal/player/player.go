@@ -38,14 +38,18 @@ type Loader func(rel string) (image.Image, error)
 // Options 播放策略。注意：自动推进时长是**播放器策略**，不是脚本保真 ——
 // 原作是「等玩家点击」，重演时用字数估算阅读时长（本作无语音可依）。
 type Options struct {
-	Speed      float64 // 时间倍率（默认 1）
-	CharMs     float64 // 每字阅读耗时（默认 75ms）
-	BaseMs     int64   // 每个点击点基础停留（默认 800ms）
-	MinWaitMs  int64   // 自动推进下限（默认 800ms）
-	MaxWaitMs  int64   // 自动推进上限（默认 6000ms）
-	MsgLines   int     // 每个消息层最多保留行数（默认 8）
-	SkipWaits  bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
-	MsgDefault string  // 默认消息层 id（默认 message0）
+	Speed     float64 // 时间倍率（默认 1）
+	CharMs    float64 // 每字阅读耗时（默认 75ms）
+	BaseMs    int64   // 每个点击点基础停留（默认 800ms）
+	MinWaitMs int64   // 自动推进下限（默认 800ms）
+	MaxWaitMs int64   // 自动推进上限（默认 6000ms）
+	MsgLines  int     // 每个消息层最多保留行数（默认 8）
+	SkipWaits bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
+
+	// VideoDur 查询影片时长（毫秒，0=未知）。OP/ED 的台本里通常不写时长，
+	// 不查就会「播 0 帧立刻结束」。平台层注入 ffprobe 实现，player 不依赖它。
+	VideoDur   func(ref string) int64
+	MsgDefault string // 默认消息层 id（默认 message0）
 
 	// 文字样式（Config.tjs 实参；渲染层可再覆盖）
 	FontSize     float64  // 字号（默认 48）
@@ -316,8 +320,12 @@ func (p *Player) exec(op ir.ShowOp) {
 			break
 		}
 		p.videoRef, p.videoStart = op.Ref, p.now
-		if op.DurMs > 0 && !p.opt.SkipWaits {
-			p.blockKind, p.blockUntil = "video", p.now+op.DurMs
+		dur := op.DurMs
+		if dur <= 0 && p.opt.VideoDur != nil {
+			dur = p.opt.VideoDur(op.Ref)
+		}
+		if dur > 0 && !p.opt.SkipWaits {
+			p.blockKind, p.blockUntil = "video", p.now+dur
 		}
 
 	case ir.ShowWait:
