@@ -10,6 +10,7 @@
 package unpack
 
 import (
+	"image"
 	"os"
 	"path/filepath"
 	"testing"
@@ -141,27 +142,28 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 		}
 		p := player.New(ev, player.DefaultOptions())
 		p.SetSkip(true) // 快进等待，只为看画面
-		for k := 0; k < 120; k++ {
-			p.Advance(50, player.Input{})
+		// 按步数扫全程取最大可见度：SkipWaits 下脚本几秒就跑完，
+		// 按墙钟采样只会采到「结尾的黑幕」，会误判成整段黑屏。
+		best := 0.0
+		for step := 0; step < 4000; step++ {
+			p.Advance(16, player.Input{})
+			if step%20 == 0 || p.Done() {
+				if img, _, err := player.RenderFrame(p, load, 1280, 720); err == nil {
+					if r := nonBlackRatio(img); r > best {
+						best = r
+					}
+				}
+			}
+			if p.Done() && step%20 == 0 {
+				break
+			}
 		}
-		img, missing, err := player.RenderFrame(p, load, 1280, 720)
+		_, missing, err := player.RenderFrame(p, load, 1280, 720)
 		if err != nil {
 			t.Logf("%s: 渲染失败 %v", sc.ID, err)
 			continue
 		}
-		// 统计非黑像素比例（每 4 个像素采一个）
-		var nonBlack, total int
-		b := img.Bounds()
-		for y := b.Min.Y; y < b.Max.Y; y += 2 {
-			for x := b.Min.X; x < b.Max.X; x += 2 {
-				r, g, bl, _ := img.At(x, y).RGBA()
-				total++
-				if r > 0x1000 || g > 0x1000 || bl > 0x1000 {
-					nonBlack++
-				}
-			}
-		}
-		ratio := float64(nonBlack) / float64(total)
+		ratio := best
 		if ratio < 0.02 {
 			for _, ls := range p.Frame().Layers {
 				t.Logf("    层 %s ref=%s resolved=%q vis=%v x=%.0f y=%.0f op=%.2f",
@@ -184,4 +186,23 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 	if rendered == 0 {
 		t.Fatal("没有任何事件能画出画面（非黑像素 < 2%）")
 	}
+}
+
+// nonBlackRatio 统计非黑像素比例（每 2 像素采一个）。
+func nonBlackRatio(img *image.RGBA) float64 {
+	var nonBlack, total int
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y += 2 {
+		for x := b.Min.X; x < b.Max.X; x += 2 {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			total++
+			if r > 0x1000 || g > 0x1000 || bl > 0x1000 {
+				nonBlack++
+			}
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return float64(nonBlack) / float64(total)
 }
