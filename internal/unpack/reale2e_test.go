@@ -105,6 +105,16 @@ func TestRealCS2EndToEnd(t *testing.T) {
 			t.Fatalf("ScanWith(cs2): %v", err)
 		}
 		t.Logf("事件库：%d 个事件", len(lib.Scenes))
+		videoN := 0
+		for _, sc := range lib.Scenes {
+			if sc.HasVideo {
+				videoN++
+			}
+		}
+		t.Logf("其中影片事件（OP/ED）：%d 个", videoN)
+		if videoN == 0 {
+			t.Error("事件库应标记出影片事件（has_video）")
+		}
 		if len(lib.Scenes) == 0 {
 			t.Fatal("事件库为空")
 		}
@@ -128,6 +138,16 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 		t.Fatalf("ScanWith: %v", err)
 	}
 	t.Logf("事件库：%d 个事件", len(lib.Scenes))
+	videoN := 0
+	for _, sc := range lib.Scenes {
+		if sc.HasVideo {
+			videoN++
+		}
+	}
+	t.Logf("其中影片事件（OP/ED）：%d 个", videoN)
+	if videoN == 0 {
+		t.Error("事件库应标记出影片事件（has_video）")
+	}
 
 	load := player.Cached(player.Loader(replay.GameLoader(root)))
 	// 与桌面端同一条路径：流式解码（一条 ffmpeg 进程连续出帧）

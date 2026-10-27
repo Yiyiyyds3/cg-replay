@@ -169,7 +169,7 @@ export interface SpeakerDTO {
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
   | { kind: "cg"; id: string; title: string; note: string; ok: true }
-  | { kind: "scene"; id: string; title: string; note: ""; ok: true }
+  | { kind: "scene"; id: string; title: string; note: ""; ok: true; video?: boolean }
   | { kind: "chapter"; id: string; title: string; note: string; ok: true }
   | { kind: string; id: string; title: string; note: string; ok: false };
 

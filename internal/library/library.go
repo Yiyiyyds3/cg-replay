@@ -39,6 +39,8 @@ type SceneEvent struct {
 	Script string `json:"script"` // 相对 root 的脚本路径
 	// Label 引擎内的定位串（KiriKiri 不用；Artemis = block 序号）。
 	Label string `json:"label,omitempty"`
+	// HasVideo 该事件里含影片指令（OP/ED）——前端给 ▶ 角标，别让人误以为是坏图。
+	HasVideo bool `json:"has_video,omitempty"`
 }
 
 // ChapterEvent 一个「演出段落」= 原作自己的章节标记 `*labelNN|显示名`。

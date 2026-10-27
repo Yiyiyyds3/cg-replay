@@ -616,7 +616,14 @@ export default function EventGrid({
     if (tab === "scene") {
       return (lib.scenes ?? [])
         .filter((s) => hit(s.title))
-        .map((s) => ({ kind: "scene" as const, id: s.id, title: s.title, note: "", ok: true as const }));
+        .map((s) => ({
+          kind: "scene" as const,
+          id: s.id,
+          title: s.title,
+          note: "" as const,
+          ok: true as const,
+          video: (s as { has_video?: boolean }).has_video ?? false,
+        }));
     }
     return (lib.chapters ?? [])
       .filter((ch) => hit(ch.title) || hit(ch.scene))
@@ -2009,6 +2016,14 @@ function EventCard({
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-accent/40 text-muted-foreground/40">
             <Ship className="h-8 w-8" />
           </div>
+        )}
+        {card.kind === "scene" && "video" in card && card.video && (
+          <span
+            className="absolute right-1.5 top-1.5 rounded border border-primary/50 bg-background/80 px-1 py-0.5 text-[10px] text-primary"
+            title="该事件是影片（OP/ED）"
+          >
+            ▶ 影片
+          </span>
         )}
         {miss && (
           <span className="absolute left-1.5 top-1.5 rounded border border-amber-900 bg-amber-950/80 px-1 py-0.5 text-[10px] text-amber-400">

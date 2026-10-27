@@ -57,6 +57,7 @@ export namespace library {
 	    title: string;
 	    script: string;
 	    label?: string;
+	    has_video?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SceneEvent(source);
@@ -68,6 +69,7 @@ export namespace library {
 	        this.title = source["title"];
 	        this.script = source["script"];
 	        this.label = source["label"];
+	        this.has_video = source["has_video"];
 	    }
 	}
 	export class Library {
