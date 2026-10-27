@@ -44,6 +44,7 @@ const (
 	autoWaitMs  = 2500 // 与 cmd/cgreplay 一致
 	jpegQuality = 88
 	encMinGap   = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
+	videoFPS    = 20                    // 影片流的目标帧率（与渲染上限一致）
 
 	durSnapshots = 240 // 时长估计取样点数
 )
@@ -60,8 +61,10 @@ type replaySession struct {
 	opts player.Options
 	p    *player.Player
 
-	load  player.Loader // 缺素材记账版 loader
-	audio *audio.System
+	load   player.Loader // 缺素材记账版 loader
+	vs     *video.Stream // 当前影片流（惰性打开）
+	vsPath string        // 流对应的文件
+	audio  *audio.System
 
 	playing  bool
 	auto     bool
@@ -347,6 +350,7 @@ func (a *App) closeSessionLocked() {
 	if s.audio != nil {
 		s.audio.Close()
 	}
+	s.closeVideo()
 	s.p = nil
 }
 
@@ -520,16 +524,38 @@ func boxDTOs(f player.Frame) []BoxDTO {
 	return out
 }
 
-// videoProvider 影片取帧：引用 → 解包目录里的真实文件 → ffmpeg 提帧。
-// 没有 ffmpeg 时返回错误，渲染层会把它记进缺素材而不中断播放。
+// videoProvider 影片取帧：引用 → 解包目录里的真实文件 → ffmpeg 流式解码。
+//
+// 回放时间单调向前，所以开一条进程连续出帧（按时间丢帧），比每帧 seek 省得多；
+// 换片或倒退时 Stream 自己会重开。没有 ffmpeg 时返回错误，渲染层记进缺素材、
+// 不中断播放。
 func (s *replaySession) videoProvider() player.VideoProvider {
 	root := s.root
 	return func(ref string, tMs int64) (image.Image, error) {
-		p, err := replay.AssetPath(root, ref)
+		path, err := replay.AssetPath(root, ref)
 		if err != nil {
 			return nil, err
 		}
-		return video.Frame(p, tMs)
+		if s.vs == nil || s.vsPath != path {
+			if s.vs != nil {
+				_ = s.vs.Close()
+			}
+			s.vs, s.vsPath = nil, path
+			st, err := video.OpenStream(path, stageW, stageH, videoFPS)
+			if err != nil {
+				return nil, err
+			}
+			s.vs = st
+		}
+		return s.vs.Frame(tMs)
+	}
+}
+
+// closeVideo 关掉影片流（换事件/关会话时调用）。
+func (s *replaySession) closeVideo() {
+	if s.vs != nil {
+		_ = s.vs.Close()
+		s.vs, s.vsPath = nil, ""
 	}
 }
 
