@@ -42,21 +42,36 @@ type archiveSet struct {
 	entries   map[string]archiveEntry
 	owner     map[string]string // 条目路径 → 所属归档
 	encrypted []string
+	// adlr 专指 XP3 的 adlr 校验和块（KeyHint=adlr）；CS2 的 KIF 是 Blowfish
+	// 加密、读取时自动解密，不该被算成「带 adlr」。
+	adlr    []string
+	skipped []string // 解析失败的归档（含原因）——不阻断其余归档
+
+	// 引擎自带的条目读取器（CS2 的 KIF 需要解密）；缺省走通用 seek+zlib。
+	readers map[string]func([]adapter.ArchiveEntry) ([]byte, error)
+	closers []func() error
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
-func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry, error)) (*archiveSet, error) {
+func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry, error), openReader func(string) (func([]adapter.ArchiveEntry) ([]byte, error), func() error, error)) (*archiveSet, error) {
 	s := &archiveSet{
 		archives: archives,
 		files:    map[string]*os.File{},
 		entries:  map[string]archiveEntry{},
 		owner:    map[string]string{},
+		readers:  map[string]func([]adapter.ArchiveEntry) ([]byte, error){},
 	}
 	for _, arch := range archives {
 		segs, err := parse(arch)
 		if err != nil {
-			s.close()
-			return nil, fmt.Errorf("解析归档 %s 失败：%w", filepath.Base(arch), err)
+			// 一个坏归档不该拖垮整场解包：实测有的游戏目录里混着扩展名骗人的
+			// 文件（如 .int 其实是 EVB）。记下来，继续处理其余归档。
+			msg := fmt.Sprintf("%s：%v", filepath.Base(arch), err)
+			if hint := sniffHint(arch); hint != "" {
+				msg += "（" + hint + "）"
+			}
+			s.skipped = append(s.skipped, msg)
+			continue
 		}
 		order := []string{}
 		grouped := map[string][]adapter.ArchiveEntry{}
@@ -70,6 +85,14 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 				enc[e.Path] = true
 			}
 		}
+		if openReader != nil {
+			if read, closeFn, rerr := openReader(arch); rerr == nil {
+				s.readers[arch] = read
+				if closeFn != nil {
+					s.closers = append(s.closers, closeFn)
+				}
+			}
+		}
 		for _, p := range order {
 			if _, exists := s.entries[p]; exists {
 				continue // 同名条目以先出现的归档为准
@@ -78,10 +101,17 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 			s.owner[p] = arch
 			if enc[p] {
 				s.encrypted = append(s.encrypted, p)
+				if strings.EqualFold(grouped[p][0].KeyHint, "adlr") {
+					s.adlr = append(s.adlr, p)
+				}
 			}
 		}
 	}
 	sort.Strings(s.encrypted)
+	if len(s.entries) == 0 && len(s.skipped) > 0 {
+		s.close()
+		return nil, fmt.Errorf("所有归档都无法解析：%s", strings.Join(s.skipped, "；"))
+	}
 	return s, nil
 }
 
@@ -91,6 +121,10 @@ func (s *archiveSet) close() {
 		_ = f.Close()
 	}
 	s.files = map[string]*os.File{}
+	for _, c := range s.closers {
+		_ = c()
+	}
+	s.closers = nil
 }
 
 // read 读一个条目的完整内容（多段顺序拼接，每段各自解压）。
@@ -98,6 +132,9 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 	arch, ok := s.owner[e.path]
 	if !ok {
 		return nil, fmt.Errorf("条目 %s 不知道属于哪个归档", e.path)
+	}
+	if read, ok := s.readers[arch]; ok {
+		return read(e.segs)
 	}
 	f, ok := s.files[arch]
 	if !ok {

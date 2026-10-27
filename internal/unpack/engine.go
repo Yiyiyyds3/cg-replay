@@ -30,10 +30,13 @@ type scriptInfo struct {
 // engineDeps 一个引擎的解包能力。
 type engineDeps struct {
 	ID           string
-	ArchiveExts  []string                                           // 归档后缀（如 .xp3）
-	ParseArchive func(path string) ([]adapter.ArchiveEntry, error)  // 列条目
-	IsScript     func(path string) bool                             // 条目是不是剧本
-	ParseScript  func(data []byte, name string) (scriptInfo, error) // 解析剧本
+	ArchiveExts  []string                                          // 归档后缀（如 .xp3）
+	ParseArchive func(path string) ([]adapter.ArchiveEntry, error) // 列条目
+	// OpenReader 打包条目读取器（默认 = 通用 seek+zlib）。CS2 的 KIF 条目是
+	// Blowfish 加密的，必须走 kif.Archive.Read 才能拿到明文；close 由归档集调用。
+	OpenReader  func(archPath string) (read func([]adapter.ArchiveEntry) ([]byte, error), close func() error, err error)
+	IsScript    func(path string) bool                             // 条目是不是剧本
+	ParseScript func(data []byte, name string) (scriptInfo, error) // 解析剧本
 	// ScriptDir 落盘时剧本放哪（相对解包根）；ImageDir 素材放哪。
 	ScriptDir string
 	ImageDir  string

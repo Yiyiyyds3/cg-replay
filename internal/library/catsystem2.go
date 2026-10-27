@@ -52,8 +52,10 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 		if err != nil {
 			continue
 		}
-		// 能解析才算可回放（坏文件不列进事件库）。
-		if _, err := catsystem2.BuildShowScript(data, name); err != nil {
+		// 能解析**且**能构建出演出才算可回放（坏文件、空脚本都不列进库——
+		// 否则会出现「库里列着但点开播不出来」）。
+		ev, err := catsystem2.BuildShowScript(data, name)
+		if err != nil || len(ev.Show) == 0 {
 			continue
 		}
 		stem := strings.TrimSuffix(name, filepath.Ext(name))

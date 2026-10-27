@@ -270,3 +270,40 @@ func TestUnpackExplainsWrongContainer(t *testing.T) {
 		}
 	}
 }
+
+// TestUnpackSkipsBrokenArchive 一个坏归档不该拖垮整场解包。
+//
+// 实测：游戏目录里混着扩展名骗人的文件（GrisaiaAno1_cn.int 其实是 EVB），
+// 以前会让整个预览直接失败；现在应跳过它、继续处理其余归档，并把原因写进 notes。
+func TestUnpackSkipsBrokenArchive(t *testing.T) {
+	dir := t.TempDir()
+	// 正常归档（PFS v6）
+	writePFS(t, filepath.Join(dir, "data.pfs"), map[string][]byte{
+		"scenario/01_01.ast":  []byte(testAST),
+		"image/ev_cut_001_00": []byte("CG1"),
+		"image/black":         []byte("BG"),
+	})
+	// 坏归档：扩展名 .pfs，内容却是 ZIP
+	if err := os.WriteFile(filepath.Join(dir, "update.pfs"), []byte("PK\x03\x04oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Preview(dir)
+	if err != nil {
+		t.Fatalf("Preview 不应因单个坏归档失败：%v", err)
+	}
+	if plan.Unsupported {
+		t.Fatalf("应继续解析其余归档（%+v）", plan)
+	}
+	if plan.ScenarioFiles == 0 {
+		t.Fatalf("好归档里的剧本应被认出：%+v", plan)
+	}
+	var noted bool
+	for _, n := range plan.Notes {
+		if strings.Contains(n, "跳过无法解析的归档") && strings.Contains(n, "ZIP") {
+			noted = true
+		}
+	}
+	if !noted {
+		t.Fatalf("notes 里应说明跳过了哪个坏归档及原因：%v", plan.Notes)
+	}
+}

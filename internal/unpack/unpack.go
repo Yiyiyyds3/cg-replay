@@ -184,7 +184,7 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 			Reason:      fmt.Sprintf("引擎 %s 暂不支持自动解包", engine),
 		}, nil
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
 		// 解析失败要说清「它其实是什么」——实测有 .xp3 里装着 ZIP / EVB。
 		hint := ""
@@ -211,7 +211,7 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		Root:      strings.Join(archives, " "),
 		Kind:      "archive",
 		Archives:  archives,
-		Encrypted: len(assets.encrypted),
+		Encrypted: len(assets.adlr), // 只算 XP3 的 adlr（CS2 的 Blowfish 会自动解）
 	}
 	refs := map[string]bool{}
 	for path, e := range assets.entries {
@@ -235,6 +235,11 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		}
 	}
 	p.Refs = len(refs)
+	if len(assets.skipped) > 0 {
+		for _, sk := range assets.skipped {
+			p.Notes = append(p.Notes, "跳过无法解析的归档 —— "+sk)
+		}
+	}
 	if p.Encrypted > 0 {
 		p.Notes = append(p.Notes, fmt.Sprintf(
 			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
@@ -253,7 +258,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	if !ok {
 		return nil, fmt.Errorf("引擎 %s 暂不支持自动解包", engine)
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
 		hint := ""
 		if len(archives) > 0 {
@@ -269,6 +274,9 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+	for _, sk := range assets.skipped {
+		res.Warnings = append(res.Warnings, "跳过无法解析的归档 —— "+sk)
+	}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
 		if !deps.IsScript(path) {
@@ -324,7 +332,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			res.Missing = append(res.Missing, ref)
 			continue
 		}
-		if e.encrypted && opts.Decrypt == SchemeNone {
+		if e.encrypted && opts.Decrypt == SchemeNone && strings.EqualFold(e.segs[0].KeyHint, "adlr") {
 			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
 			// 真解不开时上面的解析失败告警会指出。
 			res.Encrypted = append(res.Encrypted, e.path)
