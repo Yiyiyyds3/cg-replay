@@ -45,6 +45,8 @@ type Status =
 const SIDEBAR_KEY = "ucgr.sidebarCollapsed";
 const RECENT_LIMIT = 12; // 「全部」页签最近播放取多少条（清理后同量刷新）
 const AUTOPRUNE_KEY = "ucgr.autoPruneRecent"; // 启动自动清理 72h 前最近播放的开关（默认关）
+// 解包时是否提取 OP/ED 影片。默认开（提取）；"0" = 用户选择跳过。
+const EXTRACT_VIDEO_KEY = "ucgr.extractVideo";
 const PRUNE_DAYS = 3; // 冷归档窗口（与 UI 文案一致）
 
 // M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
@@ -73,7 +75,16 @@ export default function EventGrid({
   const [unpackResult, setUnpackResult] = useState<UnpackImportDTO | null>(null); // 已解包但未接入
   const [unpackScheme, setUnpackScheme] = useState(""); // XP3 解密方案；空 = 不解密
   const [unpackKey, setUnpackKey] = useState("0"); // xor 固定密钥（0-255）
-  const [skipVideo, setSkipVideo] = useState(false); // 不提取 OP/ED 影片（省盘）
+  // 提取影片的偏好：默认开（提取）。落 localStorage，下次解包沿用上次选择。
+  const [extractVideo, setExtractVideo] = useState(() => {
+    try {
+      return window.localStorage.getItem(EXTRACT_VIDEO_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  // 点「开始解包」后、真解之前先问一次（有影片时）。
+  const [askVideo, setAskVideo] = useState(false);
 
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
@@ -477,6 +488,7 @@ export default function EventGrid({
       const plan = await api.unpackPreview(path);
       setUnpackPath(path);
       setUnpackPlan(plan);
+      setAskVideo(false);
       setUnpackResult(null);
       setUnpackScheme("");
       setUnpackKey("0");
@@ -511,7 +523,8 @@ export default function EventGrid({
   };
 
   // 确认解包 → 解出最小集合 → 登记入库 → 切到该游戏。
-  const runUnpack = async () => {
+  // skipVideo 由调用方显式传入（有影片时先问一次，见 askVideo）。
+  const runUnpack = async (skipVideo: boolean) => {
     if (!unpackPath) return;
     const scheme = unpackScheme.trim();
     let key = 0;
@@ -526,6 +539,7 @@ export default function EventGrid({
     }
     setUnpacking(true);
     setBusy(true);
+    setAskVideo(false);
     try {
       const r: UnpackImportDTO = scheme
         ? await api.unpackImportDecrypt(unpackPath, scheme, key, skipVideo)
@@ -824,19 +838,82 @@ export default function EventGrid({
                   </div>
                 )}
                 {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
-                  <label className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={skipVideo}
-                      onChange={(e) => setSkipVideo(e.target.checked)}
-                      disabled={unpacking}
-                      className="h-3.5 w-3.5 accent-primary"
-                    />
-                    <span>
-                      不提取 OP/ED 影片（省 {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB，共{" "}
-                      {unpackPlan.videos} 个；去掉后这些事件播放时会缺素材）
-                    </span>
-                  </label>
+                  <div className="space-y-1 pt-1">
+                    <label className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={extractVideo}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setExtractVideo(next);
+                          try {
+                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, next ? "1" : "0");
+                          } catch {
+                            /* localStorage 不可用就只影响本次 */
+                          }
+                        }}
+                        disabled={unpacking}
+                        className="h-3.5 w-3.5 accent-primary"
+                      />
+                      <span>
+                        提取 OP/ED 影片（共 {unpackPlan.videos} 个 ·{" "}
+                        {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）
+                      </span>
+                    </label>
+                    <div className="pl-6 text-[10px] text-muted-foreground/80">
+                      关掉可省这份空间，但这些事件播放时会缺素材。
+                      <b>以后想加回来：重新解包时这块面板会再问一次，勾选状态也会记住（就在这里改）。</b>
+                      已解包的游戏需要重解一次才会补上影片。
+                    </div>
+                  </div>
+                )}
+                {askVideo && !unpackPlan.unsupported && (
+                  <div className="mt-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                    <div className="text-[11px] text-foreground">
+                      检测到 {unpackPlan.videos} 个 OP/ED 影片（约{" "}
+                      {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）。默认会一起提取，要跳过吗？
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const remember = true;
+                          setExtractVideo(remember);
+                          try {
+                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, "1");
+                          } catch {
+                            /* ignore */
+                          }
+                          void runUnpack(false);
+                        }}
+                        disabled={unpacking || busy}
+                      >
+                        一起提取（推荐）
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setExtractVideo(false);
+                          try {
+                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, "0");
+                          } catch {
+                            /* ignore */
+                          }
+                          void runUnpack(true);
+                        }}
+                        disabled={unpacking || busy}
+                      >
+                        跳过影片（省 {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAskVideo(false)} disabled={unpacking}>
+                        再想想
+                      </Button>
+                    </div>
+                    <div className="mt-1.5 text-[10px] text-muted-foreground">
+                      选择会被记住；想改回来随时在上面勾选框里改（已解包的游戏需重解才能补上）。
+                    </div>
+                  </div>
                 )}
                 {unpackPlan.unsupported && (
                   <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
@@ -855,7 +932,18 @@ export default function EventGrid({
                   取消
                 </Button>
                 {!unpackPlan.unsupported && (
-                  <Button size="sm" onClick={() => void runUnpack()} disabled={unpacking || busy}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // 默认提取 → 有影片就先问一次；用户已取消勾选则直接按跳过走。
+                      if (extractVideo && unpackPlan.videos > 0 && !askVideo) {
+                        setAskVideo(true);
+                        return;
+                      }
+                      void runUnpack(!extractVideo);
+                    }}
+                    disabled={unpacking || busy}
+                  >
                     {unpacking ? "解包中…" : "开始解包"}
                   </Button>
                 )}
