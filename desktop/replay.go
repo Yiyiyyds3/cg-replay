@@ -35,6 +35,7 @@ import (
 	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
+	"ucgr/internal/video"
 )
 
 const (
@@ -437,7 +438,7 @@ func (s *replaySession) frameLocked() FrameDTO {
 	}
 	s.lastSig = sig
 	s.lastEnc = time.Now()
-	j, err := renderJPEG(s.p, s.load, f.QuakeX, f.QuakeY)
+	j, err := renderJPEG(s.p, s.load, s.videoProvider(), f.QuakeX, f.QuakeY)
 	if err != nil {
 		dto.JPEG = s.lastJPEG // 理论上到不了（stageLoader 已吞素材错）
 		return dto
@@ -519,10 +520,23 @@ func boxDTOs(f player.Frame) []BoxDTO {
 	return out
 }
 
+// videoProvider 影片取帧：引用 → 解包目录里的真实文件 → ffmpeg 提帧。
+// 没有 ffmpeg 时返回错误，渲染层会把它记进缺素材而不中断播放。
+func (s *replaySession) videoProvider() player.VideoProvider {
+	root := s.root
+	return func(ref string, tMs int64) (image.Image, error) {
+		p, err := replay.AssetPath(root, ref)
+		if err != nil {
+			return nil, err
+		}
+		return video.Frame(p, tMs)
+	}
+}
+
 // renderJPEG RenderFrame → JPEG dataURL（quake 偏移已由 Compose/定位处理？——
 // RenderFrame 只管图层与框底，前端拿 QuakeX/Y 对 <img> 做位移）。
-func renderJPEG(p *player.Player, load player.Loader, _, _ int) (string, error) {
-	rgba, _, err := player.RenderFrame(p, load, stageW, stageH)
+func renderJPEG(p *player.Player, load player.Loader, video player.VideoProvider, _, _ int) (string, error) {
+	rgba, _, err := player.RenderFrameWithVideo(p, load, video, stageW, stageH)
 	if err != nil {
 		return "", err
 	}

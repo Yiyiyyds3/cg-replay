@@ -20,6 +20,7 @@ import (
 	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
+	"ucgr/internal/video"
 )
 
 func TestRealCS2EndToEnd(t *testing.T) {
@@ -129,6 +130,13 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 	t.Logf("事件库：%d 个事件", len(lib.Scenes))
 
 	load := player.Cached(player.Loader(replay.GameLoader(root)))
+	videoProv := func(ref string, tMs int64) (image.Image, error) {
+		p, err := replay.AssetPath(root, ref)
+		if err != nil {
+			return nil, err
+		}
+		return video.Frame(p, tMs)
+	}
 	var rendered, blank, tried int
 	for i := 0; i < len(lib.Scenes) && tried < 30; i++ {
 		sc := lib.Scenes[i]
@@ -148,7 +156,7 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 		for step := 0; step < 4000; step++ {
 			p.Advance(16, player.Input{})
 			if step%20 == 0 || p.Done() {
-				if img, _, err := player.RenderFrame(p, load, 1280, 720); err == nil {
+				if img, _, err := player.RenderFrameWithVideo(p, load, videoProv, 1280, 720); err == nil {
 					if r := nonBlackRatio(img); r > best {
 						best = r
 					}
@@ -158,7 +166,7 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 				break
 			}
 		}
-		_, missing, err := player.RenderFrame(p, load, 1280, 720)
+		_, missing, err := player.RenderFrameWithVideo(p, load, videoProv, 1280, 720)
 		if err != nil {
 			t.Logf("%s: 渲染失败 %v", sc.ID, err)
 			continue

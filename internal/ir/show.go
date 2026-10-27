@@ -36,6 +36,7 @@ const (
 	ShowSEFadeOut  = "se_fadeout"
 	ShowSEStop     = "se_stop"
 	ShowVoicePlay  = "voice_play" // 语音（本作无，保留以对齐其它引擎）
+	ShowVideoPlay  = "video_play" // 影片（OP/ED）：Ref 是视频名，DurMs=0 表示直到被替换
 )
 
 // ShowOp 一条台本指令。TMs 为脚本时钟（仅供参考/进度条，播放器不据此排序）。

@@ -162,6 +162,14 @@ type Frame struct {
 	Waiting       bool  // 停在原作点击点（等自动/手动推进）
 	Now           int64 // 已流逝演出毫秒
 	TransProgress float64
+	Video         *VideoState // 非空表示当前在放影片（OP/ED）
+}
+
+// VideoState 当前影片的播放位置（相对影片开头）。
+type VideoState struct {
+	Ref     string
+	StartMs int64
+	Now     int64
 }
 
 // surface 一个消息层的文字状态。
@@ -196,6 +204,10 @@ type Player struct {
 
 	texts  map[string]*surface
 	curMsg string
+
+	// 当前影片（OP/ED）：videoRef 为空表示没在放。
+	videoRef   string
+	videoStart int64
 
 	// Audio 非 nil 时按台本回调（BGM/SE/语音交给平台层）。
 	Audio func(ir.ShowOp)
@@ -296,6 +308,16 @@ func (p *Player) exec(op ir.ShowOp) {
 		p.quakeCount = iattr(op.Attr, "count", 2)
 		if !p.opt.SkipWaits && op.DurMs > 0 {
 			p.blockKind, p.blockUntil = "time", p.now+op.DurMs
+		}
+
+	case ir.ShowVideoPlay:
+		// 影片铺满舞台：记下引用与起点，渲染层按 Now 去提帧。
+		if op.Ref == "" {
+			break
+		}
+		p.videoRef, p.videoStart = op.Ref, p.now
+		if op.DurMs > 0 && !p.opt.SkipWaits {
+			p.blockKind, p.blockUntil = "video", p.now+op.DurMs
 		}
 
 	case ir.ShowWait:
@@ -533,6 +555,9 @@ func (p *Player) Frame() Frame {
 		f.QuakeX = int(amp * amp * math.Sin(phase) * p.quakeHmax)
 	}
 	f.Waiting = p.blockKind == "text" && p.now < p.blockUntil
+	if p.videoRef != "" {
+		f.Video = &VideoState{Ref: p.videoRef, StartMs: p.videoStart, Now: p.now - p.videoStart}
+	}
 	return f
 }
 

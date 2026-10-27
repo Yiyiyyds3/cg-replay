@@ -16,10 +16,56 @@ var assetDirs = []string{
 	"image00", "image01", "cndate04",
 	"raw/data/fgimage", "raw/data/image", "raw/data/bgimage", "raw/data/system", "raw/data/rule",
 	"fgimage", "image", "bgimage", "system", "rule",
+	// 影片（OP/ED）：CS2 解包树把动画放在「视频/动画_movie」等目录。
+	"视频/动画_movie", "视频/动画_汉化更新", "video", "movie", "anime/movie", "raw/data/movie",
 }
 
 // assetExts 候选扩展名（storage 名常常不带扩展名；.hg3 是 CatSystem2 侧，见 decode/hg3.go）。
-var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3"}
+var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3",
+	// 影片扩展名放最后：静态图优先，找不到才当视频试。
+	".mpg", ".mpeg", ".wmv", ".mp4", ".avi", ".webm"}
+
+// assetRoots 素材根的候选：自身 + 上一层（容纳「视频/」与「原始归档解包/」平级的布局）。
+func assetRoots(root string) []string {
+	root = strings.TrimRight(root, `\/`)
+	out := []string{root}
+	if parent := filepath.Dir(root); parent != "" && parent != root {
+		out = append(out, parent)
+	}
+	return out
+}
+
+// AssetPath 把演出台本里的「storage 名」解析成解包目录下的真实文件路径。
+//
+// 与 GameLoader 共用同一套候选规则：先按原路径找，再在常见素材子目录里试扩展名。
+func AssetPath(root, rel string) (string, error) {
+	rel = strings.TrimSpace(rel)
+	if rel == "" {
+		return "", fmt.Errorf("空素材名")
+	}
+	slashRel := filepath.FromSlash(rel)
+	base := filepath.Base(slashRel)
+	stem := strings.TrimSuffix(base, filepath.Ext(base))
+	cands := []string{filepath.Join(root, slashRel)}
+	// 也要往上一层找：第三方解包树把「视频/」放在 原始归档解包/ 的同级，
+	// 用户通常把 root 指到 原始归档解包/（那里才有 scene/）。
+	for _, base := range assetRoots(root) {
+		for _, d := range assetDirs {
+			for _, ext := range assetExts {
+				if d == "" && ext == "" {
+					continue
+				}
+				cands = append(cands, filepath.Join(base, filepath.FromSlash(d), stem+ext))
+			}
+		}
+	}
+	for _, c := range cands {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c, nil
+		}
+	}
+	return "", fmt.Errorf("素材未找到: %s", rel)
+}
 
 // GameLoader 在解包目录下按「storage 名」找图并解码。
 //
@@ -42,12 +88,14 @@ func GameLoader(root string) Loader {
 		base := filepath.Base(slashRel)
 		stem := strings.TrimSuffix(base, filepath.Ext(base))
 		cands := []string{filepath.Join(root, slashRel)}
-		for _, d := range assetDirs {
-			for _, ext := range assetExts {
-				if d == "" && ext == "" {
-					continue
+		for _, base := range assetRoots(root) {
+			for _, d := range assetDirs {
+				for _, ext := range assetExts {
+					if d == "" && ext == "" {
+						continue
+					}
+					cands = append(cands, filepath.Join(base, filepath.FromSlash(d), stem+ext))
 				}
-				cands = append(cands, filepath.Join(root, filepath.FromSlash(d), stem+ext))
 			}
 		}
 		for _, c := range cands {

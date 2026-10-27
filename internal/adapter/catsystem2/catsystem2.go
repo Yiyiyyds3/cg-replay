@@ -694,6 +694,22 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 		c := it.Cmd
 		tag := strings.ToLower(c.Tag)
 		switch tag {
+		case "movie", "sysmovie":
+			// movie <名> [#flag*3] [音量]：OP/ED 影片，铺满舞台。
+			// 影片不进图层表（它不是静态图），单独发一条 video_show。
+			if len(c.Args) == 0 {
+				break
+			}
+			name := strings.TrimSpace(c.Args[0])
+			if name == "" {
+				break
+			}
+			add(name)
+			ev.Timeline = append(ev.Timeline, ir.TimelineOp{
+				TMs: clock, Op: "video_show", Target: "video",
+				Params: map[string]interface{}{"ref": name},
+			})
+
 		case "bg", "cg", "fg", "eg":
 			// 图层命令有两种形态：
 			//   bg 0 bg03_smr_b             换图（第三 token 是图片名）
@@ -792,7 +808,7 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 					ev.Voices = append(ev.Voices, ir.Voice{LineID: ev.Texts[i].LineID, Asset: *ar})
 				}
 			}
-		case "se", "bgm", "movie", "sysmovie":
+		case "se", "bgm":
 			for _, a := range c.Args {
 				if !isAllDigits(a) && !isCSCmdWord(a) {
 					add(a)
