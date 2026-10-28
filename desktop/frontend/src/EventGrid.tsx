@@ -12,10 +12,12 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
   Ship,
   Star,
   Users,
 } from "lucide-react";
+import { SettingsDialog } from "./SettingsDialog";
 import {
   api,
   type CardItem,
@@ -85,6 +87,17 @@ export default function EventGrid({
   });
   // 点「开始解包」后、真解之前先问一次（有影片时）。
   const [askVideo, setAskVideo] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false); // 设置弹层
+
+  // 改「提取影片」偏好：状态 + localStorage 一起写（弹层与面板勾选框共用）。
+  const setExtractVideoPref = (next: boolean) => {
+    setExtractVideo(next);
+    try {
+      window.localStorage.setItem(EXTRACT_VIDEO_KEY, next ? "1" : "0");
+    } catch {
+      /* localStorage 不可用就只影响本次会话 */
+    }
+  };
 
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
@@ -768,6 +781,15 @@ export default function EventGrid({
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            title="设置"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </header>
 
         {/* 错误横幅区：任何异常都常驻可见（对齐 FR-12） */}
@@ -843,15 +865,7 @@ export default function EventGrid({
                       <input
                         type="checkbox"
                         checked={extractVideo}
-                        onChange={(e) => {
-                          const next = e.target.checked;
-                          setExtractVideo(next);
-                          try {
-                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, next ? "1" : "0");
-                          } catch {
-                            /* localStorage 不可用就只影响本次 */
-                          }
-                        }}
+                        onChange={(e) => setExtractVideoPref(e.target.checked)}
                         disabled={unpacking}
                         className="h-3.5 w-3.5 accent-primary"
                       />
@@ -862,7 +876,7 @@ export default function EventGrid({
                     </label>
                     <div className="pl-6 text-[10px] text-muted-foreground/80">
                       关掉可省这份空间，但这些事件播放时会缺素材。
-                      <b>以后想加回来：重新解包时这块面板会再问一次，勾选状态也会记住（就在这里改）。</b>
+                      <b>以后想加回来：右上角 ⚙ 设置 → 解包 → 勾上「提取 OP/ED 影片」。</b>
                       已解包的游戏需要重解一次才会补上影片。
                     </div>
                   </div>
@@ -877,13 +891,7 @@ export default function EventGrid({
                       <Button
                         size="sm"
                         onClick={() => {
-                          const remember = true;
-                          setExtractVideo(remember);
-                          try {
-                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, "1");
-                          } catch {
-                            /* ignore */
-                          }
+                          setExtractVideoPref(true);
                           void runUnpack(false);
                         }}
                         disabled={unpacking || busy}
@@ -894,12 +902,7 @@ export default function EventGrid({
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          setExtractVideo(false);
-                          try {
-                            window.localStorage.setItem(EXTRACT_VIDEO_KEY, "0");
-                          } catch {
-                            /* ignore */
-                          }
+                          setExtractVideoPref(false);
                           void runUnpack(true);
                         }}
                         disabled={unpacking || busy}
@@ -911,7 +914,7 @@ export default function EventGrid({
                       </Button>
                     </div>
                     <div className="mt-1.5 text-[10px] text-muted-foreground">
-                      选择会被记住；想改回来随时在上面勾选框里改（已解包的游戏需重解才能补上）。
+                      选择会被记住；想改回来随时在右上角 ⚙ 设置里改（已解包的游戏需重解才能补上）。
                     </div>
                   </div>
                 )}
@@ -1046,6 +1049,15 @@ export default function EventGrid({
           </main>
         )}
       </div>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        extractVideo={extractVideo}
+        onChangeExtractVideo={setExtractVideoPref}
+        autoPrune={autoPrune}
+        onToggleAutoPrune={() => void toggleAutoPrune()}
+      />
     </div>
   );
 }
