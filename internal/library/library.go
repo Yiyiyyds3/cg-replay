@@ -245,6 +245,42 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 		})
 	}
 
+	// ③′ 影片脚本（OP/ED）：KiriKiri 把它们放在 raw/data/sysscn/ 之类的系统目录，
+	// 不在剧本目录，所以上面扫不到。这里只收**含影片指令**的脚本——那个目录里
+	// 几十个 .ks 全是系统 UI 脚本（brows/save/option…），收进来是噪声。
+	for _, md := range conv.MovieDirs {
+		mdir := filepath.Join(root, filepath.FromSlash(md))
+		ents, err := os.ReadDir(mdir)
+		if err != nil {
+			continue // 没有这个目录很正常（不是每个游戏都有）
+		}
+		ext := conv.ScriptExt
+		if ext == "" {
+			ext = ".ks"
+		}
+		for _, e := range ents {
+			if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ext) {
+				continue
+			}
+			p := filepath.Join(mdir, e.Name())
+			data, err := os.ReadFile(p)
+			if err != nil || !kirikiri.ScriptHasMovie(data) {
+				continue
+			}
+			id := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+			if lib.hasSceneID(id) {
+				// 与剧本目录里的同名脚本撞了：加目录前缀区分
+				id = filepath.Base(mdir) + "_" + id
+			}
+			lib.Scenes = append(lib.Scenes, SceneEvent{
+				ID:       id,
+				Title:    id,
+				Script:   rel(p),
+				HasVideo: true,
+			})
+		}
+	}
+
 	// ④ 演出段落：场景脚本里原作自己的章节标记（*labelNN|显示名）。
 	// 一个长脚本常有几十个标签但只有十来个章节标记，按章节切才是「演出段落」。
 	//
@@ -459,4 +495,14 @@ func tailDigits(s string) string {
 		i--
 	}
 	return s[i:]
+}
+
+// hasSceneID 事件库里是否已有这个 ID（收影片脚本时避免与剧本目录撞名）。
+func (l *Library) hasSceneID(id string) bool {
+	for _, s := range l.Scenes {
+		if s.ID == id {
+			return true
+		}
+	}
+	return false
 }

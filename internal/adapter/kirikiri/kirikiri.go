@@ -791,16 +791,37 @@ func (a *Adapter) Transitions() *adapter.TransitionRegistry {
 	return r
 }
 
-// ScriptHasMovie 脚本里有没有影片指令（[movie] / [video] / [sysmovie]）。
+// ScriptHasMovie 脚本里有没有「播放影片」的指令。
 //
 // KiriKiri 的 .ks 是明文脚本，所以不必完整解析就能知道「这个场景是不是 OP/ED」。
 // 这里只认 KiriKiri 自己的语法；「算不算影片事件」由 ir.HasVideo 统一判定。
+//
+// 注意 [video] 有两种用法，别混：
+//
+//	[video storage="op.mpg"]        → 播影片，算
+//	[video visible=false]           → 只是关掉视频图层（title.ks/loadinit.ks），
+//	                                  **不算**（真机核对过 9nine 的这两个文件）
 func ScriptHasMovie(data []byte) bool {
 	s := strings.ToLower(string(data))
-	for _, tag := range []string{"[movie", "[video", "[sysmovie"} {
+	for _, tag := range []string{"[movie", "[sysmovie"} {
 		if strings.Contains(s, tag) {
 			return true
 		}
 	}
-	return false
+	// [video]：排除 visible=false 的图层开关写法
+	for i := 0; ; {
+		j := strings.Index(s[i:], "[video")
+		if j < 0 {
+			return false
+		}
+		j += i
+		end := j + 40
+		if end > len(s) {
+			end = len(s)
+		}
+		if !strings.Contains(s[j:end], "visible=false") {
+			return true
+		}
+		i = j + 6
+	}
 }
