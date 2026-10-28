@@ -863,10 +863,19 @@ export default function EventGrid({
                 )}
                 {!unpackPlan.unsupported && (unpackPlan.imported_videos ?? 0) > 0 && (
                   <div
-                    className="pt-1 text-[11px] text-emerald-400"
-                    title="以磁盘上的实际文件为准：重解不会删除它们，也不受「提取影片」设置影响。"
+                    className="pt-1 text-[11px]"
+                    title="以磁盘上的实际文件为准；重解不会删除已有影片，只补缺的。"
                   >
-                    已含 {unpackPlan.imported_videos} 个影片（重解不会删除，可正常播放）
+                    {(unpackPlan.imported_videos ?? 0) < unpackPlan.videos ? (
+                      <span className="text-amber-300">
+                        已有 {unpackPlan.imported_videos} / {unpackPlan.videos} 个影片 ·
+                        重解会补上差的 {unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400">
+                        影片已全部提取（{unpackPlan.imported_videos} 个）
+                      </span>
+                    )}
                   </div>
                 )}
                 {!unpackPlan.unsupported &&
