@@ -860,8 +860,11 @@ export default function EventGrid({
                   </div>
                 )}
                 {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <label className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="pt-1">
+                    <label
+                      className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
+                      title="关掉后影片事件不能播；已解包的游戏需重解才能补上。之后可在右上角 ⚙ 设置里改。"
+                    >
                       <input
                         type="checkbox"
                         checked={extractVideo}
@@ -874,18 +877,12 @@ export default function EventGrid({
                         {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）
                       </span>
                     </label>
-                    <div className="pl-6 text-[10px] text-muted-foreground/80">
-                      关掉可省这份空间，但这些事件播放时会缺素材。
-                      <b>以后想加回来：右上角 ⚙ 设置 → 解包 → 勾上「提取 OP/ED 影片」。</b>
-                      已解包的游戏需要重解一次才会补上影片。
-                    </div>
                   </div>
                 )}
                 {askVideo && !unpackPlan.unsupported && (
                   <div className="mt-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
                     <div className="text-[11px] text-foreground">
-                      检测到 {unpackPlan.videos} 个 OP/ED 影片（约{" "}
-                      {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）。默认会一起提取，要跳过吗？
+                      有 {unpackPlan.videos} 个影片（{(unpackPlan.video_bytes / 1048576).toFixed(0)} MB），一起提取？
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
@@ -907,15 +904,13 @@ export default function EventGrid({
                         }}
                         disabled={unpacking || busy}
                       >
-                        跳过影片（省 {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）
+                        跳过影片
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setAskVideo(false)} disabled={unpacking}>
                         再想想
                       </Button>
                     </div>
-                    <div className="mt-1.5 text-[10px] text-muted-foreground">
-                      选择会被记住；想改回来随时在右上角 ⚙ 设置里改（已解包的游戏需重解才能补上）。
-                    </div>
+                    <div className="mt-1.5 text-[10px] text-muted-foreground">选择会记住，可在 ⚙ 设置里改</div>
                   </div>
                 )}
                 {unpackPlan.unsupported && (

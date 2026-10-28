@@ -60,7 +60,7 @@ export function SettingsDialog({
           </Button>
         </div>
 
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-5 py-4">
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
           {/* 解包 */}
           <section className="space-y-2">
             <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">解包</h3>
@@ -73,15 +73,11 @@ export function SettingsDialog({
               />
               <span className="min-w-0">
                 <span className="block text-sm">提取 OP/ED 影片</span>
-                <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                  影片很占空间（单个 100~300 MB，一部作品常常 1~2 GB）。关掉后影片事件仍会出现在事件库里，
-                  但播放时缺素材；<b>已经解包的游戏需要重新解包才会补上</b>。
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  更费空间；关掉后影片不能播（已解包的需重解）
                 </span>
               </span>
             </label>
-            <p className="pl-6 text-[11px] text-muted-foreground/80">
-              解包预览面板里还有一个同样的勾选框，用于那一次导入临时覆盖这个设置。
-            </p>
           </section>
 
           {/* 播放记录 */}
@@ -95,17 +91,15 @@ export function SettingsDialog({
                 className="mt-0.5 h-4 w-4 accent-primary"
               />
               <span className="min-w-0">
-                <span className="block text-sm">启动时自动清理 3 天前的最近播放</span>
-                <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-                  只清理「最近播放」记录，不动收藏、评分与备注。
-                </span>
+                <span className="block text-sm">启动时清理 3 天前的最近播放</span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">不影响收藏与评分</span>
               </span>
             </label>
           </section>
         </div>
 
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
-          <span className="text-[11px] text-muted-foreground">设置会自动保存</span>
+          <span className="text-[11px] text-muted-foreground">自动保存</span>
           <Button size="sm" onClick={onClose}>
             完成
           </Button>
