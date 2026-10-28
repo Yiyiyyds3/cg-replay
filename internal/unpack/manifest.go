@@ -20,6 +20,12 @@ type manifest struct {
 	Version  int           `json:"version"`
 	Written  string        `json:"written"`
 	Archives []archiveMark `json:"archives"`
+	// Videos 解出来的影片文件名（相对产物根）。有了它，「已含几个影片」
+	// 只需 stat 这几个文件，不必扫整个产物目录（1.6 万个文件要 200+ ms）。
+	Videos []string `json:"videos,omitempty"`
+	// Files/Bytes 这次解出来的文件数与字节数（用于预览显示体积）。
+	Files int   `json:"files"`
+	Bytes int64 `json:"bytes"`
 }
 
 // archiveMark 一个归档的指纹（名称 + 大小 + 修改时间）。
@@ -73,12 +79,31 @@ func readManifest(dest string) *manifest {
 	return &m
 }
 
+// ExistingVideos 产物目录里现有多少影片。
+//
+// 优先用清单里记的文件名（只需 stat 几个文件）；清单缺失（旧版本解的）就退回扫目录。
+func ExistingVideos(dest string) int {
+	if m := readManifest(dest); m != nil && len(m.Videos) > 0 {
+		n := 0
+		for _, name := range m.Videos {
+			if _, err := os.Stat(filepath.Join(dest, filepath.FromSlash(name))); err == nil {
+				n++
+			}
+		}
+		return n
+	}
+	return CountVideos(dest)
+}
+
 // writeManifest 落盘清单（失败不影响解包结果，只让下次退化成「归档变了→重解」）。
-func writeManifest(dest string, archives []string) error {
+func writeManifest(dest string, archives []string, videos []string, files int, bytes int64) error {
 	m := manifest{
 		Version:  1,
 		Written:  time.Now().Format(time.RFC3339),
 		Archives: markArchives(archives),
+		Videos:   videos,
+		Files:    files,
+		Bytes:    bytes,
 	}
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {

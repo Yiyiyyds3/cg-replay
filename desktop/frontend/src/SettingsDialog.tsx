@@ -18,6 +18,7 @@ export function SettingsDialog({
   onChangeExtractVideo,
   autoPrune,
   onToggleAutoPrune,
+  onReset,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +26,7 @@ export function SettingsDialog({
   onChangeExtractVideo: (v: boolean) => void;
   autoPrune: boolean;
   onToggleAutoPrune: () => void;
+  onReset: () => void;
 }) {
   // Esc 关闭
   useEffect(() => {
@@ -100,9 +102,14 @@ export function SettingsDialog({
 
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <span className="text-[11px] text-muted-foreground">自动保存</span>
-          <Button size="sm" onClick={onClose}>
-            完成
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={onReset} title="恢复默认：提取影片开、启动清理关">
+              恢复默认
+            </Button>
+            <Button size="sm" onClick={onClose}>
+              完成
+            </Button>
+          </div>
         </div>
       </div>
     </div>

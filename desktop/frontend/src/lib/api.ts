@@ -51,6 +51,9 @@ export interface UnpackPlanDTO {
   imported_videos: number;
   /** 该源之前已解包过（产物目录非空） */
   imported: boolean;
+  /** 这次解包预计产出的字节数/文件数 */
+  est_bytes: number;
+  est_files: number;
   encrypted: number;
   notes: string[];
   unsupported: boolean;

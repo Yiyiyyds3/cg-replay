@@ -456,3 +456,29 @@ func TestUnpackArchiveChanged(t *testing.T) {
 		t.Fatalf("归档变了应重解出 BBBB，实际 %q", got)
 	}
 }
+
+// TestExistingVideos 已有影片数走清单（只 stat 清单里的几个文件），不扫整个目录。
+func TestExistingVideos(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[movie storage=\"op.mpg\"]\n[image storage=\"a.png\"]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+		{path: "data/movie/op.mpg", data: []byte("MPG")},
+	})
+	dest := t.TempDir()
+	if _, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll}); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExistingVideos(dest); got != 1 {
+		t.Fatalf("应数出 1 个影片，实际 %d", got)
+	}
+	// 用户手动删掉 → 立刻反映为 0
+	vid := filepath.Join(dest, "raw", "data", "image", "op.mpg")
+	if err := os.Remove(vid); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExistingVideos(dest); got != 0 {
+		t.Fatalf("删掉影片后应为 0，实际 %d", got)
+	}
+}

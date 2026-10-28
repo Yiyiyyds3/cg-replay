@@ -109,15 +109,24 @@ export default function EventGrid({
   });
 
   // 切换「启动自动清理」：落 localStorage，并立刻手动跑一次让用户看到效果。
-  const toggleAutoPrune = async () => {
-    const next = !autoPrune;
-    setAutoPrune(next);
+  const setAutoPrunePref = (v: boolean) => {
+    setAutoPrune(v);
     try {
-      window.localStorage.setItem(AUTOPRUNE_KEY, next ? "1" : "0");
+      window.localStorage.setItem(AUTOPRUNE_KEY, v ? "1" : "0");
     } catch {
       /* 隐私模式下写不了：本次会话内仍然生效 */
     }
+  };
+  const toggleAutoPrune = async () => {
+    const next = !autoPrune;
+    setAutoPrunePref(next);
     if (next) await pruneRecent();
+  };
+
+  // 恢复默认：提取影片=开、启动自动清理=关。
+  const resetSettings = () => {
+    setExtractVideoPref(true);
+    setAutoPrunePref(false);
   };
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
@@ -826,6 +835,8 @@ export default function EventGrid({
                   <div className="text-[11px] text-muted-foreground">
                     引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
                     预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
+                    {(unpackPlan.est_bytes ?? 0) > 0 &&
+                      ` · 预计占盘 ${(unpackPlan.est_bytes / 1048576).toFixed(0)} MB`}
                     {unpackPlan.encrypted > 0 &&
                       ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`}
                   </div>
@@ -1089,6 +1100,7 @@ export default function EventGrid({
         onChangeExtractVideo={setExtractVideoPref}
         autoPrune={autoPrune}
         onToggleAutoPrune={() => void toggleAutoPrune()}
+        onReset={resetSettings}
       />
     </div>
   );

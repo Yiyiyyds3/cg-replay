@@ -47,10 +47,13 @@ type Plan struct {
 	Refs          int      `json:"refs"`           // 引用到的素材数
 	Videos        int      `json:"videos"`         // 其中影片（OP/ED）条目数
 	VideoBytes    int64    `json:"video_bytes"`    // 影片原始体积（估算）
-	Encrypted     int      `json:"encrypted"`      // 加密条目数（不解，要密钥）
-	Notes         []string `json:"notes"`
-	Unsupported   bool     `json:"unsupported"` // 引擎暂不支持自动解包
-	Reason        string   `json:"reason"`      // 不支持的原因（对用户明说）
+	// EstBytes/EstFiles 这次解包预计产出多少字节/文件（闭包里的引用总量）
+	EstBytes    int64    `json:"est_bytes"`
+	EstFiles    int      `json:"est_files"`
+	Encrypted   int      `json:"encrypted"` // 加密条目数（不解，要密钥）
+	Notes       []string `json:"notes"`
+	Unsupported bool     `json:"unsupported"` // 引擎暂不支持自动解包
+	Reason      string   `json:"reason"`      // 不支持的原因（对用户明说）
 }
 
 // Result 解包结果。
@@ -254,12 +257,18 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 	// 顺便数出影片条目与体积：用户据此决定「要不要把它们一起解出来」。
 	for r := range refs {
 		e, ok := assets.lookup(r)
-		if !ok || !isVideoPath(e.path) {
+		if !ok {
 			continue
 		}
-		p.Videos++
 		for _, sg := range e.segs {
-			p.VideoBytes += sg.Size
+			p.EstBytes += sg.Size
+		}
+		p.EstFiles++
+		if isVideoPath(e.path) {
+			p.Videos++
+			for _, sg := range e.segs {
+				p.VideoBytes += sg.Size
+			}
 		}
 	}
 	if p.Encrypted > 0 {
@@ -296,6 +305,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+	var videoNames []string // 解出的影片（相对产物根），写进清单备查
 
 	// 增量是否可信：只有「源归档与上次解包时一致」才允许复用已存在的文件。
 	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了。
@@ -413,9 +423,15 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		res.Files++
 		res.Bytes += int64(len(data))
+		if isVideoPath(e.path) {
+			rel, rerr := filepath.Rel(dest, assetPath)
+			if rerr == nil {
+				videoNames = append(videoNames, filepath.ToSlash(rel))
+			}
+		}
 	}
 	// 记下这次依据的归档指纹，供下次判断「能不能复用」。
-	if err := writeManifest(dest, archives); err != nil {
+	if err := writeManifest(dest, archives, videoNames, res.Files, res.Bytes); err != nil {
 		res.Warnings = append(res.Warnings, "写归档指纹失败："+err.Error())
 	}
 

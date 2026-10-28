@@ -32,7 +32,10 @@ type UnpackPlanDTO struct {
 	// >0 表示之前提过：重解不会删它们，也不用再问「要不要提取」。
 	ImportedVideos int `json:"imported_videos"`
 	// Imported 该源之前已解包过（产物目录非空）→ 重读时给「复用 / 强制重解」选项
-	Imported    bool     `json:"imported"`
+	Imported bool `json:"imported"`
+	// EstBytes/EstFiles 这次解包预计产出多少字节/文件
+	EstBytes    int64    `json:"est_bytes"`
+	EstFiles    int      `json:"est_files"`
 	Encrypted   int      `json:"encrypted"`
 	Notes       []string `json:"notes"`
 	Unsupported bool     `json:"unsupported"`
@@ -76,13 +79,15 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 		dest := filepath.Join(dataDir(), "games", registry.IDFor(clean))
 		if st, statErr := os.Stat(dest); statErr == nil && st.IsDir() {
 			imported = !emptyDir(dest)
-			existing = unpack.CountVideos(dest)
+			existing = unpack.ExistingVideos(dest)
 		}
 	}
 	return &UnpackPlanDTO{
 		EngineID:       plan.EngineID,
 		ImportedVideos: existing,
 		Imported:       imported,
+		EstBytes:       plan.EstBytes,
+		EstFiles:       plan.EstFiles,
 		Kind:           plan.Kind,
 		Archives:       plan.Archives,
 		ScenarioFiles:  plan.ScenarioFiles,
