@@ -790,3 +790,17 @@ func (a *Adapter) Transitions() *adapter.TransitionRegistry {
 	r.Register("blind", adapter.TransitionImpl{ImplKey: "wipe", DurationMs: 800})
 	return r
 }
+
+// ScriptHasMovie 脚本里有没有影片指令（[movie] / [video] / [sysmovie]）。
+//
+// KiriKiri 的 .ks 是明文脚本，所以不必完整解析就能知道「这个场景是不是 OP/ED」。
+// 这里只认 KiriKiri 自己的语法；「算不算影片事件」由 ir.HasVideo 统一判定。
+func ScriptHasMovie(data []byte) bool {
+	s := strings.ToLower(string(data))
+	for _, tag := range []string{"[movie", "[video", "[sysmovie"} {
+		if strings.Contains(s, tag) {
+			return true
+		}
+	}
+	return false
+}

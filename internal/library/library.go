@@ -232,10 +232,16 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	sort.Strings(names)
 	for _, name := range names {
 		id := strings.TrimSuffix(name, filepath.Ext(name))
+		// 影片场景（OP/ED）：KiriKiri 的 .ks 是明文脚本，认一下自己的语法即可。
+		hasVideo := false
+		if data, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
+			hasVideo = kirikiri.ScriptHasMovie(data)
+		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
-			ID:     id,
-			Title:  id,
-			Script: rel(filepath.Join(dir, name)),
+			ID:       id,
+			Title:    id,
+			Script:   rel(filepath.Join(dir, name)),
+			HasVideo: hasVideo,
 		})
 	}
 

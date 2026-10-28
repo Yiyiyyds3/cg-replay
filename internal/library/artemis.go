@@ -56,16 +56,19 @@ func ScanArtemis(root string, conv adapter.Convention) (*Library, error) {
 			continue // 单个剧本坏掉不拖垮整个库
 		}
 		stem := strings.TrimSuffix(name, filepath.Ext(name))
-		for _, blk := range artemis.BlockTitles(ast) {
+		movieFlags := artemis.BlockMovieFlags(ast)
+		for bi, blk := range artemis.BlockTitles(ast) {
 			title := blk.Title
 			if title == "" {
 				title = fmt.Sprintf("%s#%d", stem, blk.Index)
 			}
+			hasVideo := bi < len(movieFlags) && movieFlags[bi]
 			lib.Scenes = append(lib.Scenes, SceneEvent{
-				ID:     fmt.Sprintf("%s#%d", stem, blk.Index),
-				Title:  title,
-				Script: rel(p),
-				Label:  fmt.Sprint(blk.Index),
+				ID:       fmt.Sprintf("%s#%d", stem, blk.Index),
+				Title:    title,
+				Script:   rel(p),
+				Label:    fmt.Sprint(blk.Index),
+				HasVideo: hasVideo,
 			})
 		}
 	}

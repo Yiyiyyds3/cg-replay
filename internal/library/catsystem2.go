@@ -60,13 +60,7 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 			continue
 		}
 		stem := strings.TrimSuffix(name, filepath.Ext(name))
-		hasVideo := false
-		for _, op := range ev.Show {
-			if op.Kind == ir.ShowVideoPlay {
-				hasVideo = true
-				break
-			}
-		}
+		hasVideo := ir.HasVideo(ev)
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:       stem,
 			Title:    stem,

@@ -381,3 +381,28 @@ func CollectAssetHashes(ir *IR) []string {
 	sort.Strings(out)
 	return out
 }
+
+// HasVideo 判断一个演出事件里有没有影片。
+//
+// 「什么算影片事件」只有这一处口径：各引擎的**表达方式**不同（CatSystem2 是
+// 独立的 video_play 指令，KiriKiri/Artemis 是一种 movie 图层），但判定规则统一，
+// 这样 UI 与事件库都只认一个信号，不必每个引擎各写一套。
+//
+// 引擎要做的是「从自己的语法里认出影片」（那是解析，本来就属于引擎），
+// 然后把台本交到这里判定。
+func HasVideo(ev *Event) bool {
+	if ev == nil {
+		return false
+	}
+	for _, op := range ev.Show {
+		if op.Kind == ShowVideoPlay {
+			return true
+		}
+	}
+	for _, l := range ev.Layers {
+		if l.Kind == LayerMovie {
+			return true
+		}
+	}
+	return false
+}
