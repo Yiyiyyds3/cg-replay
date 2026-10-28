@@ -680,6 +680,7 @@ export namespace main {
 	    videos: number;
 	    video_bytes: number;
 	    imported_videos: number;
+	    imported: boolean;
 	    encrypted: number;
 	    notes: string[];
 	    unsupported: boolean;
@@ -700,6 +701,7 @@ export namespace main {
 	        this.videos = source["videos"];
 	        this.video_bytes = source["video_bytes"];
 	        this.imported_videos = source["imported_videos"];
+	        this.imported = source["imported"];
 	        this.encrypted = source["encrypted"];
 	        this.notes = source["notes"];
 	        this.unsupported = source["unsupported"];

@@ -49,6 +49,8 @@ export interface UnpackPlanDTO {
   video_bytes: number; // 影片原始体积（估算）
   /** 该源已解包目录里现有的影片数（>0 = 之前提过，重解不会删） */
   imported_videos: number;
+  /** 该源之前已解包过（产物目录非空） */
+  imported: boolean;
   encrypted: number;
   notes: string[];
   unsupported: boolean;
@@ -197,10 +199,10 @@ export const api = {
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
   unpackPreview: (path: string) =>
     bridge().UnpackPreview(path) as Promise<UnpackPlanDTO>,
-  unpackImport: (path: string, skipVideo: boolean) =>
-    bridge().UnpackImport(path, skipVideo) as Promise<UnpackImportDTO>,
-  unpackImportDecrypt: (path: string, scheme: string, key: number, skipVideo: boolean) =>
-    bridge().UnpackImportDecrypt(path, scheme, key, skipVideo) as Promise<UnpackImportDTO>,
+  unpackImport: (path: string, skipVideo: boolean, force: boolean) =>
+    bridge().UnpackImport(path, skipVideo, force) as Promise<UnpackImportDTO>,
+  unpackImportDecrypt: (path: string, scheme: string, key: number, skipVideo: boolean, force: boolean) =>
+    bridge().UnpackImportDecrypt(path, scheme, key, skipVideo, force) as Promise<UnpackImportDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,

@@ -385,3 +385,29 @@ func TestUnpackIncremental(t *testing.T) {
 		t.Fatalf("应只补 1 个缺失文件，实际写了 %d 个", r3.Files)
 	}
 }
+
+// TestUnpackForce 强制重解：忽略增量，全部重写（补丁改了内容但大小没变时用）。
+func TestUnpackForce(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[image storage=\"a.png\"]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+	})
+	dest := t.TempDir()
+
+	r1, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll, Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Reused != 0 {
+		t.Fatalf("强制重解不该有复用，实际 %d", r2.Reused)
+	}
+	if r2.Files != r1.Files {
+		t.Fatalf("强制重解应重写全部：files=%d，首次 %d", r2.Files, r1.Files)
+	}
+}

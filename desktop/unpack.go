@@ -30,11 +30,13 @@ type UnpackPlanDTO struct {
 	VideoBytes    int64    `json:"video_bytes"`
 	// ImportedVideos 该源**已经解包过**的目录里现有多少影片。
 	// >0 表示之前提过：重解不会删它们，也不用再问「要不要提取」。
-	ImportedVideos int      `json:"imported_videos"`
-	Encrypted      int      `json:"encrypted"`
-	Notes          []string `json:"notes"`
-	Unsupported    bool     `json:"unsupported"`
-	Reason         string   `json:"reason"`
+	ImportedVideos int `json:"imported_videos"`
+	// Imported 该源之前已解包过（产物目录非空）→ 重读时给「复用 / 强制重解」选项
+	Imported    bool     `json:"imported"`
+	Encrypted   int      `json:"encrypted"`
+	Notes       []string `json:"notes"`
+	Unsupported bool     `json:"unsupported"`
+	Reason      string   `json:"reason"`
 }
 
 // UnpackImportDTO 导入结果（解包 + 登记）。
@@ -69,15 +71,18 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 	}
 	// 这个源如果之前解过，看看产物目录里现有多少影片（按磁盘实况，不看记忆）。
 	existing := 0
+	imported := false
 	if clean := filepath.Clean(strings.TrimSpace(path)); clean != "" {
 		dest := filepath.Join(dataDir(), "games", registry.IDFor(clean))
 		if st, statErr := os.Stat(dest); statErr == nil && st.IsDir() {
+			imported = !emptyDir(dest)
 			existing = unpack.CountVideos(dest)
 		}
 	}
 	return &UnpackPlanDTO{
 		EngineID:       plan.EngineID,
 		ImportedVideos: existing,
+		Imported:       imported,
 		Kind:           plan.Kind,
 		Archives:       plan.Archives,
 		ScenarioFiles:  plan.ScenarioFiles,
@@ -94,7 +99,7 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 
 // UnpackImportDecrypt 带解密方案地解包（方案名见 unpack.SchemeFromString；
 // 固定密钥 key 供 "xor" 方案用；其余方案由条目自身的 adlr 派生密钥）。
-func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo bool) (*UnpackImportDTO, error) {
+func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo, force bool) (*UnpackImportDTO, error) {
 	sc, err := unpack.SchemeFromString(scheme)
 	if err != nil {
 		return nil, err
@@ -104,6 +109,7 @@ func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo bool) 
 		Decrypt:   sc,
 		Key:       byte(key),
 		SkipVideo: skipVideo,
+		Force:     force,
 	})
 }
 
@@ -112,8 +118,8 @@ func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo bool) 
 // 目标目录固定为 `%LOCALAPPDATA%\cgreplay-ui\games\<源路径 id>`，同一份源
 // 重复导入落在同一处（幂等）。登记时以**解包产物目录**为游戏根目录，
 // 播放器直接就能读。
-func (a *App) UnpackImport(path string, skipVideo bool) (*UnpackImportDTO, error) {
-	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG, SkipVideo: skipVideo})
+func (a *App) UnpackImport(path string, skipVideo, force bool) (*UnpackImportDTO, error) {
+	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG, SkipVideo: skipVideo, Force: force})
 }
 
 // unpackImport 真正的解包 + 登记流程（两种入口共用）。
@@ -181,4 +187,21 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 		Connected:    true,
 		Library:      lib,
 	}, nil
+}
+
+// emptyDir 目录里是否一个文件都没有（够判断「解过没」）。
+func emptyDir(dir string) bool {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	for _, e := range ents {
+		if !e.IsDir() {
+			return false
+		}
+		if !emptyDir(filepath.Join(dir, e.Name())) {
+			return false
+		}
+	}
+	return true
 }

@@ -88,6 +88,7 @@ export default function EventGrid({
   // 点「开始解包」后、真解之前先问一次（有影片时）。
   const [askVideo, setAskVideo] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false); // 设置弹层
+  const [forceReextract, setForceReextract] = useState(false); // 重读时「强制重解」
 
   // 改「提取影片」偏好：状态 + localStorage 一起写（弹层与面板勾选框共用）。
   const setExtractVideoPref = (next: boolean) => {
@@ -502,6 +503,7 @@ export default function EventGrid({
       setUnpackPath(path);
       setUnpackPlan(plan);
       setAskVideo(false);
+      setForceReextract(false);
       setUnpackResult(null);
       setUnpackScheme("");
       setUnpackKey("0");
@@ -537,7 +539,7 @@ export default function EventGrid({
 
   // 确认解包 → 解出最小集合 → 登记入库 → 切到该游戏。
   // skipVideo 由调用方显式传入（有影片时先问一次，见 askVideo）。
-  const runUnpack = async (skipVideo: boolean) => {
+  const runUnpack = async (skipVideo: boolean, force: boolean = false) => {
     if (!unpackPath) return;
     const scheme = unpackScheme.trim();
     let key = 0;
@@ -555,8 +557,8 @@ export default function EventGrid({
     setAskVideo(false);
     try {
       const r: UnpackImportDTO = scheme
-        ? await api.unpackImportDecrypt(unpackPath, scheme, key, skipVideo)
-        : await api.unpackImport(unpackPath, skipVideo);
+        ? await api.unpackImportDecrypt(unpackPath, scheme, key, skipVideo, force)
+        : await api.unpackImport(unpackPath, skipVideo, force);
       setUnpackPlan(null);
       setUnpackPath("");
       if (!r.connected || !r.library) {
@@ -899,7 +901,7 @@ export default function EventGrid({
                         size="sm"
                         onClick={() => {
                           setExtractVideoPref(true);
-                          void runUnpack(false);
+                          void runUnpack(false, forceReextract);
                         }}
                         disabled={unpacking || busy}
                       >
@@ -910,7 +912,7 @@ export default function EventGrid({
                         variant="outline"
                         onClick={() => {
                           setExtractVideoPref(false);
-                          void runUnpack(true);
+                          void runUnpack(true, forceReextract);
                         }}
                         disabled={unpacking || busy}
                       >
@@ -922,6 +924,21 @@ export default function EventGrid({
                     </div>
                     <div className="mt-1.5 text-[10px] text-muted-foreground">选择会记住，可在 ⚙ 设置里改</div>
                   </div>
+                )}
+                {!unpackPlan.unsupported && unpackPlan.imported && (
+                  <label
+                    className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground"
+                    title="默认只补缺失的文件；如果换了补丁但画面没变，勾这个全部重写一遍。"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={forceReextract}
+                      onChange={(e) => setForceReextract(e.target.checked)}
+                      disabled={unpacking}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    <span>强制重解（全部重写；默认只补缺失）</span>
+                  </label>
                 )}
                 {unpackPlan.unsupported && (
                   <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
@@ -949,7 +966,7 @@ export default function EventGrid({
                         setAskVideo(true);
                         return;
                       }
-                      void runUnpack(!extractVideo);
+                      void runUnpack(!extractVideo, forceReextract);
                     }}
                     disabled={unpacking || busy}
                   >

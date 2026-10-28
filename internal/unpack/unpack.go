@@ -133,6 +133,10 @@ type Options struct {
 	// SkipVideo 不提取影片（OP/ED）。单个影片就 100~300 MB，全解出来很占盘；
 	// 关掉后视频事件仍在事件库里，只是播放时缺素材（零值 = 提取，向后兼容）。
 	SkipVideo bool
+	// Force 忽略「已存在且大小一致就复用」的增量优化，全部重写。
+	// 用途：换了汉化/修正补丁但文件大小碰巧没变时，增量会误判为「没变」，
+	// 用户看到一个按钮就能强制重来（比默认存哈希清单便宜）。
+	Force bool
 }
 
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
@@ -339,7 +343,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
-		if sameSize(p, int64(len(data))) {
+		if !opts.Force && sameSize(p, int64(len(data))) {
 			// 已经解过且大小一致：内容来自同一份归档，不重写（增量）。
 			res.Reused++
 		} else {
@@ -374,7 +378,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		// 增量：已存在且大小与归档记录一致 → 连归档都不用读（省 IO 与解密）。
 		// 只在不解密时按此判定：解密会改变字节数，大小对不上就老老实实重解。
-		if opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
+		if !opts.Force && opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
 			res.Reused++
 			continue
 		}
