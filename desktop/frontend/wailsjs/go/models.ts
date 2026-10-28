@@ -622,6 +622,7 @@ export namespace main {
 	    encrypted: string[];
 	    warnings: string[];
 	    skipped_video?: number;
+	    reused?: number;
 	    game_id: string;
 	    connected: boolean;
 	    reason?: string;
@@ -643,6 +644,7 @@ export namespace main {
 	        this.encrypted = source["encrypted"];
 	        this.warnings = source["warnings"];
 	        this.skipped_video = source["skipped_video"];
+	        this.reused = source["reused"];
 	        this.game_id = source["game_id"];
 	        this.connected = source["connected"];
 	        this.reason = source["reason"];

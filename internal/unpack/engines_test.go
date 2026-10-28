@@ -339,3 +339,49 @@ func TestCountVideos(t *testing.T) {
 		t.Fatalf("目录不存在应为 0，实际 %d", got)
 	}
 }
+
+// TestUnpackIncremental 重复解包是增量的：已存在且大小一致的文件不重写。
+//
+// 动机：解包原来是「每次全量重写」，重复导入一个已解好的游戏会把几百 MB~几 GB
+// 再写一遍（纯浪费 IO）。现在按「归档记录的大小 == 目标文件大小」判定复用。
+func TestUnpackIncremental(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[image storage=\"a.png\"]\n[image storage=\"b.png\"]\n[wait time=100]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+		{path: "data/image/b.png", data: []byte("PNG-B")},
+	})
+	dest := t.TempDir()
+
+	r1, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第一次解包: %v", err)
+	}
+	if r1.Files == 0 || r1.Reused != 0 {
+		t.Fatalf("第一次应全写、无复用：files=%d reused=%d", r1.Files, r1.Reused)
+	}
+
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第二次解包: %v", err)
+	}
+	if r2.Files != 0 {
+		t.Fatalf("第二次不该重写任何文件：files=%d（复用 %d）", r2.Files, r2.Reused)
+	}
+	if r2.Reused != r1.Files {
+		t.Fatalf("第二次应全部复用：reused=%d，第一次写了 %d", r2.Reused, r1.Files)
+	}
+
+	// 删掉一个文件 → 只补那一个
+	if err := os.Remove(filepath.Join(dest, "raw", "data", "image", "b.png")); err != nil {
+		t.Fatal(err)
+	}
+	r3, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第三次解包: %v", err)
+	}
+	if r3.Files != 1 {
+		t.Fatalf("应只补 1 个缺失文件，实际写了 %d 个", r3.Files)
+	}
+}

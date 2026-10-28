@@ -65,6 +65,8 @@ type Result struct {
 	Warnings  []string `json:"warnings"`
 	// SkippedVideo 按选项跳过的影片数
 	SkippedVideo int `json:"skipped_video,omitempty"`
+	// Reused 已存在且大小一致、直接复用没有重写的文件数（增量解包）
+	Reused int `json:"reused,omitempty"`
 }
 
 // Preview 预览一个游戏目录/归档，不落盘（解包前先给用户看「会解出什么」）。
@@ -337,11 +339,16 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			return nil, err
+		if sameSize(p, int64(len(data))) {
+			// 已经解过且大小一致：内容来自同一份归档，不重写（增量）。
+			res.Reused++
+		} else {
+			if err := os.WriteFile(p, data, 0o644); err != nil {
+				return nil, err
+			}
+			res.Files++
+			res.Bytes += int64(len(data))
 		}
-		res.Files++
-		res.Bytes += int64(len(data))
 		res.Events += len(info.Labels)
 	}
 	// 素材落盘（只解被引用的）。
@@ -360,6 +367,17 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			// 真解不开时上面的解析失败告警会指出。
 			res.Encrypted = append(res.Encrypted, e.path)
 		}
+		assetPath := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
+		want := int64(0)
+		for _, sg := range e.segs {
+			want += sg.Size
+		}
+		// 增量：已存在且大小与归档记录一致 → 连归档都不用读（省 IO 与解密）。
+		// 只在不解密时按此判定：解密会改变字节数，大小对不上就老老实实重解。
+		if opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
+			res.Reused++
+			continue
+		}
 		data, err := assets.read(e)
 		if err != nil {
 			res.Warnings = append(res.Warnings, fmt.Sprintf("读素材 %s 失败：%v", e.base(), err))
@@ -373,11 +391,10 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			}
 			data = plain
 		}
-		p := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(assetPath), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
+		if err := os.WriteFile(assetPath, data, 0o644); err != nil {
 			return nil, err
 		}
 		res.Files++
@@ -473,4 +490,13 @@ func CountVideos(root string) int {
 		return nil
 	})
 	return n
+}
+
+// sameSize 目标文件是否已存在且大小一致（增量解包的判定口径）。
+//
+// 只比大小不比内容：这些文件来自同一份归档，大小一致即可放心复用；
+// 换成哈希就要把文件读一遍，反而把省下的 IO 花回去。
+func sameSize(path string, want int64) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir() && st.Size() == want
 }

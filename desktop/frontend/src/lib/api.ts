@@ -66,6 +66,8 @@ export interface UnpackImportDTO {
   warnings: string[];
   /** 按「不提取影片」选项跳过的数量 */
   skipped_video?: number;
+  /** 已存在且大小一致、直接复用的文件数（增量解包） */
+  reused?: number;
   game_id: string;
   /** false = 已解包但事件库接入失败（例如扫描不到事件），产物仍保留在 dest。 */
   connected: boolean;

@@ -577,7 +577,7 @@ export default function EventGrid({
       setUnpackResult(null);
       setAllWarnings((w) => [
         ...w,
-        `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个事件 → ${r.dest}` +
+        `已导入：新增 ${r.files} 个文件${r.reused ? ` · 复用 ${r.reused} 个` : ""}（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个事件 → ${r.dest}` +
           (r.missing.length ? ` · ${r.missing.length} 个素材没找到` : "") +
           (r.encrypted.length ? ` · ${r.encrypted.length} 个加密条目未解出` : ""),
       ]);

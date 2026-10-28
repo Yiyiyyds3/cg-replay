@@ -48,8 +48,10 @@ type UnpackImportDTO struct {
 	Encrypted []string `json:"encrypted"`
 	Warnings  []string `json:"warnings"`
 	// SkippedVideo 按「不提取影片」选项跳过的数量
-	SkippedVideo int    `json:"skipped_video,omitempty"`
-	GameID       string `json:"game_id"`
+	SkippedVideo int `json:"skipped_video,omitempty"`
+	// Reused 已存在且大小一致、直接复用的文件数（增量解包）
+	Reused int    `json:"reused,omitempty"`
+	GameID string `json:"game_id"`
 	// Connected=false 表示素材已解出，但事件库接入失败（例如该引擎扫描不到事件）。
 	// 这不是解包失败：产物保留在 Dest，前端要给打开目录/手动退路，不能只弹一句错。
 	Connected bool   `json:"connected"`
@@ -155,6 +157,7 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 			Missing:      res.Missing,
 			Encrypted:    res.Encrypted,
 			SkippedVideo: res.SkippedVideo,
+			Reused:       res.Reused,
 			Warnings:     res.Warnings,
 			GameID:       registry.IDFor(filepath.Clean(dest)),
 			Connected:    false,
