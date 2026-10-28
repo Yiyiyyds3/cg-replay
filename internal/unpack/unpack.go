@@ -296,6 +296,16 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+
+	// 增量是否可信：只有「源归档与上次解包时一致」才允许复用已存在的文件。
+	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了。
+	curMarks := markArchives(archives)
+	prev := readManifest(dest)
+	archivesUnchanged := prev != nil && sameMarks(prev.Archives, curMarks)
+	if prev != nil && !archivesUnchanged {
+		res.Warnings = append(res.Warnings,
+			"源归档与上次解包时不一致（换了补丁或更新过），本次全部重解")
+	}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
 		if !deps.IsScript(path) {
@@ -343,7 +353,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
-		if !opts.Force && sameSize(p, int64(len(data))) {
+		if !opts.Force && archivesUnchanged && sameSize(p, int64(len(data))) {
 			// 已经解过且大小一致：内容来自同一份归档，不重写（增量）。
 			res.Reused++
 		} else {
@@ -378,7 +388,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		// 增量：已存在且大小与归档记录一致 → 连归档都不用读（省 IO 与解密）。
 		// 只在不解密时按此判定：解密会改变字节数，大小对不上就老老实实重解。
-		if !opts.Force && opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
+		if !opts.Force && archivesUnchanged && opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
 			res.Reused++
 			continue
 		}
@@ -404,6 +414,11 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		res.Files++
 		res.Bytes += int64(len(data))
 	}
+	// 记下这次依据的归档指纹，供下次判断「能不能复用」。
+	if err := writeManifest(dest, archives); err != nil {
+		res.Warnings = append(res.Warnings, "写归档指纹失败："+err.Error())
+	}
+
 	sort.Strings(res.Missing)
 
 	// 写约定文件（加载器按它找剧本目录）。非 KiriKiri 引擎的画廊/标签规则

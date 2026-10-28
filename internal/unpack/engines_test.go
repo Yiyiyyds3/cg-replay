@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------
@@ -409,5 +410,49 @@ func TestUnpackForce(t *testing.T) {
 	}
 	if r2.Files != r1.Files {
 		t.Fatalf("强制重解应重写全部：files=%d，首次 %d", r2.Files, r1.Files)
+	}
+}
+
+// TestUnpackArchiveChanged 归档变了（大小可能没变）就必须重解，不能靠产物大小蒙过去。
+//
+// 这是「只比大小」方案的漏洞：补丁改了图里的几个字节，大小一模一样，
+// 只比大小会误判成「没变」。改成看源归档指纹（大小 + 纳秒级修改时间）后能发现。
+func TestUnpackArchiveChanged(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	body := func(s string) []byte {
+		return []byte("[image storage=\"a.png\"]\n")
+	}
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: body("ks")},
+		{path: "data/image/a.png", data: []byte("AAAA")}, // 4 字节
+	})
+	dest := t.TempDir()
+	if _, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll}); err != nil {
+		t.Fatal(err)
+	}
+	asset := filepath.Join(dest, "raw", "data", "image", "a.png")
+	if got, _ := os.ReadFile(asset); string(got) != "AAAA" {
+		t.Fatalf("首次内容应为 AAAA，实际 %q", got)
+	}
+
+	// 同尺寸不同内容，并确保修改时间前进（纳秒级）
+	if err := os.Chtimes(xp3, time.Now(), time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: body("ks")},
+		{path: "data/image/a.png", data: []byte("BBBB")}, // 仍然 4 字节
+	})
+
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Reused != 0 {
+		t.Fatalf("归档已变，不该复用任何文件（reused=%d）", r2.Reused)
+	}
+	if got, _ := os.ReadFile(asset); string(got) != "BBBB" {
+		t.Fatalf("归档变了应重解出 BBBB，实际 %q", got)
 	}
 }
