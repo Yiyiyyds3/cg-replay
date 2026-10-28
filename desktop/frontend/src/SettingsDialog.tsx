@@ -94,7 +94,9 @@ export function SettingsDialog({
               />
               <span className="min-w-0">
                 <span className="block text-sm">启动时清理 3 天前的最近播放</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">不影响收藏与评分</span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  不影响收藏与评分；侧栏「最近播放」区也有这个开关
+                </span>
               </span>
             </label>
           </section>
