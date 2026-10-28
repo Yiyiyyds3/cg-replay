@@ -456,3 +456,21 @@ var videoExts = map[string]bool{
 func isVideoPath(p string) bool {
 	return videoExts[strings.ToLower(filepath.Ext(p))]
 }
+
+// CountVideos 数一个目录里已有的影片文件（用于「这个游戏之前提过没」的判断）。
+//
+// 以磁盘实况为准而不是记一个布尔标记：用户可能手动拷过影片、也可能删过，
+// 只有实际文件才决定「能不能播」。
+func CountVideos(root string) int {
+	n := 0
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if isVideoPath(p) {
+			n++
+		}
+		return nil
+	})
+	return n
+}

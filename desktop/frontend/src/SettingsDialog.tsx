@@ -74,7 +74,7 @@ export function SettingsDialog({
               <span className="min-w-0">
                 <span className="block text-sm">提取 OP/ED 影片</span>
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                  更费空间；关掉后影片不能播（已解包的需重解）
+                  只影响新解包；已解出的影片不受影响
                 </span>
               </span>
             </label>

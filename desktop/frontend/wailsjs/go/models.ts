@@ -677,6 +677,7 @@ export namespace main {
 	    refs: number;
 	    videos: number;
 	    video_bytes: number;
+	    imported_videos: number;
 	    encrypted: number;
 	    notes: string[];
 	    unsupported: boolean;
@@ -696,6 +697,7 @@ export namespace main {
 	        this.refs = source["refs"];
 	        this.videos = source["videos"];
 	        this.video_bytes = source["video_bytes"];
+	        this.imported_videos = source["imported_videos"];
 	        this.encrypted = source["encrypted"];
 	        this.notes = source["notes"];
 	        this.unsupported = source["unsupported"];

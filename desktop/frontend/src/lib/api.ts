@@ -47,6 +47,8 @@ export interface UnpackPlanDTO {
   refs: number; // 预计引用到的素材数
   videos: number; // 其中影片（OP/ED）条目数
   video_bytes: number; // 影片原始体积（估算）
+  /** 该源已解包目录里现有的影片数（>0 = 之前提过，重解不会删） */
+  imported_videos: number;
   encrypted: number;
   notes: string[];
   unsupported: boolean;

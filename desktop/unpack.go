@@ -9,6 +9,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,10 +28,13 @@ type UnpackPlanDTO struct {
 	Refs          int      `json:"refs"`   // 预计引用到的素材数
 	Videos        int      `json:"videos"` // 其中影片（OP/ED）条目数
 	VideoBytes    int64    `json:"video_bytes"`
-	Encrypted     int      `json:"encrypted"`
-	Notes         []string `json:"notes"`
-	Unsupported   bool     `json:"unsupported"`
-	Reason        string   `json:"reason"`
+	// ImportedVideos 该源**已经解包过**的目录里现有多少影片。
+	// >0 表示之前提过：重解不会删它们，也不用再问「要不要提取」。
+	ImportedVideos int      `json:"imported_videos"`
+	Encrypted      int      `json:"encrypted"`
+	Notes          []string `json:"notes"`
+	Unsupported    bool     `json:"unsupported"`
+	Reason         string   `json:"reason"`
 }
 
 // UnpackImportDTO 导入结果（解包 + 登记）。
@@ -61,19 +65,28 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 这个源如果之前解过，看看产物目录里现有多少影片（按磁盘实况，不看记忆）。
+	existing := 0
+	if clean := filepath.Clean(strings.TrimSpace(path)); clean != "" {
+		dest := filepath.Join(dataDir(), "games", registry.IDFor(clean))
+		if st, statErr := os.Stat(dest); statErr == nil && st.IsDir() {
+			existing = unpack.CountVideos(dest)
+		}
+	}
 	return &UnpackPlanDTO{
-		EngineID:      plan.EngineID,
-		Kind:          plan.Kind,
-		Archives:      plan.Archives,
-		ScenarioFiles: plan.ScenarioFiles,
-		Labels:        plan.Labels,
-		Refs:          plan.Refs,
-		Videos:        plan.Videos,
-		VideoBytes:    plan.VideoBytes,
-		Encrypted:     plan.Encrypted,
-		Notes:         plan.Notes,
-		Unsupported:   plan.Unsupported,
-		Reason:        plan.Reason,
+		EngineID:       plan.EngineID,
+		ImportedVideos: existing,
+		Kind:           plan.Kind,
+		Archives:       plan.Archives,
+		ScenarioFiles:  plan.ScenarioFiles,
+		Labels:         plan.Labels,
+		Refs:           plan.Refs,
+		Videos:         plan.Videos,
+		VideoBytes:     plan.VideoBytes,
+		Encrypted:      plan.Encrypted,
+		Notes:          plan.Notes,
+		Unsupported:    plan.Unsupported,
+		Reason:         plan.Reason,
 	}, nil
 }
 

@@ -320,3 +320,22 @@ func TestUnpackSkipVideo(t *testing.T) {
 		}
 	}
 }
+
+// TestCountVideos 「已含影片」按磁盘实况判断，不看记忆。
+func TestCountVideos(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "image"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"a.png", "op.mpg", "ed.wmv", "note.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, "image", n), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := CountVideos(dir); got != 2 {
+		t.Fatalf("应数出 2 个影片，实际 %d", got)
+	}
+	if got := CountVideos(filepath.Join(dir, "nope")); got != 0 {
+		t.Fatalf("目录不存在应为 0，实际 %d", got)
+	}
+}

@@ -859,7 +859,17 @@ export default function EventGrid({
                     <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
                   </div>
                 )}
-                {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
+                {!unpackPlan.unsupported && (unpackPlan.imported_videos ?? 0) > 0 && (
+                  <div
+                    className="pt-1 text-[11px] text-emerald-400"
+                    title="以磁盘上的实际文件为准：重解不会删除它们，也不受「提取影片」设置影响。"
+                  >
+                    已含 {unpackPlan.imported_videos} 个影片（重解不会删除，可正常播放）
+                  </div>
+                )}
+                {!unpackPlan.unsupported &&
+                  unpackPlan.videos > 0 &&
+                  (unpackPlan.imported_videos ?? 0) === 0 && (
                   <div className="pt-1">
                     <label
                       className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
@@ -934,7 +944,8 @@ export default function EventGrid({
                     size="sm"
                     onClick={() => {
                       // 默认提取 → 有影片就先问一次；用户已取消勾选则直接按跳过走。
-                      if (extractVideo && unpackPlan.videos > 0 && !askVideo) {
+                      const already = (unpackPlan.imported_videos ?? 0) > 0;
+                      if (extractVideo && !already && unpackPlan.videos > 0 && !askVideo) {
                         setAskVideo(true);
                         return;
                       }
