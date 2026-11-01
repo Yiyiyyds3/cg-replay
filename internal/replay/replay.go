@@ -9,14 +9,12 @@
 package replay
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"image/color/palette"
 	"image/draw"
 	"image/gif"
-	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -261,51 +259,9 @@ func DirLoader(root string) Loader {
 	}
 }
 
-// DecodeImage 解 PNG（标准库）或 TLG5/JPEG（internal/decode，自动还原 XOR 掩码）。
-func DecodeImage(data []byte) (image.Image, error) {
-	if len(data) > 8 && bytes.Equal(data[1:4], []byte("PNG")) {
-		img, err := png.Decode(bytes.NewReader(data))
-		if err != nil {
-			return nil, fmt.Errorf("PNG 解码失败: %w", err)
-		}
-		return img, nil
-	}
-	im, err := decode.Decode(data)
-	if err != nil {
-		return nil, err
-	}
-	// HG3 的 24 位图只有 3 字节/像素（Colors==3），不能按 4 字节取。
-	ps := 4
-	if im.Colors == 3 {
-		ps = 3
-	}
-	return &bgraImage{w: im.Width, h: im.Height, ps: ps, pix: im.Pixels}, nil
-}
-
-// bgraImage 把 decode.Image 的 B、G、R[、A] 字节序适配成 image.Image。
-// ps 为每像素字节数（3 = BGR 无 alpha，4 = BGRA）。
-type bgraImage struct {
-	w, h int
-	ps   int
-	pix  []byte
-}
-
-func (b *bgraImage) ColorModel() color.Model { return color.RGBAModel }
-func (b *bgraImage) Bounds() image.Rectangle { return image.Rect(0, 0, b.w, b.h) }
-
-func (b *bgraImage) At(x, y int) color.Color {
-	if x < 0 || y < 0 || x >= b.w || y >= b.h {
-		return color.RGBA{}
-	}
-	i := (y*b.w + x) * b.ps
-	if i+b.ps > len(b.pix) {
-		return color.RGBA{}
-	}
-	if b.ps == 3 {
-		return color.RGBA{R: b.pix[i+2], G: b.pix[i+1], B: b.pix[i], A: 0xFF}
-	}
-	return color.RGBA{R: b.pix[i+2], G: b.pix[i+1], B: b.pix[i], A: b.pix[i+3]}
-}
+// DecodeImage 解 PNG（标准库）或 TLG5/JPEG/HG3（internal/decode，自动还原 XOR 掩码）。
+// 实现已下沉到 decode 包，避免适配层反向依赖 replay 造成 import 环。
+func DecodeImage(data []byte) (image.Image, error) { return decode.DecodeImage(data) }
 
 // Compose 按 z 升序把可见层叠到画布上。
 //

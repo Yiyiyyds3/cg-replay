@@ -115,6 +115,7 @@ type LayerState struct {
 	Visible  bool
 	X, Y     float64
 	HasPos   bool
+	Scale    float64 // 缩放倍率（0/1 = 原尺寸）
 	Opacity  float64 // 0~1（脚本 opacity 为 0~255，已归一）
 	ClipL    float64
 	ClipT    float64
@@ -466,6 +467,9 @@ func (p *Player) applyAttrs(st *LayerState, attrs map[string]string) {
 	}
 	if v, ok := floatAttr(attrs, "top"); ok {
 		st.Y, st.HasPos = v, true
+	}
+	if v, ok := floatAttr(attrs, "scale"); ok && v > 0 {
+		st.Scale = v
 	}
 	// 消息层：opacity = frameOpacity（底色不透明度），不改图层 alpha。
 	// 图像层：opacity = 图层 alpha（0~255，255=不透明）。

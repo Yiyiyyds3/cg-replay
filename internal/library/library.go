@@ -134,6 +134,9 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 	if strings.EqualFold(conv.EngineID, "unity") {
 		return ScanUnity(root)
 	}
+	if strings.EqualFold(conv.EngineID, "rmmz") {
+		return ScanRMMZ(root, conv)
+	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
 	galleryRe := conventionRe(conv.GalleryRe)

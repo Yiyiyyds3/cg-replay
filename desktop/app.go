@@ -19,6 +19,8 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/adapter/rmmz"
+	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/catalog"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
@@ -33,22 +35,47 @@ import (
 //
 // 约定文件写坏了要报错（用户明确写了配置却写坏，静默忽略会让人以为配置生效了）。
 func gameConvention(root, engineID string) (adapter.Convention, error) {
-	conv, ok := adapter.ConventionByEngine(engineID)
-	if !ok {
-		// 未知引擎先按 KiriKiri 试（约定文件可覆盖）；真扫不出事件时上层会报错。
-		conv = adapter.DefaultKiriKiri()
-	}
 	file, exists, err := adapter.LoadConventionFile(root)
 	if err != nil {
-		return conv, err
+		return adapter.Convention{}, err
+	}
+	// 约定文件里的引擎优先（它是用户/导出器明确写的）。
+	if engineID == "" && exists && strings.TrimSpace(file.EngineID) != "" {
+		engineID = file.EngineID
+	}
+	conv, ok := adapter.ConventionByEngine(engineID)
+	if !ok {
+		// 未指定引擎时按目录特征识别；都认不出再按 KiriKiri 试，
+		// 真扫不出事件时上层会报错（不静默降级）。
+		conv = detectConvention(root)
 	}
 	if exists {
 		conv = file.Merge(conv)
+	}
+	// RPG Maker 的 data 目录有三种摆法（www/data、data、内嵌/data），
+	// 登记表里只记了引擎，这里按实际结构校正，避免拿默认值去 stat 报错。
+	if strings.EqualFold(conv.EngineID, "rmmz") {
+		if dataDir, ok := rmmz.FindDataDir(root); ok {
+			conv.ScenarioDir = dataDir
+		}
 	}
 	if err := conv.Validate(); err != nil {
 		return conv, err
 	}
 	return conv, nil
+}
+
+// detectConvention 按目录特征猜引擎约定（只认确定的结构，不乱猜）。
+func detectConvention(root string) adapter.Convention {
+	if dataDir, ok := rmmz.FindDataDir(root); ok {
+		conv := adapter.DefaultRMMZ()
+		conv.ScenarioDir = dataDir
+		return conv
+	}
+	if st, err := os.Stat(filepath.Join(root, unitycg.IndexFile)); err == nil && !st.IsDir() {
+		return adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
+	}
+	return adapter.DefaultKiriKiri()
 }
 
 // exeDir 返回 exe 所在目录（只读用途：如日志排查时告诉用户 exe 在哪）。
@@ -328,7 +355,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 		return nil, err
 	}
 	if len(lib.CGs)+len(lib.Scenes)+len(lib.Chapters) == 0 {
-		return nil, fmt.Errorf("没有识别到可回放事件（当前仅支持 KiriKiri 布局：raw\\data\\scenario）")
+		return nil, fmt.Errorf("没有识别到可回放事件（已按 %s 约定扫描 %s）", conv.EngineID, conv.ScenarioDir)
 	}
 	c, _ := a.loadConf()
 	reg, err := a.loadRegistry(c)
@@ -366,7 +393,11 @@ func (a *App) SetActiveGame(id string) (*library.Library, error) {
 	if g == nil {
 		return nil, fmt.Errorf("游戏 %s 未登记", id)
 	}
-	if _, err := os.Stat(library.ScenarioDir(g.Root)); err != nil {
+	conv, cerr := gameConvention(g.Root, g.Engine)
+	if cerr != nil {
+		return nil, cerr
+	}
+	if _, err := os.Stat(filepath.Join(g.Root, filepath.FromSlash(conv.ScenarioDir))); err != nil {
 		return nil, fmt.Errorf("游戏「%s」根目录不可用：%w", g.Title, err)
 	}
 	if g.Library == "" {
