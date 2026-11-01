@@ -7,6 +7,7 @@ package ir
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // IRVersion 当前 IR 规范版本。破坏性变更时递增，并配套迁移。
@@ -405,4 +406,22 @@ func HasVideo(ev *Event) bool {
 		}
 	}
 	return false
+}
+
+// videoExts 影片扩展名（唯一口径：解包、播放器、提帧都按这里判断）。
+var videoExts = map[string]bool{
+	".mpg": true, ".mpeg": true, ".wmv": true, ".mp4": true,
+	".avi": true, ".webm": true, ".mov": true, ".mkv": true,
+}
+
+// IsVideoRef 引用是不是影片（按扩展名）。
+//
+// 放在 ir 层是为了让「什么算影片」只有一处：解包要知道该不该提、播放器要知道
+// 该不该当视频图层画、ffmpeg 提帧层要知道能不能解。
+func IsVideoRef(name string) bool {
+	i := strings.LastIndexByte(name, '.')
+	if i < 0 {
+		return false
+	}
+	return videoExts[strings.ToLower(name[i:])]
 }

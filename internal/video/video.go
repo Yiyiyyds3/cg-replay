@@ -18,18 +18,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"ucgr/internal/ir"
 )
 
-// Exts 视频扩展名（用于判定「这个 ref 是影片」）。
-var Exts = map[string]bool{
-	".mpg": true, ".mpeg": true, ".wmv": true, ".mp4": true,
-	".avi": true, ".webm": true, ".mov": true, ".mkv": true,
-}
-
-// IsVideo 判断路径/引用是否为影片（按扩展名）。
-func IsVideo(p string) bool {
-	return Exts[filepath.Ext(p)]
-}
+// IsVideo 判断路径/引用是否为影片。
+//
+// 扩展名表只在 ir.IsVideoRef 里定义一次（解包、播放器、提帧共用同一口径）。
+func IsVideo(p string) bool { return ir.IsVideoRef(p) }
 
 // Locate 找 ffmpeg（PATH → WinGet 链接 → C:/ffmpeg）。找不到返回空串。
 func Locate() string {

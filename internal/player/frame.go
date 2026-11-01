@@ -36,12 +36,28 @@ type VideoProvider func(ref string, tMs int64) (image.Image, error)
 //
 // 视频不进 Compose —— player 包不依赖 ffmpeg，取帧由调用方注入。
 func RenderFrameWithVideo(p *Player, load Loader, video VideoProvider, w, h int) (*image.RGBA, []string, error) {
-	rgba, drawn, err := RenderFrame(p, load, w, h)
-	if err != nil {
-		return rgba, drawn, err
-	}
+	// 走 ComposeWithVideo：影片图层要按 z 序画进去（图层式影片走这条）。
 	f := p.Frame()
-	if f.Video == nil || video == nil || f.Video.Ref == "" {
+	rgba, drawn, err := ComposeWithVideo(f, load, video, w, h)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, box := range f.Texts {
+		if box.Frame == "" || !box.Visible {
+			continue
+		}
+		if img, lerr := load(ResolveRef(p.Event(), box.Frame)); lerr == nil {
+			DrawBoxBackground(rgba, box, img, f.QuakeX, f.QuakeY)
+		}
+	}
+	if f.Video == nil || f.Video.Ref == "" {
+		if f.VideoMissing != "" {
+			// 影片事件但脚本没给文件名：说清楚，别让用户对着黑屏猜。
+			drawn = append(drawn, "✗ video←("+f.VideoMissing+" 定位不到影片文件)")
+		}
+		return rgba, drawn, nil
+	}
+	if video == nil {
 		return rgba, drawn, nil
 	}
 	img, verr := video(f.Video.Ref, f.Video.Now)

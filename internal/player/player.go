@@ -127,6 +127,8 @@ type LayerState struct {
 	HasClip  bool
 	Z        int
 	Attrs    map[string]string
+	// StartMs 影片图层的起播时刻（相对本事件）；非影片层不用。
+	StartMs int64
 }
 
 // TextLine 消息层上的一行。
@@ -167,6 +169,8 @@ type Frame struct {
 	Now           int64 // 已流逝演出毫秒
 	TransProgress float64
 	Video         *VideoState // 非空表示当前在放影片（OP/ED）
+	// VideoMissing 影片指令定位不到文件的说明（非空 = 这是影片但没文件）
+	VideoMissing string
 }
 
 // VideoState 当前影片的播放位置（相对影片开头）。
@@ -212,6 +216,8 @@ type Player struct {
 	// 当前影片（OP/ED）：videoRef 为空表示没在放。
 	videoRef   string
 	videoStart int64
+	// videoMissing 影片指令定位不到文件时的说明（如 "state=end"）
+	videoMissing string
 
 	// Audio 非 nil 时按台本回调（BGM/SE/语音交给平台层）。
 	Audio func(ir.ShowOp)
@@ -317,8 +323,14 @@ func (p *Player) exec(op ir.ShowOp) {
 	case ir.ShowVideoPlay:
 		// 影片铺满舞台：记下引用与起点，渲染层按 Now 去提帧。
 		if op.Ref == "" {
+			// 有影片指令但脚本没写文件名（KiriKiri 的 [sysmovie state=end]）：
+			// 记下 state 供上层明确报错，别再假装「什么都没有」。
+			if st := op.Attr["state"]; st != "" {
+				p.videoMissing = "state=" + st
+			}
 			break
 		}
+		p.videoMissing = ""
 		p.videoRef, p.videoStart = op.Ref, p.now
 		dur := op.DurMs
 		if dur <= 0 && p.opt.VideoDur != nil {
@@ -453,9 +465,13 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 	switch op.Kind {
 	case ir.ShowLayerShow:
 		st.Visible = true
-		if op.Ref != "" {
+		if op.Ref != "" && op.Ref != st.Ref {
 			st.Ref = op.Ref
 			st.Resolved = ResolveRef(p.ev, op.Ref)
+			// 影片图层：记下起播时刻，渲染层按 (now - StartMs) 去提帧。
+			if ir.IsVideoRef(st.Resolved) {
+				st.StartMs = p.now
+			}
 		}
 	case ir.ShowLayerHide:
 		st.Visible = false
@@ -566,6 +582,7 @@ func (p *Player) Frame() Frame {
 	if p.videoRef != "" {
 		f.Video = &VideoState{Ref: p.videoRef, StartMs: p.videoStart, Now: p.now - p.videoStart}
 	}
+	f.VideoMissing = p.videoMissing
 	return f
 }
 
