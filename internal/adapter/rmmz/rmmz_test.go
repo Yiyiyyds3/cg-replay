@@ -1,6 +1,10 @@
 package rmmz
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestCleanTextPlaceholders(t *testing.T) {
 	c := textCleaner{
@@ -58,5 +62,32 @@ func TestSegments(t *testing.T) {
 	}
 	if len(segs[0]) != 3 || len(segs[1]) != 2 {
 		t.Fatalf("段落长度 = %d,%d，want 3,2", len(segs[0]), len(segs[1]))
+	}
+}
+
+// TestLocatePictureJPFallback DLsite 审查版只保留马赛克变体（<名>JP.png）时，
+// 仍要能定位到实际文件；原名存在时优先原名。
+func TestLocatePictureJPFallback(t *testing.T) {
+	root := t.TempDir()
+	picDir := filepath.Join(root, "img", "pictures", "CG")
+	if err := os.MkdirAll(picDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	jp := filepath.Join(picDir, "ChelseaH7_01JP.png")
+	if err := os.WriteFile(jp, []byte("jp"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rel, ok := LocatePicture(root, []string{"img"}, "CG/ChelseaH7_01")
+	if !ok || rel != "img/pictures/CG/ChelseaH7_01JP.png" {
+		t.Fatalf("JP 变体定位 = %q,%v，want img/pictures/CG/ChelseaH7_01JP.png,true", rel, ok)
+	}
+
+	plain := filepath.Join(picDir, "ChelseaH7_01.png")
+	if err := os.WriteFile(plain, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rel, ok = LocatePicture(root, []string{"img"}, "CG/ChelseaH7_01")
+	if !ok || rel != "img/pictures/CG/ChelseaH7_01.png" {
+		t.Fatalf("原名优先 = %q,%v，want img/pictures/CG/ChelseaH7_01.png,true", rel, ok)
 	}
 }

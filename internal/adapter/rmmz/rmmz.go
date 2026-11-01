@@ -213,7 +213,11 @@ func FindDataDir(root string) (string, bool) {
 		return "", false
 	}
 	for _, e := range ents {
-		if !e.IsDir() {
+		// 这里必须 os.Stat 跟随联接：ReadDir 返回的 DirEntry.IsDir() 对
+		// junction/符号联接是 false（Lstat 语义），而游戏库条目本身就是联接，
+		// 整合包外层再套一层联接时会整层被跳过。
+		sub := filepath.Join(root, e.Name())
+		if st, serr := os.Stat(sub); serr != nil || !st.IsDir() {
 			continue
 		}
 		for _, c := range []string{"www/data", "data"} {
@@ -272,7 +276,12 @@ func MainImageDir(root string, dirs []string) string {
 
 var extTry = []string{".png", ".jpg", ".jpeg", ".webp", ".rpgmvp", ".png_"}
 
-// MapGroup 地图显示名；没起名时用「地图<编号>」（Map149.json → 地图149）。
+// LocatePicture 按图片名找实际文件（相对 root），找不到返回 false。
+//
+// 除了常规扩展名，还要兼容 DLsite 审查版的「马赛克变体」：BuildModeChange
+// 插件（dlsite/fanza 模式）会在原名后加 "JP" 再取图，例如
+// CG/ChelseaH7/ChelseaH7_01 → CG/ChelseaH7/ChelseaH7_01JP.png；
+// 这类包里往往只保留 JP 文件，不回退就会整段 CG 找不到图。
 func LocatePicture(root string, imageDirs []string, name string) (string, bool) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -280,10 +289,12 @@ func LocatePicture(root string, imageDirs []string, name string) (string, bool) 
 	}
 	name = strings.TrimSuffix(name, filepath.Ext(name))
 	for _, dir := range imageDirs {
-		for _, ext := range extTry {
-			rel := filepath.ToSlash(filepath.Join(dir, "pictures", name+ext))
-			if st, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil && !st.IsDir() {
-				return rel, true
+		for _, suffix := range []string{"", "JP"} {
+			for _, ext := range extTry {
+				rel := filepath.ToSlash(filepath.Join(dir, "pictures", name+suffix+ext))
+				if st, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil && !st.IsDir() {
+					return rel, true
+				}
 			}
 		}
 	}
