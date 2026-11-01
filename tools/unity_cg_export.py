@@ -32,6 +32,7 @@ webview 里没有 Unity 运行时，所以中间必须有一次「格式转换�
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -184,6 +185,224 @@ def read_catalog(cat_path: str) -> tuple[dict[str, str], list[str]]:
     return asset_to_cg, sorted(groups)
 
 
+# ---------------------------------------------------------------------------
+# 非 Addressables 的两种真实布局
+# ---------------------------------------------------------------------------
+#
+# 实测（2026-11，「一般」目录三款 Unity 游戏）：
+#   1. 资源内嵌：CG 在 <游戏>_Data/resources.assets 或 sharedassetsN.assets 里，
+#      旁边是 resources.assets.resS（像素流）；没有 catalog，也没有 *_all.bundle。
+#   2. StreamingAssets 散装 bundle：aa/catalog.json 不存在（新版是 catalog.bin），
+#      bundle 直接放在 StreamingAssets 下，且文件开头多 64 字节自定义 GUID 头，
+#      「UnityFS」从 0x40 才开始。
+# 两条路都不需要 catalog：CG 分组直接按资产名（骨架 JSON + 同名 .atlas + 同名贴图）。
+
+def load_container(path: str, offset: str = "auto"):
+    """读一个 Unity 容器，必要时跳过 UnityFS 之前的自定义头。
+
+    注意：带外部 .resS 的 .assets 必须按路径加载（走 bytes 会丢 resS），
+    所以只有确实存在头偏移时才降级为 bytes。
+    """
+    off = 0
+    with open(path, "rb") as f:
+        head = f.read(4096)
+    if offset == "auto":
+        i = head.find(b"UnityFS")
+        if i > 0:
+            off = i
+    elif offset not in (None, "", "0"):
+        off = int(offset)
+    if off:
+        with open(path, "rb") as f:
+            f.seek(off)
+            return UnityPy.load(f.read())
+    return UnityPy.load(path)
+
+
+def _obj_name(d) -> str:
+    n = getattr(d, "m_Name", None)
+    n = getattr(n, "string", n) if n is not None else None
+    return str(n) if n is not None else ""
+
+
+def _safe_name(name: str) -> str:
+    """目录/文件名里只保留 Windows 允许的字符（贴图名可能带 / 等）。"""
+    return re.sub(r'[\\/:*?"<>|]', "_", name)
+
+
+def read_cg_csv(path: str) -> tuple[dict[str, str], list[tuple[str, list[str]]]]:
+    """读游戏自带的 CG 表（实测列名：AssetID / Type / CGUrl / Variants）。
+
+    返回 (Spine 骨架名 → CG id, [(CG id, [贴图名…]), …])。
+    Type=spine 时 CGUrl 形如 SpinePrefab_ICG1；Type=pic 时形如 CG/reop1，
+    Variants 里可能还有 reop2;reop3 —— 那是同一部 CG 的其余帧。
+    """
+    with open(path, "rb") as f:
+        txt = f.read().decode("utf-8-sig", "replace")
+    spine: dict[str, str] = {}
+    stills: list[tuple[str, list[str]]] = []
+    for row in csv.DictReader(txt.splitlines()):
+        typ = (row.get("Type") or "").strip().lower()
+        url = (row.get("CGUrl") or "").strip()
+        aid = (row.get("AssetID") or "").strip()
+        if typ == "spine" and url:
+            spine[url.replace("SpinePrefab_", "")] = aid or url
+        elif typ == "pic" and url:
+            urls = [url] + [v for v in (row.get("Variants") or "").split(";") if v.strip()]
+            texs: list[str] = []
+            for u in urls:
+                t = u.replace("\\", "/").split("/")[-1].strip()
+                if t and t not in texs:
+                    texs.append(t)
+            stills.append((aid or texs[0], texs))
+    return spine, stills
+
+
+def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int, int]:
+    """把「资源内嵌 / 散装 bundle」里的 CG 导出来。
+
+    只认两种能被播放器直接消费的形态（与 Addressables 版一致）：
+      spine  —— 骨架 JSON + .atlas + 贴图（渲染器接入后可播）
+      still  —— 单张贴图（现在就能播）
+    """
+    textures: dict[str, object] = {}
+    texts: dict[str, bytes] = {}
+    sources: list[str] = []
+    for p in paths:
+        env = load_container(p, args.offset)
+        sources.append(p)
+        for o in env.objects:
+            t = o.type.name
+            if t not in ("Texture2D", "TextAsset"):
+                continue
+            try:
+                d = o.read()
+            except Exception as e:  # 个别对象坏掉不影响整体
+                print(f"  ! 读对象失败 {os.path.basename(p)} {t}: {e}")
+                continue
+            n = _obj_name(d)
+            if not n:
+                continue
+            if t == "Texture2D":
+                textures.setdefault(n, d)
+            else:
+                raw = d.m_Script
+                raw = bytes(raw) if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", "ignore")
+                texts.setdefault(n, raw)
+        env = None  # 尽快释放容器索引
+
+    skel_by_base: dict[str, bytes] = {}
+    for n, raw in texts.items():
+        if raw[:1] == b"{" and b'"skeleton"' in raw[:400]:
+            base = n[:-5] if n.lower().endswith(".json") else n
+            skel_by_base.setdefault(base, raw)
+    atlas_by_base: dict[str, bytes] = {}
+    for n, raw in texts.items():
+        if n.lower().endswith(".atlas"):
+            atlas_by_base.setdefault(n[:-6], raw)
+    bases = sorted(set(skel_by_base) & set(atlas_by_base))
+
+    csv_spine: dict[str, str] = {}
+    csv_stills: list[tuple[str, str]] = []
+    if args.cg_csv:
+        csv_spine, csv_stills = read_cg_csv(args.cg_csv)
+
+    if csv_spine:
+        missing = sorted(set(csv_spine) - set(bases))
+        if missing:
+            print(f"  ! CG 表里有 {len(missing)} 个 Spine 在容器里没找到：{missing[:6]}")
+        bases = [b for b in sorted(csv_spine) if b in set(bases)]
+    elif args.spine_prefix:
+        pre = tuple(x.strip() for x in args.spine_prefix.split(",") if x.strip())
+        bases = [b for b in bases if b.startswith(pre)]
+
+    cg_files: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"png": [], "text": []})
+    orphan = {"png": 0, "text": 0}
+    used_tex: set[str] = set()
+    png_bytes = text_bytes = 0
+    dry = args.dry_run
+
+    def save_png(tex_name: str, dest_dir: str) -> bool:
+        nonlocal png_bytes
+        d = textures.get(tex_name)
+        if d is None:
+            return False
+        fname = _safe_name(tex_name) + ".png"
+        dest = os.path.join(dest_dir, fname)
+        if dry:
+            return True
+        os.makedirs(dest_dir, exist_ok=True)
+        if not args.force and os.path.isfile(dest) and os.path.getsize(dest) > 0:
+            png_bytes += os.path.getsize(dest)
+            return True
+        try:
+            d.image.save(dest)
+        except Exception as e:
+            print(f"  ! 贴图导出失败 {tex_name}: {e}")
+            return False
+        png_bytes += os.path.getsize(dest)
+        return True
+
+    for base in bases:
+        cg = _safe_name(csv_spine.get(base, base))
+        if args.only and args.only not in (cg, base):
+            continue
+        dest_dir = os.path.join(args.out, "cg", cg)
+        if not dry:
+            os.makedirs(dest_dir, exist_ok=True)
+        # 骨架 + 图集
+        sk = skel_by_base[base]
+        at = atlas_by_base[base]
+        if not dry:
+            with open(os.path.join(dest_dir, _safe_name(base) + ".json"), "wb") as f:
+                f.write(sk)
+            with open(os.path.join(dest_dir, _safe_name(base) + ".atlas"), "wb") as f:
+                f.write(at)
+        cg_files[cg]["text"].extend([_safe_name(base) + ".json", _safe_name(base) + ".atlas"])
+        text_bytes += len(sk) + len(at)
+        # 同名贴图（含 <base>_2 这种变体）
+        cand = [t for t in textures if t == base or t.startswith(base + "_")]
+        if not cand:
+            print(f"  ! {base}: 有骨架/图集但没有同名贴图")
+        for tn in cand:
+            if tn in used_tex:
+                continue
+            if save_png(tn, dest_dir):
+                used_tex.add(tn)
+                cg_files[cg]["png"].append(_safe_name(tn) + ".png")
+
+    # 单图 CG：优先用游戏自带 CG 表；否则按前缀/正则挑孤立贴图。
+    for cg_id, texs in csv_stills:
+        cg = _safe_name(cg_id)
+        if args.only and args.only != cg:
+            continue
+        for tex in texs:
+            if tex not in textures:
+                print(f"  ! {cg}: CG 表指向的贴图 {tex} 不存在")
+                continue
+            if save_png(tex, os.path.join(args.out, "cg", cg)):
+                used_tex.add(tex)
+                cg_files[cg]["png"].append(_safe_name(tex) + ".png")
+
+    prefixes = tuple(x.strip() for x in args.still_prefix.split(",") if x.strip())
+    rx = re.compile(args.still_regex) if args.still_regex else None
+    for tn in textures:
+        if tn in used_tex:
+            continue
+        if not ((prefixes and tn.startswith(prefixes)) or (rx and rx.search(tn))):
+            continue
+        cg = _safe_name(tn)
+        if args.only and args.only != cg:
+            continue
+        if save_png(tn, os.path.join(args.out, "cg", cg)):
+            used_tex.add(tn)
+            cg_files[cg]["png"].append(_safe_name(tn) + ".png")
+
+    orphan["png"] = len(textures) - len(used_tex)
+    orphan["text"] = len(texts) - sum(len(v["text"]) for v in cg_files.values())
+    return cg_files, orphan, sources, png_bytes, text_bytes
+
+
 def spine_stats(path: str) -> dict:
     """从 Spine 的 skeleton JSON 里数出骨骼/插槽/皮肤/动画，并估算每段时长。"""
     try:
@@ -226,85 +445,103 @@ def spine_stats(path: str) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="导出 Unity/Addressables 里的 Spine CG")
-    ap.add_argument("--game", required=True, help="游戏根目录（含 *_Data）")
+    ap.add_argument("--game", default="", help="游戏根目录（含 *_Data）；用 --assets 时可不填")
     ap.add_argument("--out", required=True, help="输出目录")
     ap.add_argument("--bundle", default="cg_assets_all.bundle", help="CG 所在 bundle 文件名")
+    ap.add_argument("--assets", action="append", default=[],
+                    help="直接指定容器（.assets/.bundle/无扩展名 bundle），可重复；给了就不走 catalog")
+    ap.add_argument("--offset", default="auto", help="容器头偏移；auto=自动找 UnityFS（默认）")
+    ap.add_argument("--cg-csv", default="", help="游戏自带 CG 表 CSV（列 Type/CGUrl/AssetID）")
+    ap.add_argument("--spine-prefix", default="", help="只导出这些前缀的 Spine（逗号分隔）")
+    ap.add_argument("--still-prefix", default="", help="把名字前缀匹配的孤立贴图当单图 CG（逗号分隔）")
+    ap.add_argument("--still-regex", default="", help="把名字正则匹配的孤立贴图当单图 CG")
     ap.add_argument("--only", default="", help="只导某个 CG（目录名）")
     ap.add_argument("--dry-run", action="store_true", help="只出索引，不写素材")
     ap.add_argument("--force", action="store_true", help="已存在的文件也重写")
     args = ap.parse_args()
 
     t0 = time.time()
-    cat, bdir = find_game_layout(args.game)
-    bundle = os.path.join(bdir, args.bundle)
-    if not os.path.isfile(bundle):
-        raise SystemExit(f"没找到 bundle：{bundle}")
-
-    asset_to_cg, groups = read_catalog(cat)
-    print(f"清单：{len(asset_to_cg)} 个 CG 资产 · {len(groups)} 个 DialogueData 组")
-
-    env = UnityPy.load(bundle)
     cg_files: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"png": [], "text": []})
-    orphan = {"png": 0, "text": 0}
+    groups: list[str] = []
     png_bytes = text_bytes = 0
 
-    for o in env.objects:
-        tname = o.type.name
-        if tname == "Texture2D":
-            d = o.read()
-            name = getattr(d.m_Name, "string", str(d.m_Name))
-            cg = asset_to_cg.get(name)
-            if not cg:
-                orphan["png"] += 1
-                continue
-            if args.only and cg != args.only:
-                continue
-            dest_dir = os.path.join(args.out, "cg", cg)
-            dest = os.path.join(dest_dir, name + ".png")
-            if args.dry_run:
-                cg_files[cg]["png"].append(name + ".png")
-                continue
-            os.makedirs(dest_dir, exist_ok=True)
-            if not args.force and os.path.isfile(dest) and os.path.getsize(dest) > 0:
+    if args.assets:
+        cg_files, orphan, sources, png_bytes, text_bytes = export_embedded(args.assets, args)
+        if not args.game:
+            args.game = os.path.basename(os.path.dirname(os.path.abspath(args.assets[0])))
+        print(f"容器：{len(args.assets)} 个 · 候选 CG：{len(cg_files)} 部")
+    else:
+        if not args.game:
+            raise SystemExit("要么给 --game（Addressables 布局），要么给 --assets（内嵌/散装 bundle）")
+        cat, bdir = find_game_layout(args.game)
+        bundle = os.path.join(bdir, args.bundle)
+        if not os.path.isfile(bundle):
+            raise SystemExit(f"没找到 bundle：{bundle}")
+        sources = [bundle]
+        orphan = {"png": 0, "text": 0}
+
+        asset_to_cg, groups = read_catalog(cat)
+        print(f"清单：{len(asset_to_cg)} 个 CG 资产 · {len(groups)} 个 DialogueData 组")
+
+        env = UnityPy.load(bundle)
+
+        for o in env.objects:
+            tname = o.type.name
+            if tname == "Texture2D":
+                d = o.read()
+                name = getattr(d.m_Name, "string", str(d.m_Name))
+                cg = asset_to_cg.get(name)
+                if not cg:
+                    orphan["png"] += 1
+                    continue
+                if args.only and cg != args.only:
+                    continue
+                dest_dir = os.path.join(args.out, "cg", cg)
+                dest = os.path.join(dest_dir, name + ".png")
+                if args.dry_run:
+                    cg_files[cg]["png"].append(name + ".png")
+                    continue
+                os.makedirs(dest_dir, exist_ok=True)
+                if not args.force and os.path.isfile(dest) and os.path.getsize(dest) > 0:
+                    cg_files[cg]["png"].append(name + ".png")
+                    png_bytes += os.path.getsize(dest)
+                    continue
+                try:
+                    d.image.save(dest)
+                except Exception as e:
+                    print(f"  ! 贴图导出失败 {name}: {e}")
+                    continue
                 cg_files[cg]["png"].append(name + ".png")
                 png_bytes += os.path.getsize(dest)
-                continue
-            try:
-                d.image.save(dest)
-            except Exception as e:
-                print(f"  ! 贴图导出失败 {name}: {e}")
-                continue
-            cg_files[cg]["png"].append(name + ".png")
-            png_bytes += os.path.getsize(dest)
 
-        elif tname == "TextAsset":
-            d = o.read()
-            name = getattr(d.m_Name, "string", str(d.m_Name))
-            stem = os.path.splitext(name)[0]
-            cg = asset_to_cg.get(stem) or asset_to_cg.get(name)
-            if not cg:
-                orphan["text"] += 1
-                continue
-            if args.only and cg != args.only:
-                continue
-            raw = d.m_Script
-            raw = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", "ignore")
-            # 名字多半已经带扩展名（X.atlas / X.json）；没有的话按内容判：骨架是 JSON，图集是文本
-            if name.lower().endswith((".atlas", ".json")):
-                fname = name
-            else:
-                fname = name + (".json" if raw[:1] == b"{" else ".atlas")
-            if args.dry_run:
+            elif tname == "TextAsset":
+                d = o.read()
+                name = getattr(d.m_Name, "string", str(d.m_Name))
+                stem = os.path.splitext(name)[0]
+                cg = asset_to_cg.get(stem) or asset_to_cg.get(name)
+                if not cg:
+                    orphan["text"] += 1
+                    continue
+                if args.only and cg != args.only:
+                    continue
+                raw = d.m_Script
+                raw = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", "ignore")
+                # 名字多半已经带扩展名（X.atlas / X.json）；没有的话按内容判：骨架是 JSON，图集是文本
+                if name.lower().endswith((".atlas", ".json")):
+                    fname = name
+                else:
+                    fname = name + (".json" if raw[:1] == b"{" else ".atlas")
+                if args.dry_run:
+                    cg_files[cg]["text"].append(fname)
+                    continue
+                dest_dir = os.path.join(args.out, "cg", cg)
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, fname)
+                if args.force or not (os.path.isfile(dest) and os.path.getsize(dest) == len(raw)):
+                    with open(dest, "wb") as f:
+                        f.write(raw)
                 cg_files[cg]["text"].append(fname)
-                continue
-            dest_dir = os.path.join(args.out, "cg", cg)
-            os.makedirs(dest_dir, exist_ok=True)
-            dest = os.path.join(dest_dir, fname)
-            if args.force or not (os.path.isfile(dest) and os.path.getsize(dest) == len(raw)):
-                with open(dest, "wb") as f:
-                    f.write(raw)
-            cg_files[cg]["text"].append(fname)
-            text_bytes += len(raw)
+                text_bytes += len(raw)
 
     # 建索引
     cgs = []
@@ -363,7 +600,7 @@ def main() -> int:
         "engine": "unity",
         "game": os.path.basename(os.path.normpath(args.game)),
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "source": {"bundle": os.path.basename(bundle), "bytes": os.path.getsize(bundle)},
+        "source": {"bundle": "、".join(os.path.basename(p) for p in sources), "bytes": sum(os.path.getsize(p) for p in sources)},
         "counts": {
             "cg": len(cgs),
             "png": sum(len(c["files"]["png"]) for c in cgs),
