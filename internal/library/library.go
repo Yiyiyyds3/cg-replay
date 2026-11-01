@@ -61,7 +61,10 @@ type ChapterEvent struct {
 
 // Library 事件库清单。
 type Library struct {
-	Root        string         `json:"root"`
+	Root string `json:"root"`
+	// EngineID 这份库是哪个引擎扫出来的。打开事件时按它分派台本构建
+	// （registry 里的 Engine 可能为空，约定文件才是权威）。
+	EngineID    string         `json:"engine_id,omitempty"`
 	Game        string         `json:"game,omitempty"`
 	GeneratedAt string         `json:"generated_at"`
 	CGs         []CGEvent      `json:"cgs"`
@@ -108,6 +111,15 @@ func Scan(root string) (*Library, error) {
 // 约定决定：剧本目录、画廊文件模式、画廊索引脚本、CG 标签正则、场景文件正则。
 // 解析器仍是引擎专属的（KiriKiri 的 AST），约定只管「文件在哪、叫什么」。
 func ScanWith(root string, conv adapter.Convention) (*Library, error) {
+	lib, err := scanWith(root, conv)
+	// 统一回填引擎 id：打开事件时按它分派台本构建（跟目录的约定文件一致）。
+	if lib != nil && lib.EngineID == "" {
+		lib.EngineID = strings.ToLower(strings.TrimSpace(conv.EngineID))
+	}
+	return lib, err
+}
+
+func scanWith(root string, conv adapter.Convention) (*Library, error) {
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())
 	}
@@ -118,6 +130,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	}
 	if strings.EqualFold(conv.EngineID, "bgi") {
 		return ScanBGI(root, conv)
+	}
+	if strings.EqualFold(conv.EngineID, "unity") {
+		return ScanUnity(root)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)

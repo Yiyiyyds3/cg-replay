@@ -72,6 +72,7 @@ export namespace library {
 	}
 	export class Library {
 	    root: string;
+	    engine_id?: string;
 	    game?: string;
 	    generated_at: string;
 	    cgs: CGEvent[];
@@ -85,6 +86,7 @@ export namespace library {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.root = source["root"];
+	        this.engine_id = source["engine_id"];
 	        this.game = source["game"];
 	        this.generated_at = source["generated_at"];
 	        this.cgs = this.convertValues(source["cgs"], CGEvent);

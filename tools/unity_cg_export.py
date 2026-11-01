@@ -399,6 +399,10 @@ def main() -> int:
         os.makedirs(args.out, exist_ok=True)
         with open(os.path.join(args.out, "cg-index.json"), "w", encoding="utf-8") as f:
             json.dump(index, f, ensure_ascii=False, indent=2)
+        # 约定文件：让桌面端「添加游戏」认出这是 unity 库，并把 cg/ 当剧本目录
+        # （AddGame 会检查 conv.scenario_dir 是否存在，所以必须是导出后真实存在的目录）。
+        with open(os.path.join(args.out, "ucgr-convention.json"), "w", encoding="utf-8") as f:
+            json.dump({"engine_id": "unity", "scenario_dir": "cg"}, f, ensure_ascii=False, indent=2)
 
     print(
         f"完成：{len(cgs)} 部 CG · PNG {index['counts']['png']} 张（{png_bytes/1048576:.1f} MB）· "
