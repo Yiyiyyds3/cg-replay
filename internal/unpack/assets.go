@@ -5,12 +5,17 @@
 // 容器解析与段读取复用各引擎适配器已有的能力：
 //
 //   - 条目列举：引擎适配器的 ParseArchive
-//   - 段读取：adapter.ReadArchiveEntry（seek + 读 + zlib）
+//   - 段读取：adapter.ReadArchiveEntry（seek + 读原始字节；**不解压**）
+//   - 段解压：本包按段做 zlib——解压必须留在解包层，因为后续口径是
+//     「先解压、再对整份数据解密」（见 decrypt.go），本层才掌握引擎差异
 //   - 加密标记：条目自带 Encrypted/KeyHint（XP3 的 adlr、ARC 的 BSE 加密图）
 package unpack
 
 import (
+	"bytes"
+	"compress/zlib"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,6 +47,9 @@ type archiveSet struct {
 	entries   map[string]archiveEntry
 	owner     map[string]string // 条目路径 → 所属归档
 	encrypted []string
+
+	byBase map[string]archiveEntry // 文件名（小写，含扩展名）→ 条目
+	byStem map[string]archiveEntry // 去扩展名的文件名（小写）→ 条目
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
@@ -114,6 +122,20 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		// ReadArchiveEntry 对压缩段只读原始字节（留给调用方处理加密层），
+		// 解压必须在这里做——多段各自 zlib，顺序拼接才是完整文件。
+		if seg.Compression == adapter.CompZlib {
+			zr, err := zlib.NewReader(bytes.NewReader(b))
+			if err != nil {
+				return nil, fmt.Errorf("段不是合法 zlib %s: %w", e.path, err)
+			}
+			plain, err := io.ReadAll(zr)
+			_ = zr.Close()
+			if err != nil {
+				return nil, fmt.Errorf("段解压失败 %s: %w", e.path, err)
+			}
+			b = plain
+		}
 		out = append(out, b...)
 	}
 	return out, nil
@@ -121,20 +143,32 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 
 // nameIndex 按文件名与「无扩展名」各建一份索引——演出脚本里的 storage 名
 // 常常不带扩展名，两份索引都要有才找得到。
+//
+// 索引只建一次（lookup 会被引用集反复调用）。同名条目按路径排序取第一个，
+// 保证跨归档同名时的选择是确定的（map 迭代顺序随机，会让「解出哪份」飘）。
 func (s *archiveSet) nameIndex() (map[string]archiveEntry, map[string]archiveEntry) {
-	byBase := map[string]archiveEntry{}
-	byStem := map[string]archiveEntry{}
-	for _, e := range s.entries {
+	if s.byBase != nil {
+		return s.byBase, s.byStem
+	}
+	paths := make([]string, 0, len(s.entries))
+	for p := range s.entries {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	s.byBase = map[string]archiveEntry{}
+	s.byStem = map[string]archiveEntry{}
+	for _, p := range paths {
+		e := s.entries[p]
 		lb := strings.ToLower(e.base())
-		if _, ok := byBase[lb]; !ok {
-			byBase[lb] = e
+		if _, ok := s.byBase[lb]; !ok {
+			s.byBase[lb] = e
 		}
 		ls := strings.ToLower(e.stem())
-		if _, ok := byStem[ls]; !ok {
-			byStem[ls] = e
+		if _, ok := s.byStem[ls]; !ok {
+			s.byStem[ls] = e
 		}
 	}
-	return byBase, byStem
+	return s.byBase, s.byStem
 }
 
 // lookup 按引用名找条目：先按完整文件名，再按去扩展名的名字。

@@ -39,6 +39,9 @@ type engineDeps struct {
 	ImageDir  string
 	// ScriptExt 剧本后缀（如 .ks / .ast / .bs）——写进约定文件。
 	ScriptExt string
+	// ScriptCompat 可选：为「现有台本构建器认不出」的脚本生成兼容台本（标准 KAG
+	// 标签的 .ks）。返回 nil 表示不需要。resolve 用来判断引用在归档里是否真的存在。
+	ScriptCompat func(data []byte, name string, resolve func(string) bool) ([]byte, []string)
 }
 
 // engineRegistry 引擎 id → 能力表（按引擎注册，核心不感知差异）。

@@ -11,6 +11,7 @@ package unpack
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -29,7 +30,12 @@ func init() {
 		ArchiveExts:  []string{".xp3"},
 		ParseArchive: a.ParseArchive,
 		IsScript: func(p string) bool {
+			// .wks 是 Mai@KF.dll 一系的剧本（内容仍是 KAG，但用自定义宏画图，
+			// 且路径不带 scenario/ 前缀，不能按 .ks 的规则筛）。
 			sl := strings.ToLower(filepath.ToSlash(p))
+			if strings.EqualFold(filepath.Ext(p), ".wks") {
+				return true
+			}
 			return strings.Contains(sl, "scenario") && strings.EqualFold(filepath.Ext(p), ".ks")
 		},
 		ParseScript: func(data []byte, name string) (scriptInfo, error) {
@@ -47,9 +53,10 @@ func init() {
 			info.Refs = dedupSorted(info.Refs)
 			return info, nil
 		},
-		ScriptExt: ".ks",
-		ScriptDir: filepath.Join("raw", "data", "scenario"),
-		ImageDir:  filepath.Join("raw", "data", "image"),
+		ScriptExt:    ".ks",
+		ScriptDir:    filepath.Join("raw", "data", "scenario"),
+		ImageDir:     filepath.Join("raw", "data", "image"),
+		ScriptCompat: buildWKSCompat,
 	})
 }
 
@@ -67,8 +74,12 @@ func parseAst(data []byte, name string) (*kirikiri.Ast, error) {
 	return ast, nil
 }
 
-// cgLabelsOf 取画廊脚本里的 CG 事件标签（sysbutton 的 graphic/target 配对，
-// 与 library.Scan 同口径：只有两者都像 CG 槽位才算一个事件）。
+// cgLabelsOf 取画廊脚本里的 CG 事件标签。
+//
+// 两条口径：
+//  1. 标准 KiriKiri 画廊：sysbutton 的 graphic/target 配对（与 library.Scan 同口径）。
+//  2. 宏家族（Mai@KF.dll 一系，.wks）：没有 sysbutton 画廊，CG 事件写成脚本里的
+//     `*eh_xxx` 标签——那就是原作自己的事件切分，按它切即可。
 func cgLabelsOf(ast *kirikiri.Ast) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -91,6 +102,16 @@ func cgLabelsOf(ast *kirikiri.Ast) []string {
 			}
 			seen[label] = true
 			out = append(out, label)
+		}
+	}
+	if len(out) == 0 {
+		for _, lb := range ast.Labels {
+			name := strings.TrimSpace(lb.Name)
+			if !strings.HasPrefix(strings.ToLower(name), "eh") || seen[name] {
+				continue
+			}
+			seen[name] = true
+			out = append(out, name)
 		}
 	}
 	sort.Strings(out)
@@ -116,4 +137,109 @@ func dedupSorted(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// buildWKSCompat 把宏家族脚本（macImageDraw / TransName… 这类自定义宏，
+// Mai@KF.dll 一系）翻成标准 KAG 标签的 .ks，供现有台本构建器直接播。
+//
+// 只保留「能演」的部分：台词、静态 CG 图、等待、BGM/SE、转场时长。
+// & / $ 开头的引用是 TJS 运行时变量（背景、立绘名表都在 exe 里），静态不可解，
+// 如实跳过并在告警里报数量；自定义宏的控制流、翻译叠加层（TransName/TransHitret
+// 的英/繁/简三语）不进台本。
+func buildWKSCompat(data []byte, name string, resolve func(string) bool) ([]byte, []string) {
+	s := string(data)
+	if !strings.Contains(s, "[macImageDraw") && !strings.Contains(s, "[macTrans") {
+		return nil, nil // 不是宏家族脚本，原样交给现有构建器
+	}
+	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	var b strings.Builder
+	fmt.Fprintf(&b, "*label01|%s\n", strings.TrimSuffix(name, filepath.Ext(name)))
+	inTrans := false
+	keptImg, dyn := 0, 0
+	for i, raw := range lines {
+		t := strings.TrimSpace(raw)
+		low := strings.ToLower(t)
+		if t == "" || strings.HasPrefix(t, ";") || strings.HasPrefix(t, "//") {
+			continue
+		}
+		if strings.HasPrefix(low, "[transname") {
+			inTrans = true
+			continue
+		}
+		if strings.HasPrefix(low, "[transhitret") {
+			inTrans = false
+			continue
+		}
+		if inTrans {
+			continue
+		}
+		switch {
+		case low == "[hitret]":
+			// 原作宏：等点击 → 清消息层。
+			b.WriteString("[l]\n[er]\n")
+		case strings.HasPrefix(low, "[talk"):
+			b.WriteString(t + "\n")
+		case strings.HasPrefix(low, "[macwait"):
+			if v := kagAttr(t, "time"); v != "" {
+				fmt.Fprintf(&b, "[wait time=%s]\n", v)
+			}
+		case strings.HasPrefix(low, "[macplaybgm"):
+			if v := kagAttr(t, "file"); v != "" && resolve(v) {
+				fmt.Fprintf(&b, "[playbgm storage=%s]\n", v)
+			}
+		case strings.HasPrefix(low, "[macplayse"):
+			if v := kagAttr(t, "file"); v != "" && resolve(v) {
+				fmt.Fprintf(&b, "[playse storage=%s]\n", v)
+			}
+		case strings.HasPrefix(low, "[macimagedraw") || strings.HasPrefix(low, "[imagedraw"):
+			v := kagAttr(t, "file")
+			if v == "" || strings.HasPrefix(v, "&") || strings.HasPrefix(v, "$") {
+				dyn++
+				continue
+			}
+			if !resolve(v) {
+				continue
+			}
+			fmt.Fprintf(&b, "[image storage=%s]\n", v)
+			keptImg++
+			// 原脚本多在下一条宏里转场/等待；没有的话补一个，别让 CG 一闪而过。
+			if i+1 >= len(lines) || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(lines[i+1])), "[macwait") {
+				b.WriteString("[wait time=1200]\n")
+			}
+		case strings.HasPrefix(low, "[mactrans"):
+			if v := kagAttr(t, "time"); v != "" {
+				fmt.Fprintf(&b, "[trans time=%s]\n", v)
+			}
+		case strings.HasPrefix(t, "[") || strings.HasPrefix(t, "@"):
+			// 其余自定义宏 / 控制流不进台本（与 build_show 的「未识别即跳过」一致）。
+		default:
+			b.WriteString(t + "\n")
+		}
+	}
+	if keptImg == 0 {
+		return nil, []string{fmt.Sprintf("%s：没有可静态解析的 CG 图（%d 条 & 变量引用不可解），未生成兼容台本", name, dyn)}
+	}
+	return []byte(b.String()), []string{fmt.Sprintf("%s：已生成兼容台本（CG 图 %d 张，跳过 %d 条 & 变量引用）", name, keptImg, dyn)}
+}
+
+// kagAttr 取一个 KAG 标签里的属性值（支持带引号与不带引号）。
+func kagAttr(t, key string) string {
+	i := strings.Index(t, key+"=")
+	if i < 0 {
+		return ""
+	}
+	v := t[i+len(key)+1:]
+	if v == "" {
+		return ""
+	}
+	if v[0] == '"' || v[0] == '\'' {
+		if j := strings.IndexByte(v[1:], v[0]); j >= 0 {
+			return v[1 : 1+j]
+		}
+		return v[1:]
+	}
+	if j := strings.IndexAny(v, " \t]"); j >= 0 {
+		v = v[:j]
+	}
+	return v
 }
