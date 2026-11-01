@@ -150,3 +150,12 @@ desktop.ini
 
 # archify 生成的图（本地查看用，不入库）
 .archify/
+
+# CG 导出产物（tools/unity_cg_export.py）
+# 导出器默认该指到仓库外；万一指进了仓库，别让 111 MB 的 PNG 被顺手提交。
+# 只忽略仓库根的 cg/ 与这些约定俗成的输出目录，不影响源码里的同名子目录。
+cg-index.json
+/cg/
+/out/
+/export/
+/cg_out/
