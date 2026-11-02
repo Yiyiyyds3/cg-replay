@@ -67,6 +67,10 @@ bundle 是 UnityFS（LZ4 + 序列化对象 + 未压缩像素流），webview 没
 # 只看索引不落盘：--dry-run    只导一部：--only HCG02    全量重写：--force
 ```
 
+`--only` 会读旧 `cg-index.json` 合并写回（不会把整库索引删成只剩一部）。
+输出默认必须落在 git 仓库外；确实要写进仓库时加 `--allow-repo-output`，
+否则 100+ MB 的 PNG 很容易被 `git add -A` 顺手带上。
+
 产出：
 
 ```

@@ -17,6 +17,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/bgi"
+	"ucgr/internal/ir"
 )
 
 // ScanBGI 扫 BGI 解包目录（.bs 编译脚本），产出事件库。
@@ -69,10 +70,11 @@ func ScanBGI(root string, conv adapter.Convention) (*Library, error) {
 				title = fmt.Sprintf("%s #%03d", stem, i+1)
 			}
 			lib.Scenes = append(lib.Scenes, SceneEvent{
-				ID:     id,
-				Title:  title,
-				Script: rel(p),
-				Label:  fmt.Sprint(i + 1),
+				ID:       id,
+				Title:    title,
+				Script:   rel(p),
+				Label:    fmt.Sprint(i + 1),
+				HasVideo: ir.HasVideo(&ev),
 			})
 		}
 	}

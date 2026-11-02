@@ -368,6 +368,8 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 		libPath = old.Library
 	}
 	g, _ := reg.Ensure(clean, libPath)
+	// 登记时把识别出的引擎写回：OpenEvent 的分派与卡片展示都靠它。
+	g.Engine = conv.EngineID
 	reg.Active = g.ID
 	if err := lib.Save(g.Library); err != nil {
 		return nil, err
@@ -548,7 +550,9 @@ func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 // loadOrScanLib 读该游戏的库清单，读不到（或 root 已变）就地扫描并回写。
 func (a *App) loadOrScanLib(g *registry.Game) (*library.Library, error) {
 	if g.Library != "" {
-		if lib, err := library.Load(g.Library); err == nil && lib.Root == g.Root {
+		// 版本不符（旧清单没有 has_video 等新字段）也要重扫，而不是原样复用。
+		if lib, err := library.Load(g.Library); err == nil &&
+			lib.Root == g.Root && lib.Schema == library.SchemaVersion {
 			return lib, nil
 		}
 	}

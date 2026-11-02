@@ -36,6 +36,7 @@ import csv
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -140,6 +141,63 @@ def match_score(cg: str, group: str) -> int:
 
 MATCH_MIN = 50  # 低于这个分就不认（留空，人工补）
 
+# Windows 不允许的字符 + 路径分隔符。CG 名/资产名来自游戏数据，不能直接拼路径。
+_BAD_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_component(raw: str, fallback: str = "unnamed") -> str:
+    """把游戏数据里的名字变成单个安全的路径分量。
+
+    只取 basename，并替换 Windows 非法字符；这样 `../x`、`C:\\x`、`a/b`
+    都只会落在当前目录，不会把文件写到 --out 之外。
+    """
+    s = os.path.basename(str(raw).replace("\\", "/"))
+    s = _BAD_NAME.sub("_", s).strip().rstrip(". ")
+    if not s or s in (".", ".."):
+        return fallback
+    return s
+
+
+def natural_key(s: str):
+    """自然排序键：`2.png` < `10.png`，`Witch01_2` < `Witch01_10`。"""
+    return [
+        (0, int(part)) if part.isdigit() else (1, part.lower())
+        for part in re.split(r"(\d+)", s)
+    ]
+
+
+def within(root: str, path: str) -> bool:
+    """path 是否在 root 子树内（用于落盘前兜底校验）。"""
+    try:
+        return os.path.commonpath([os.path.abspath(root), os.path.abspath(path)]) == os.path.abspath(root)
+    except ValueError:  # Windows 不同盘符
+        return False
+
+
+def out_path(root: str, *parts: str) -> str:
+    p = os.path.join(root, *parts)
+    if not within(root, p):
+        raise SystemExit(f"拒绝写出 --out 之外：{p}")
+    return p
+
+
+def repo_root_for(path: str) -> str:
+    """返回 path 所在 git 仓库根；不是仓库/没有 git 时返回空串。"""
+    p = os.path.abspath(path)
+    while p and not os.path.isdir(p):
+        parent = os.path.dirname(p)
+        if parent == p:
+            break
+        p = parent
+    try:
+        r = subprocess.run(
+            ["git", "-C", p, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except Exception:
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
 
 def find_game_layout(game: str) -> tuple[str, str]:
     """在游戏根目录里找 catalog.json 与 bundle 目录。"""
@@ -163,19 +221,24 @@ def find_game_layout(game: str) -> tuple[str, str]:
     return cat, scored[0][1]
 
 
-def read_catalog(cat_path: str) -> tuple[dict[str, str], list[str]]:
-    """返回 (资产名 → CG 名, DialogueData 组名列表)。"""
+def read_catalog(cat_path: str) -> tuple[dict[str, set[str]], list[str]]:
+    """返回 (资产名 → CG 名集合, DialogueData 组名列表)。
+
+    用集合而不是单值：同名贴图可能被多个 CG 目录复用，后写覆盖会让其中
+    一部 CG 少图。导出时按集合逐个复制。
+    """
     with open(cat_path, encoding="utf-8") as f:
         d = json.load(f)
     ids = d.get("m_InternalIds") or []
 
-    asset_to_cg: dict[str, str] = {}
+    asset_to_cg: dict[str, set[str]] = defaultdict(set)
     for i in ids:
         m = re.search(r"Art/CG/([^/]+)/([^/]+)$", i.replace("\\", "/"))
         if not m:
             continue
-        cg, fname = m.group(1), m.group(2)
-        asset_to_cg[os.path.splitext(fname)[0]] = cg
+        cg = safe_component(m.group(1), "cg")
+        fname = safe_component(m.group(2), "asset")
+        asset_to_cg[os.path.splitext(fname)[0]].add(cg)
 
     groups: set[str] = set()
     for i in ids:
@@ -258,7 +321,7 @@ def read_cg_csv(path: str) -> tuple[dict[str, str], list[tuple[str, list[str]]]]
     return spine, stills
 
 
-def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int, int]:
+def export_embedded(paths: list[str], args, problems: list[str]) -> tuple[dict, dict, list[str], int, int]:
     """把「资源内嵌 / 散装 bundle」里的 CG 导出来。
 
     只认两种能被播放器直接消费的形态（与 Addressables 版一致）：
@@ -322,13 +385,14 @@ def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int,
     png_bytes = text_bytes = 0
     dry = args.dry_run
 
-    def save_png(tex_name: str, dest_dir: str) -> bool:
+    def save_png(tex_name: str, cg: str) -> bool:
         nonlocal png_bytes
         d = textures.get(tex_name)
         if d is None:
             return False
-        fname = _safe_name(tex_name) + ".png"
-        dest = os.path.join(dest_dir, fname)
+        fname = safe_component(tex_name, "texture") + ".png"
+        dest_dir = out_path(args.out, "cg", cg)
+        dest = out_path(args.out, "cg", cg, fname)
         if dry:
             return True
         os.makedirs(dest_dir, exist_ok=True)
@@ -338,27 +402,36 @@ def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int,
         try:
             d.image.save(dest)
         except Exception as e:
-            print(f"  ! 贴图导出失败 {tex_name}: {e}")
+            msg = f"{cg}/{fname}: 贴图导出失败：{e}"
+            problems.append(msg)
+            print(f"  ! {msg}")
             return False
         png_bytes += os.path.getsize(dest)
         return True
 
     for base in bases:
-        cg = _safe_name(csv_spine.get(base, base))
+        cg = safe_component(csv_spine.get(base, base), "cg")
         if args.only and args.only not in (cg, base):
             continue
-        dest_dir = os.path.join(args.out, "cg", cg)
+        dest_dir = out_path(args.out, "cg", cg)
         if not dry:
             os.makedirs(dest_dir, exist_ok=True)
         # 骨架 + 图集
         sk = skel_by_base[base]
         at = atlas_by_base[base]
+        spine_name = safe_component(base, "spine")
         if not dry:
-            with open(os.path.join(dest_dir, _safe_name(base) + ".json"), "wb") as f:
-                f.write(sk)
-            with open(os.path.join(dest_dir, _safe_name(base) + ".atlas"), "wb") as f:
-                f.write(at)
-        cg_files[cg]["text"].extend([_safe_name(base) + ".json", _safe_name(base) + ".atlas"])
+            try:
+                with open(out_path(args.out, "cg", cg, spine_name + ".json"), "wb") as f:
+                    f.write(sk)
+                with open(out_path(args.out, "cg", cg, spine_name + ".atlas"), "wb") as f:
+                    f.write(at)
+            except Exception as e:
+                msg = f"{cg}/{spine_name}: 骨架导出失败：{e}"
+                problems.append(msg)
+                print(f"  ! {msg}")
+                continue
+        cg_files[cg]["text"].extend([spine_name + ".json", spine_name + ".atlas"])
         text_bytes += len(sk) + len(at)
         # 同名贴图（含 <base>_2 这种变体）
         cand = [t for t in textures if t == base or t.startswith(base + "_")]
@@ -367,22 +440,22 @@ def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int,
         for tn in cand:
             if tn in used_tex:
                 continue
-            if save_png(tn, dest_dir):
+            if save_png(tn, cg):
                 used_tex.add(tn)
-                cg_files[cg]["png"].append(_safe_name(tn) + ".png")
+                cg_files[cg]["png"].append(safe_component(tn, "texture") + ".png")
 
     # 单图 CG：优先用游戏自带 CG 表；否则按前缀/正则挑孤立贴图。
     for cg_id, texs in csv_stills:
-        cg = _safe_name(cg_id)
+        cg = safe_component(cg_id, "cg")
         if args.only and args.only != cg:
             continue
         for tex in texs:
             if tex not in textures:
                 print(f"  ! {cg}: CG 表指向的贴图 {tex} 不存在")
                 continue
-            if save_png(tex, os.path.join(args.out, "cg", cg)):
+            if save_png(tex, cg):
                 used_tex.add(tex)
-                cg_files[cg]["png"].append(_safe_name(tex) + ".png")
+                cg_files[cg]["png"].append(safe_component(tex, "texture") + ".png")
 
     prefixes = tuple(x.strip() for x in args.still_prefix.split(",") if x.strip())
     rx = re.compile(args.still_regex) if args.still_regex else None
@@ -391,12 +464,12 @@ def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int,
             continue
         if not ((prefixes and tn.startswith(prefixes)) or (rx and rx.search(tn))):
             continue
-        cg = _safe_name(tn)
+        cg = safe_component(tn, "cg")
         if args.only and args.only != cg:
             continue
-        if save_png(tn, os.path.join(args.out, "cg", cg)):
+        if save_png(tn, cg):
             used_tex.add(tn)
-            cg_files[cg]["png"].append(_safe_name(tn) + ".png")
+            cg_files[cg]["png"].append(safe_component(tn, "texture") + ".png")
 
     orphan["png"] = len(textures) - len(used_tex)
     orphan["text"] = len(texts) - sum(len(v["text"]) for v in cg_files.values())
@@ -404,43 +477,57 @@ def export_embedded(paths: list[str], args) -> tuple[dict, dict, list[str], int,
 
 
 def spine_stats(path: str) -> dict:
-    """从 Spine 的 skeleton JSON 里数出骨骼/插槽/皮肤/动画，并估算每段时长。"""
+    """从 Spine 的 skeleton JSON 里数出骨骼/插槽/皮肤/动画，并估算每段时长。
+
+    整个函数都在 try 里：任何字段形状异常都返回 {"error": ...}，不能因为
+    顶层是数组/字符串就抛出去，导致 PNG 已落盘而索引没写。
+    """
     try:
         with open(path, encoding="utf-8") as f:
             d = json.load(f)
+        if not isinstance(d, dict):
+            return {"error": "骨架 JSON 顶层不是对象"}
+
+        def anim_dur(a: dict) -> float:
+            t = 0.0
+            for key in ("bones", "slots", "deform", "drawOrder", "ik", "transform", "paths", "attachments"):
+                node = a.get(key) or {}
+                items = node.values() if isinstance(node, dict) else []
+                for tl in items:
+                    if not isinstance(tl, dict):
+                        continue
+                    for v in tl.values():
+                        if not isinstance(v, list):
+                            continue
+                        for e in v:
+                            if isinstance(e, dict) and isinstance(e.get("time"), (int, float)):
+                                t = max(t, float(e["time"]))
+            return round(t, 2)
+
+        anims = d.get("animations") or {}
+        if not isinstance(anims, dict):
+            anims = {}
+        skins = d.get("skins") or {}
+        if isinstance(skins, dict):
+            skin_names = list(skins.keys())
+        elif isinstance(skins, list):
+            skin_names = [s.get("name") for s in skins if isinstance(s, dict) and s.get("name")]
+        else:
+            skin_names = []
+        skeleton = d.get("skeleton") or {}
+        return {
+            "version": skeleton.get("spine") if isinstance(skeleton, dict) else None,
+            "bones": len(d.get("bones") or []),
+            "slots": len(d.get("slots") or []),
+            "skins": skin_names,
+            "animations": [
+                {"name": n, "loop": "loop" in n.lower(), "dur": anim_dur(anims[n])}
+                for n in anims
+                if isinstance(anims.get(n), dict)
+            ],
+        }
     except Exception as e:
         return {"error": str(e)}
-
-    def anim_dur(a: dict) -> float:
-        t = 0.0
-        for key in ("bones", "slots", "deform", "drawOrder", "ik", "transform", "paths", "attachments"):
-            node = a.get(key) or {}
-            items = node.values() if isinstance(node, dict) else []
-            for tl in items:
-                if not isinstance(tl, dict):
-                    continue
-                for v in tl.values():
-                    if not isinstance(v, list):
-                        continue
-                    for e in v:
-                        if isinstance(e, dict) and isinstance(e.get("time"), (int, float)):
-                            t = max(t, float(e["time"]))
-        return round(t, 2)
-
-    anims = d.get("animations") or {}
-    skins = d.get("skins") or {}
-    skin_names = list(skins.keys()) if isinstance(skins, dict) else [s.get("name") for s in skins]
-    out = {
-        "version": (d.get("skeleton") or {}).get("spine"),
-        "bones": len(d.get("bones") or []),
-        "slots": len(d.get("slots") or []),
-        "skins": skin_names,
-        "animations": [
-            {"name": n, "loop": "loop" in n.lower(), "dur": anim_dur(anims[n])}
-            for n in anims
-        ],
-    }
-    return out
 
 
 def main() -> int:
@@ -458,15 +545,29 @@ def main() -> int:
     ap.add_argument("--only", default="", help="只导某个 CG（目录名）")
     ap.add_argument("--dry-run", action="store_true", help="只出索引，不写素材")
     ap.add_argument("--force", action="store_true", help="已存在的文件也重写")
+    ap.add_argument(
+        "--allow-repo-output",
+        action="store_true",
+        help="允许把产物写进 git 仓库（默认拒绝，避免 100+ MB PNG 被顺手提交）",
+    )
     args = ap.parse_args()
+
+    if not args.dry_run and not args.allow_repo_output:
+        repo = repo_root_for(args.out)
+        if repo and within(repo, args.out):
+            raise SystemExit(
+                f"--out 位于 git 仓库内：{args.out}\n"
+                "导出产物很大，默认拒绝写进仓库；换到仓库外，或加 --allow-repo-output。"
+            )
 
     t0 = time.time()
     cg_files: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"png": [], "text": []})
     groups: list[str] = []
     png_bytes = text_bytes = 0
+    problems: list[str] = []
 
     if args.assets:
-        cg_files, orphan, sources, png_bytes, text_bytes = export_embedded(args.assets, args)
+        cg_files, orphan, sources, png_bytes, text_bytes = export_embedded(args.assets, args, problems)
         if not args.game:
             args.game = os.path.basename(os.path.dirname(os.path.abspath(args.assets[0])))
         print(f"容器：{len(args.assets)} 个 · 候选 CG：{len(cg_files)} 部")
@@ -489,40 +590,41 @@ def main() -> int:
             tname = o.type.name
             if tname == "Texture2D":
                 d = o.read()
-                name = getattr(d.m_Name, "string", str(d.m_Name))
-                cg = asset_to_cg.get(name)
-                if not cg:
+                name = safe_component(getattr(d.m_Name, "string", str(d.m_Name)), "texture")
+                targets = asset_to_cg.get(name, set())
+                if not targets:
                     orphan["png"] += 1
                     continue
-                if args.only and cg != args.only:
-                    continue
-                dest_dir = os.path.join(args.out, "cg", cg)
-                dest = os.path.join(dest_dir, name + ".png")
-                if args.dry_run:
-                    cg_files[cg]["png"].append(name + ".png")
-                    continue
-                os.makedirs(dest_dir, exist_ok=True)
-                if not args.force and os.path.isfile(dest) and os.path.getsize(dest) > 0:
-                    cg_files[cg]["png"].append(name + ".png")
+                for cg in sorted(targets):
+                    if args.only and cg != args.only:
+                        continue
+                    fname = name + ".png"
+                    dest_dir = out_path(args.out, "cg", cg)
+                    dest = out_path(args.out, "cg", cg, fname)
+                    if args.dry_run:
+                        cg_files[cg]["png"].append(fname)
+                        continue
+                    os.makedirs(dest_dir, exist_ok=True)
+                    if not args.force and os.path.isfile(dest) and os.path.getsize(dest) > 0:
+                        cg_files[cg]["png"].append(fname)
+                        png_bytes += os.path.getsize(dest)
+                        continue
+                    try:
+                        d.image.save(dest)
+                    except Exception as e:
+                        msg = f"{cg}/{fname}: 贴图导出失败：{e}"
+                        problems.append(msg)
+                        print(f"  ! {msg}")
+                        continue
+                    cg_files[cg]["png"].append(fname)
                     png_bytes += os.path.getsize(dest)
-                    continue
-                try:
-                    d.image.save(dest)
-                except Exception as e:
-                    print(f"  ! 贴图导出失败 {name}: {e}")
-                    continue
-                cg_files[cg]["png"].append(name + ".png")
-                png_bytes += os.path.getsize(dest)
-
             elif tname == "TextAsset":
                 d = o.read()
-                name = getattr(d.m_Name, "string", str(d.m_Name))
-                stem = os.path.splitext(name)[0]
-                cg = asset_to_cg.get(stem) or asset_to_cg.get(name)
-                if not cg:
+                name = safe_component(getattr(d.m_Name, "string", str(d.m_Name)), "text")
+                stem = safe_component(os.path.splitext(name)[0], "text")
+                targets = asset_to_cg.get(stem) or asset_to_cg.get(name) or set()
+                if not targets:
                     orphan["text"] += 1
-                    continue
-                if args.only and cg != args.only:
                     continue
                 raw = d.m_Script
                 raw = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", "ignore")
@@ -531,24 +633,36 @@ def main() -> int:
                     fname = name
                 else:
                     fname = name + (".json" if raw[:1] == b"{" else ".atlas")
-                if args.dry_run:
+                fname = safe_component(fname, "text")
+                for cg in sorted(targets):
+                    if args.only and cg != args.only:
+                        continue
+                    if args.dry_run:
+                        cg_files[cg]["text"].append(fname)
+                        continue
+                    dest_dir = out_path(args.out, "cg", cg)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dest = out_path(args.out, "cg", cg, fname)
+                    try:
+                        if args.force or not (os.path.isfile(dest) and os.path.getsize(dest) == len(raw)):
+                            with open(dest, "wb") as f:
+                                f.write(raw)
+                    except Exception as e:
+                        msg = f"{cg}/{fname}: 文本导出失败：{e}"
+                        problems.append(msg)
+                        print(f"  ! {msg}")
+                        continue
                     cg_files[cg]["text"].append(fname)
-                    continue
-                dest_dir = os.path.join(args.out, "cg", cg)
-                os.makedirs(dest_dir, exist_ok=True)
-                dest = os.path.join(dest_dir, fname)
-                if args.force or not (os.path.isfile(dest) and os.path.getsize(dest) == len(raw)):
-                    with open(dest, "wb") as f:
-                        f.write(raw)
-                cg_files[cg]["text"].append(fname)
-                text_bytes += len(raw)
+                    text_bytes += len(raw)
 
-    # 建索引
+    # 建索引（`--only` 时与旧索引合并：一次调试不能把整库索引删成只剩一部）
     cgs = []
     for cg in sorted(cg_files):
         files = cg_files[cg]
-        cg_dir = os.path.join(args.out, "cg", cg)
-        skeletons = [f for f in files["text"] if f.lower().endswith(".json")]
+        cg_dir = out_path(args.out, "cg", cg)
+        png_files = sorted(files["png"], key=natural_key)
+        text_files = sorted(files["text"], key=natural_key)
+        skeletons = [f for f in text_files if f.lower().endswith(".json")]
         stats = {}
         if skeletons and not args.dry_run:
             stats = spine_stats(os.path.join(cg_dir, skeletons[0]))
@@ -578,7 +692,7 @@ def main() -> int:
             kind = "still"       # 单张静态 CG
         else:
             kind = "unknown"
-        chars = characters_of(files["png"] + files["text"])
+        chars = characters_of(png_files + text_files)
         if stats.get("skins"):
             chars = sorted(set(chars) | set(characters_of(stats["skins"])))
         cgs.append(
@@ -588,12 +702,37 @@ def main() -> int:
                 "category": category_of(keyname),
                 "event_group": match or None,
                 "characters": chars,
-                "files": {"png": files["png"], "text": files["text"]},
+                "files": {"png": png_files, "text": text_files},
                 "spine": stats if kind == "spine" else None,
-                "frames": sorted(files["png"]) if kind == "frames" else None,
+                "frames": png_files if kind == "frames" else None,
                 "bytes": size,
             }
         )
+
+    if args.only:
+        idx_path = out_path(args.out, "cg-index.json")
+        if os.path.isfile(idx_path):
+            try:
+                with open(idx_path, encoding="utf-8") as f:
+                    old = json.load(f)
+                if not isinstance(old, dict) or not isinstance(old.get("cgs"), list):
+                    raise ValueError("cgs 不是数组")
+            except Exception as e:
+                raise SystemExit(
+                    f"--only 需要合并旧索引，但旧索引无法解析：{idx_path}（{e}）\n"
+                    "请先备份/删除它，避免把整库索引覆盖成只剩一部。"
+                )
+            keep = [
+                c for c in old["cgs"]
+                if isinstance(c, dict) and c.get("id") and c["id"] != args.only
+            ]
+            cgs = keep + cgs
+            old_groups = old.get("event_groups")
+            if isinstance(old_groups, list):
+                groups = sorted(set(groups) | {str(x) for x in old_groups})
+        else:
+            print("  ! 没有旧 cg-index.json：这次只写 --only 指定的 CG")
+    cgs.sort(key=lambda c: str(c.get("id", "")))
 
     index = {
         "schema": 1,
@@ -603,11 +742,11 @@ def main() -> int:
         "source": {"bundle": "、".join(os.path.basename(p) for p in sources), "bytes": sum(os.path.getsize(p) for p in sources)},
         "counts": {
             "cg": len(cgs),
-            "png": sum(len(c["files"]["png"]) for c in cgs),
-            "text": sum(len(c["files"]["text"]) for c in cgs),
-            "spine": sum(1 for c in cgs if c["kind"] == "spine"),
-            "frames": sum(1 for c in cgs if c["kind"] == "frames"),
-            "still": sum(1 for c in cgs if c["kind"] == "still"),
+            "png": sum(len((c.get("files") or {}).get("png") or []) for c in cgs),
+            "text": sum(len((c.get("files") or {}).get("text") or []) for c in cgs),
+            "spine": sum(1 for c in cgs if c.get("kind") == "spine"),
+            "frames": sum(1 for c in cgs if c.get("kind") == "frames"),
+            "still": sum(1 for c in cgs if c.get("kind") == "still"),
             "orphan_png": orphan["png"],
             "orphan_text": orphan["text"],
         },
@@ -615,30 +754,34 @@ def main() -> int:
         "cgs": cgs,
         "event_groups": groups,
     }
-    index["bytes"] = sum(c["bytes"] for c in cgs)
+    index["bytes"] = sum(int(c.get("bytes") or 0) for c in cgs)
 
     # 自检：spine 必须有骨架、frames 至少 2 帧、索引里的文件必须真在磁盘上
-    problems = []
+    check_problems: list[str] = []
     for c in cgs:
-        cg_dir = os.path.join(args.out, "cg", c["id"])
-        if c["kind"] == "spine" and not c["files"]["text"]:
-            problems.append(f'{c["id"]}: 标为 spine 但没有骨架文件')
-        if c["kind"] == "frames" and len(c["files"]["png"]) < 2:
-            problems.append(f'{c["id"]}: 标为 frames 但只有 {len(c["files"]["png"])} 张图')
+        cid = str(c.get("id") or "")
+        files = c.get("files") or {}
+        pngs = files.get("png") or []
+        texts = files.get("text") or []
+        cg_dir = out_path(args.out, "cg", cid)
+        if c.get("kind") == "spine" and not texts:
+            check_problems.append(f"{cid}: 标为 spine 但没有骨架文件")
+        if c.get("kind") == "frames" and len(pngs) < 2:
+            check_problems.append(f"{cid}: 标为 frames 但只有 {len(pngs)} 张图")
         if args.dry_run:
             continue
-        for f in c["files"]["png"] + c["files"]["text"]:
-            if not os.path.isfile(os.path.join(cg_dir, f)):
-                problems.append(f'{c["id"]}: 索引里有 {f}，磁盘上没有')
-    index["problems"] = problems
+        for f in pngs + texts:
+            if not os.path.isfile(out_path(cg_dir, f)):
+                check_problems.append(f"{cid}: 索引里有 {f}，磁盘上没有")
+    index["problems"] = problems + check_problems
 
     if not args.dry_run:
         os.makedirs(args.out, exist_ok=True)
-        with open(os.path.join(args.out, "cg-index.json"), "w", encoding="utf-8") as f:
+        with open(out_path(args.out, "cg-index.json"), "w", encoding="utf-8") as f:
             json.dump(index, f, ensure_ascii=False, indent=2)
         # 约定文件：让桌面端「添加游戏」认出这是 unity 库，并把 cg/ 当剧本目录
         # （AddGame 会检查 conv.scenario_dir 是否存在，所以必须是导出后真实存在的目录）。
-        with open(os.path.join(args.out, "ucgr-convention.json"), "w", encoding="utf-8") as f:
+        with open(out_path(args.out, "ucgr-convention.json"), "w", encoding="utf-8") as f:
             json.dump({"engine_id": "unity", "scenario_dir": "cg"}, f, ensure_ascii=False, indent=2)
 
     print(
@@ -652,15 +795,16 @@ def main() -> int:
         f"类型：spine {index['counts']['spine']} · frames {index['counts']['frames']} · "
         f"still {index['counts']['still']}"
     )
-    if problems:
-        print(f"自检发现 {len(problems)} 个问题：")
-        for x in problems[:8]:
+    all_problems = index["problems"]
+    if all_problems:
+        print(f"发现 {len(all_problems)} 个问题：")
+        for x in all_problems[:8]:
             print("  -", x)
     else:
         print("自检通过：索引与磁盘一致")
     if not args.dry_run:
-        print(f"索引：{os.path.join(args.out, 'cg-index.json')}")
-    return 0
+        print(f"索引：{out_path(args.out, 'cg-index.json')}")
+    return 1 if all_problems else 0
 
 
 if __name__ == "__main__":

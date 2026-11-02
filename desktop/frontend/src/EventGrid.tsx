@@ -12,10 +12,12 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
   Ship,
   Star,
   Users,
 } from "lucide-react";
+import { SettingsDialog } from "./SettingsDialog";
 import {
   api,
   type CardItem,
@@ -45,6 +47,8 @@ type Status =
 const SIDEBAR_KEY = "ucgr.sidebarCollapsed";
 const RECENT_LIMIT = 12; // 「全部」页签最近播放取多少条（清理后同量刷新）
 const AUTOPRUNE_KEY = "ucgr.autoPruneRecent"; // 启动自动清理 72h 前最近播放的开关（默认关）
+// 解包时是否提取 OP/ED 影片。默认开（提取）；"0" = 用户选择跳过。
+const EXTRACT_VIDEO_KEY = "ucgr.extractVideo";
 const PRUNE_DAYS = 3; // 冷归档窗口（与 UI 文案一致）
 
 // M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
@@ -73,6 +77,28 @@ export default function EventGrid({
   const [unpackResult, setUnpackResult] = useState<UnpackImportDTO | null>(null); // 已解包但未接入
   const [unpackScheme, setUnpackScheme] = useState(""); // XP3 解密方案；空 = 不解密
   const [unpackKey, setUnpackKey] = useState("0"); // xor 固定密钥（0-255）
+  // 提取影片的偏好：默认开（提取）。落 localStorage，下次解包沿用上次选择。
+  const [extractVideo, setExtractVideo] = useState(() => {
+    try {
+      return window.localStorage.getItem(EXTRACT_VIDEO_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  // 点「开始解包」后、真解之前先问一次（有影片时）。
+  const [askVideo, setAskVideo] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false); // 设置弹层
+  const [forceReextract, setForceReextract] = useState(false); // 重读时「强制重解」
+
+  // 改「提取影片」偏好：状态 + localStorage 一起写（弹层与面板勾选框共用）。
+  const setExtractVideoPref = (next: boolean) => {
+    setExtractVideo(next);
+    try {
+      window.localStorage.setItem(EXTRACT_VIDEO_KEY, next ? "1" : "0");
+    } catch {
+      /* localStorage 不可用就只影响本次会话 */
+    }
+  };
 
   const [autoPrune, setAutoPrune] = useState(() => {
     try {
@@ -83,15 +109,24 @@ export default function EventGrid({
   });
 
   // 切换「启动自动清理」：落 localStorage，并立刻手动跑一次让用户看到效果。
-  const toggleAutoPrune = async () => {
-    const next = !autoPrune;
-    setAutoPrune(next);
+  const setAutoPrunePref = (v: boolean) => {
+    setAutoPrune(v);
     try {
-      window.localStorage.setItem(AUTOPRUNE_KEY, next ? "1" : "0");
+      window.localStorage.setItem(AUTOPRUNE_KEY, v ? "1" : "0");
     } catch {
       /* 隐私模式下写不了：本次会话内仍然生效 */
     }
+  };
+  const toggleAutoPrune = async () => {
+    const next = !autoPrune;
+    setAutoPrunePref(next);
     if (next) await pruneRecent();
+  };
+
+  // 恢复默认：提取影片=开、启动自动清理=关。
+  const resetSettings = () => {
+    setExtractVideoPref(true);
+    setAutoPrunePref(false);
   };
   const [textCounts, setTextCounts] = useState<Record<string, number>>({});
   const [favs, setFavs] = useState<Set<string>>(new Set()); // event|gameID|itemID
@@ -476,6 +511,8 @@ export default function EventGrid({
       const plan = await api.unpackPreview(path);
       setUnpackPath(path);
       setUnpackPlan(plan);
+      setAskVideo(false);
+      setForceReextract(false);
       setUnpackResult(null);
       setUnpackScheme("");
       setUnpackKey("0");
@@ -510,7 +547,8 @@ export default function EventGrid({
   };
 
   // 确认解包 → 解出最小集合 → 登记入库 → 切到该游戏。
-  const runUnpack = async () => {
+  // skipVideo 由调用方显式传入（有影片时先问一次，见 askVideo）。
+  const runUnpack = async (skipVideo: boolean, force: boolean = false) => {
     if (!unpackPath) return;
     const scheme = unpackScheme.trim();
     let key = 0;
@@ -525,10 +563,11 @@ export default function EventGrid({
     }
     setUnpacking(true);
     setBusy(true);
+    setAskVideo(false);
     try {
       const r: UnpackImportDTO = scheme
-        ? await api.unpackImportDecrypt(unpackPath, scheme, key)
-        : await api.unpackImport(unpackPath);
+        ? await api.unpackImportDecrypt(unpackPath, scheme, key, skipVideo, force)
+        : await api.unpackImport(unpackPath, skipVideo, force);
       setUnpackPlan(null);
       setUnpackPath("");
       if (!r.connected || !r.library) {
@@ -549,7 +588,7 @@ export default function EventGrid({
       setUnpackResult(null);
       setAllWarnings((w) => [
         ...w,
-        `已导入：解出 ${r.files} 个文件（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个 CG 事件 → ${r.dest}` +
+        `已导入：新增 ${r.files} 个文件${r.reused ? ` · 复用 ${r.reused} 个` : ""}（${(r.bytes / 1048576).toFixed(1)} MB）· ${r.events} 个事件 → ${r.dest}` +
           (r.missing.length ? ` · ${r.missing.length} 个素材没找到` : "") +
           (r.encrypted.length ? ` · ${r.encrypted.length} 个加密条目未解出` : ""),
       ]);
@@ -616,7 +655,14 @@ export default function EventGrid({
     if (tab === "scene") {
       return (lib.scenes ?? [])
         .filter((s) => hit(s.title))
-        .map((s) => ({ kind: "scene" as const, id: s.id, title: s.title, note: "", ok: true as const }));
+        .map((s) => ({
+          kind: "scene" as const,
+          id: s.id,
+          title: s.title,
+          note: "" as const,
+          ok: true as const,
+          video: (s as { has_video?: boolean }).has_video ?? false,
+        }));
     }
     return (lib.chapters ?? [])
       .filter((ch) => hit(ch.title) || hit(ch.scene))
@@ -753,6 +799,15 @@ export default function EventGrid({
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            title="设置"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </header>
 
         {/* 错误横幅区：任何异常都常驻可见（对齐 FR-12） */}
@@ -786,9 +841,13 @@ export default function EventGrid({
                 {!unpackPlan.unsupported && (
                   <div className="text-[11px] text-muted-foreground">
                     引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
-                    预计 {unpackPlan.labels} 个 CG 事件 · 引用素材 {unpackPlan.refs} 个
+                    预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
+                    {(unpackPlan.est_bytes ?? 0) > 0 &&
+                      ` · 预计占盘 ${(unpackPlan.est_bytes / 1048576).toFixed(0)} MB`}
                     {unpackPlan.encrypted > 0 &&
-                      ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`}
+                      (unpackPlan.engine_id === "kirikiri"
+                        ? ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`
+                        : ` · ${unpackPlan.encrypted} 个条目带加密标记（当前不会自动解密）`)}
                   </div>
                 )}
                 {unpackPlan.kind === "archive" && unpackPlan.engine_id === "kirikiri" && (
@@ -822,6 +881,97 @@ export default function EventGrid({
                     <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
                   </div>
                 )}
+                {!unpackPlan.unsupported && (unpackPlan.imported_videos ?? 0) > 0 && (
+                  <div
+                    className="pt-1 text-[11px]"
+                    title="以磁盘上的实际文件为准；重解不会删除已有影片，只补缺的。"
+                  >
+                    {(unpackPlan.imported_videos ?? 0) < unpackPlan.videos ? (
+                      <span className="text-amber-300">
+                        已有 {unpackPlan.imported_videos} / {unpackPlan.videos} 个影片 ·
+                        {extractVideo
+                          ? `重解会补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`
+                          : `当前设为跳过影片；勾选下方「提取 OP/ED 影片」后再重解可补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400">
+                        影片已全部提取（{unpackPlan.imported_videos} 个）
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
+                  <div className="pt-1">
+                    <label
+                      className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
+                      title="关掉后影片事件不能播；已解包的游戏需重解才能补上。之后可在右上角 ⚙ 设置里改。"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={extractVideo}
+                        onChange={(e) => setExtractVideoPref(e.target.checked)}
+                        disabled={unpacking}
+                        className="h-3.5 w-3.5 accent-primary"
+                      />
+                      <span>
+                        {(unpackPlan.imported_videos ?? 0) > 0
+                          ? `补齐缺失的 OP/ED 影片（已有 ${unpackPlan.imported_videos} / 共 ${unpackPlan.videos} 个）`
+                          : `提取 OP/ED 影片（共 ${unpackPlan.videos} 个 · ${(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）`}
+                      </span>
+                    </label>
+                  </div>
+                )}
+                {askVideo && !unpackPlan.unsupported && (
+                  <div className="mt-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                    <div className="text-[11px] text-foreground">
+                      有 {unpackPlan.videos} 个影片（{(unpackPlan.video_bytes / 1048576).toFixed(0)} MB），一起提取？
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setExtractVideo(true); // 只影响本次；持久默认值在 ⚙ 设置里改
+                          void runUnpack(false, forceReextract);
+                        }}
+                        disabled={unpacking || busy}
+                      >
+                        一起提取（推荐）
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setExtractVideo(false); // 只影响本次；持久默认值在 ⚙ 设置里改
+                          void runUnpack(true, forceReextract);
+                        }}
+                        disabled={unpacking || busy}
+                      >
+                        跳过影片
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAskVideo(false)} disabled={unpacking}>
+                        再想想
+                      </Button>
+                    </div>
+                    <div className="mt-1.5 text-[10px] text-muted-foreground">
+                      仅本次生效；默认值可在 ⚙ 设置里改
+                    </div>
+                  </div>
+                )}
+                {!unpackPlan.unsupported && unpackPlan.imported && (
+                  <label
+                    className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground"
+                    title="默认只补缺失的文件；如果换了补丁但画面没变，勾这个全部重写一遍。"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={forceReextract}
+                      onChange={(e) => setForceReextract(e.target.checked)}
+                      disabled={unpacking}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    <span>强制重解（全部重写；默认只补缺失）</span>
+                  </label>
+                )}
                 {unpackPlan.unsupported && (
                   <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
                 )}
@@ -839,7 +989,21 @@ export default function EventGrid({
                   取消
                 </Button>
                 {!unpackPlan.unsupported && (
-                  <Button size="sm" onClick={() => void runUnpack()} disabled={unpacking || busy}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // 默认提取 → 有影片（或还有缺的影片）就先问一次；
+                      // 用户已取消勾选则直接按跳过走。
+                      const allImported =
+                        (unpackPlan.imported_videos ?? 0) >= unpackPlan.videos;
+                      if (extractVideo && !allImported && unpackPlan.videos > 0 && !askVideo) {
+                        setAskVideo(true);
+                        return;
+                      }
+                      void runUnpack(!extractVideo, forceReextract);
+                    }}
+                    disabled={unpacking || busy}
+                  >
                     {unpacking ? "解包中…" : "开始解包"}
                   </Button>
                 )}
@@ -859,7 +1023,7 @@ export default function EventGrid({
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   引擎 {unpackResult.engine_id || "?"} · 解出 {unpackResult.files} 个文件（
-                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个 CG 事件
+                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个事件
                   {unpackResult.missing.length ? ` · ${unpackResult.missing.length} 个素材没找到` : ""}
                   {unpackResult.encrypted.length ? ` · ${unpackResult.encrypted.length} 个加密条目未解出` : ""}
                 </div>
@@ -942,6 +1106,16 @@ export default function EventGrid({
           </main>
         )}
       </div>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        extractVideo={extractVideo}
+        onChangeExtractVideo={setExtractVideoPref}
+        autoPrune={autoPrune}
+        onToggleAutoPrune={() => void toggleAutoPrune()}
+        onReset={resetSettings}
+      />
     </div>
   );
 }
@@ -2009,6 +2183,14 @@ function EventCard({
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-accent/40 text-muted-foreground/40">
             <Ship className="h-8 w-8" />
           </div>
+        )}
+        {card.kind === "scene" && "video" in card && card.video && (
+          <span
+            className="absolute right-1.5 top-1.5 rounded border border-primary/50 bg-background/80 px-1 py-0.5 text-[10px] text-primary"
+            title="该事件是影片（OP/ED）"
+          >
+            ▶ 影片
+          </span>
         )}
         {miss && (
           <span className="absolute left-1.5 top-1.5 rounded border border-amber-900 bg-amber-950/80 px-1 py-0.5 text-[10px] text-amber-400">

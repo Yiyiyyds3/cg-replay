@@ -152,9 +152,9 @@ desktop.ini
 .archify/
 
 # CG 导出产物（tools/unity_cg_export.py）
-# 导出器默认该指到仓库外；万一指进了仓库，别让 111 MB 的 PNG 被顺手提交。
-# 只忽略仓库根的 cg/ 与这些约定俗成的输出目录，不影响源码里的同名子目录。
-cg-index.json
+# 导出器默认拒绝写进 git 仓库（--allow-repo-output 才放行）；这里兜底忽略
+# 仓库根的常见输出目录。`/cg-index.json` 只锚根，不误伤 fixtures 里的样本索引。
+/cg-index.json
 /cg/
 /out/
 /export/

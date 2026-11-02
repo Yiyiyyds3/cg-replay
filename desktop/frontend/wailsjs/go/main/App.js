@@ -150,12 +150,12 @@ export function TogglePlay() {
   return window['go']['main']['App']['TogglePlay']();
 }
 
-export function UnpackImport(arg1) {
-  return window['go']['main']['App']['UnpackImport'](arg1);
+export function UnpackImport(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UnpackImport'](arg1, arg2, arg3);
 }
 
-export function UnpackImportDecrypt(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UnpackImportDecrypt'](arg1, arg2, arg3);
+export function UnpackImportDecrypt(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UnpackImportDecrypt'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UnpackPreview(arg1) {

@@ -45,6 +45,15 @@ export interface UnpackPlanDTO {
   scenario_files: number;
   labels: number; // 预计的 CG 事件数
   refs: number; // 预计引用到的素材数
+  videos: number; // 其中影片（OP/ED）条目数
+  video_bytes: number; // 影片原始体积（估算）
+  /** 该源已解包目录里现有的影片数（>0 = 之前提过，重解不会删） */
+  imported_videos: number;
+  /** 该源之前已解包过（产物目录非空） */
+  imported: boolean;
+  /** 这次解包预计产出的字节数/文件数 */
+  est_bytes: number;
+  est_files: number;
   encrypted: number;
   notes: string[];
   unsupported: boolean;
@@ -60,6 +69,10 @@ export interface UnpackImportDTO {
   missing: string[];
   encrypted: string[];
   warnings: string[];
+  /** 按「不提取影片」选项跳过的数量 */
+  skipped_video?: number;
+  /** 已存在且大小一致、直接复用的文件数（增量解包） */
+  reused?: number;
   game_id: string;
   /** false = 已解包但事件库接入失败（例如扫描不到事件），产物仍保留在 dest。 */
   connected: boolean;
@@ -169,7 +182,7 @@ export interface SpeakerDTO {
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
   | { kind: "cg"; id: string; title: string; note: string; ok: true }
-  | { kind: "scene"; id: string; title: string; note: ""; ok: true }
+  | { kind: "scene"; id: string; title: string; note: ""; ok: true; video?: boolean }
   | { kind: "chapter"; id: string; title: string; note: string; ok: true }
   | { kind: string; id: string; title: string; note: string; ok: false };
 
@@ -189,10 +202,10 @@ export const api = {
   addGame: (root: string) => bridge().AddGame(root) as Promise<LibraryDTO>,
   unpackPreview: (path: string) =>
     bridge().UnpackPreview(path) as Promise<UnpackPlanDTO>,
-  unpackImport: (path: string) =>
-    bridge().UnpackImport(path) as Promise<UnpackImportDTO>,
-  unpackImportDecrypt: (path: string, scheme: string, key: number) =>
-    bridge().UnpackImportDecrypt(path, scheme, key) as Promise<UnpackImportDTO>,
+  unpackImport: (path: string, skipVideo: boolean, force: boolean) =>
+    bridge().UnpackImport(path, skipVideo, force) as Promise<UnpackImportDTO>,
+  unpackImportDecrypt: (path: string, scheme: string, key: number, skipVideo: boolean, force: boolean) =>
+    bridge().UnpackImportDecrypt(path, scheme, key, skipVideo, force) as Promise<UnpackImportDTO>,
   setActiveGame: (id: string) =>
     bridge().SetActiveGame(id) as Promise<LibraryDTO>,
   catalogStats: () => bridge().CatalogStats() as Promise<CatalogStatsDTO>,
@@ -313,6 +326,7 @@ export interface FrameDTO {
   quake_y: number;
   cached: boolean;
   missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
+  drawn: string[]; // 实际绘制清单与失败诊断（影片取帧错误在这里）
   layers: LayerDTO[]; // 调试抽屉 D
   texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
 }
