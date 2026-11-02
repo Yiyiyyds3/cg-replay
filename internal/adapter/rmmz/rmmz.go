@@ -377,7 +377,18 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 			continue
 		}
 		for _, ev := range mf.Events {
+			// 同一事件的多个 page 常常只是「初始 / 已读」条件不同、指令完全一样。
+			// 逐页登记会在事件库里出现重复 CG，这里按指令内容去重并留下告警。
+			pageSeen := map[string]int{}
 			for pi, page := range ev.Pages {
+				if sig := pageSignature(page.List); sig != "" {
+					if first, ok := pageSeen[sig]; ok {
+						res.Warnings = append(res.Warnings, fmt.Sprintf(
+							"%s 事件 %d 的 page%d 与 page%d 指令相同，已跳过重复页", name, ev.ID, pi+1, first+1))
+						continue
+					}
+					pageSeen[sig] = pi
+				}
 				key := fmt.Sprintf("map:%s:%d:%d", name, ev.ID, pi)
 				res.addSegments(key, name, MapGroup(name, mf.DisplayName), ev.Name, page.List, root, imgDirs)
 			}
@@ -418,6 +429,15 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 		}
 	}
 	return res, nil
+}
+
+// pageSignature 用于识别内容完全相同的事件页。
+func pageSignature(cmds []Command) string {
+	b, err := json.Marshal(cmds)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func (r *ScanResult) addSegments(key, file, group, name string, cmds []Command, root string, imgDirs []string) {
@@ -532,10 +552,13 @@ func Segments(cmds []Command) [][]Command {
 		if active {
 			cur = append(cur, c)
 		}
-		if c.Code == 232 {
-			delete(visible, int(c.num(0)))
-		} else if c.Code == 235 {
-			visible = map[int]bool{}
+		if c.Code == 235 {
+			id := int(c.num(0))
+			if id <= 0 {
+				visible = map[int]bool{}
+			} else {
+				delete(visible, id)
+			}
 		}
 		if active && len(visible) == 0 {
 			out = append(out, cur)
@@ -679,6 +702,8 @@ func BuildShow(root, dataDir, key string) (*ir.Event, error) {
 
 	var clock int64
 	visible := map[int]bool{}
+	picRef := map[int]string{}
+	picOpacity := map[int]int{}
 	msgOpen := false
 	speaker := ""
 	finishMsg := func() {
@@ -759,9 +784,11 @@ func BuildShow(root, dataDir, key string) (*ir.Event, error) {
 				sy = 100
 			}
 			scale := fit * ((sx + sy) / 2) / 100
-			opacity := c.num(8)
-			if opacity <= 0 {
-				opacity = 255
+			// 0 是合法的目标透明度：常见写法是 231 先放 opacity=0 的图，
+			// 再用 232（移动图片）在 duration 内淡入。只有参数缺失才用 255。
+			opacity := 255.0
+			if len(c.Params) > 8 {
+				opacity = c.num(8)
 			}
 			// 直接指定（params[3]=0）时 x/y 是像素坐标；否则坐标来自游戏变量，
 			// 静态回放读不到变量值，退回左上角，别把变量号当坐标画到画外。
@@ -789,23 +816,85 @@ func BuildShow(root, dataDir, key string) (*ir.Event, error) {
 				},
 			})
 			visible[id] = true
+			picRef[id] = rel
+			picOpacity[id] = int(opacity)
 		case 232:
+			// 移动图片：params = [id, origin, x, y, scaleX, scaleY, opacity, blend, duration, wait]
 			id := int(c.num(0))
+			rel, ok := picRef[id]
+			if !ok {
+				continue
+			}
+			sx := c.num(4)
+			sy := c.num(5)
+			if sx <= 0 {
+				sx = 100
+			}
+			if sy <= 0 {
+				sy = 100
+			}
+			scale := fit * ((sx + sy) / 2) / 100
+			opacity := float64(picOpacity[id])
+			if len(c.Params) > 6 {
+				opacity = c.num(6)
+			}
+			px, py := 0.0, 0.0
+			if c.num(1) == 0 {
+				px, py = c.num(2), c.num(3)
+			}
+			left := offX + px*fit
+			top := offY + py*fit
+			if c.num(1) == 1 {
+				if dw, dh := picDim(rel); dw > 0 {
+					left -= float64(dw) * scale / 2
+					top -= float64(dh) * scale / 2
+				}
+			}
+			durMs := int64(c.num(8) * 1000 / 60)
+			if durMs < 0 {
+				durMs = 0
+			}
+			attrs := map[string]string{
+				"left":    fmt.Sprintf("%.1f", left),
+				"top":     fmt.Sprintf("%.1f", top),
+				"scale":   fmt.Sprintf("%.6f", scale),
+				"opacity": fmt.Sprintf("%d", int(opacity)),
+			}
+			if durMs > 0 && int(opacity) != picOpacity[id] {
+				attrs["from"] = strconv.Itoa(picOpacity[id])
+				attrs["to"] = strconv.Itoa(int(opacity))
+			}
+			ev.Show = append(ev.Show, ir.ShowOp{
+				TMs: clock, Kind: ir.ShowLayerAttr, Layer: fmt.Sprintf("layer%d", id),
+				DurMs: durMs, Attr: attrs,
+			})
+			picOpacity[id] = int(opacity)
+			clock += durMs
+		case 235:
+			// 消除图片：params = [id]；id<=0 视为清空全部（部分插件脚本会这么写）。
+			id := int(c.num(0))
+			if id <= 0 {
+				for lid := range visible {
+					ev.Show = append(ev.Show, ir.ShowOp{
+						TMs: clock, Kind: ir.ShowLayerHide, Layer: fmt.Sprintf("layer%d", lid),
+					})
+					delete(picRef, lid)
+					delete(picOpacity, lid)
+				}
+				visible = map[int]bool{}
+				break
+			}
 			ev.Show = append(ev.Show, ir.ShowOp{
 				TMs: clock, Kind: ir.ShowLayerHide, Layer: fmt.Sprintf("layer%d", id),
 			})
 			delete(visible, id)
-		case 235:
-			for id := range visible {
-				ev.Show = append(ev.Show, ir.ShowOp{
-					TMs: clock, Kind: ir.ShowLayerHide, Layer: fmt.Sprintf("layer%d", id),
-				})
-			}
-			visible = map[int]bool{}
+			delete(picRef, id)
+			delete(picOpacity, id)
 		case 221, 222:
-			// 淡入淡出：按半秒近似，保证节奏不过快。
-			ev.Show = append(ev.Show, ir.ShowOp{TMs: clock, Kind: ir.ShowWait, DurMs: 500})
-			clock += 500
+			// 画面淡出/淡入（参数为空，原引擎默认约 24 帧）。回放没有全屏遮罩，
+			// 保留一个短等待，避免前后 CG 挤在同一时刻。
+			ev.Show = append(ev.Show, ir.ShowOp{TMs: clock, Kind: ir.ShowWait, DurMs: 400})
+			clock += 400
 		}
 	}
 	finishMsg()
@@ -842,12 +931,15 @@ func (t textCleaner) clean(s string) string {
 			return m // 不是翻译键就按原文保留
 		})
 	}
-	if len(t.i18n) > 0 {
-		s = ctrlI18N.ReplaceAllStringFunc(s, func(m string) string {
-			id, _ := strconv.Atoi(m[6 : len(m)-1])
-			return t.i18n[id] // 查不到就留空，别把编号漏到画面上
-		})
-	}
+	// 即使翻译表为空也要处理占位符：直接删掉会让整行变空，
+	// 上游按 texts==0 把整段演出当成「没有台词」丢掉。
+	s = ctrlI18N.ReplaceAllStringFunc(s, func(m string) string {
+		id, _ := strconv.Atoi(m[6 : len(m)-1])
+		if v, ok := t.i18n[id]; ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+		return fmt.Sprintf("【I18N %d 缺失】", id)
+	})
 	s = ctrlTag.ReplaceAllString(s, "")
 	s = ctrlCode.ReplaceAllString(s, "")
 	s = ctrlNewline.ReplaceAllString(s, " ")
