@@ -85,6 +85,15 @@ func BuildShowFromEvent(ev *ir.Event) []ir.ShowOp {
 				Attr:  cs2Attrs(pm),
 				DurMs: durFromParams(pm),
 			})
+		case "video_show":
+			// 影片：名字通常在 ref 参数里；没有扩展名时按原样交给平台层找文件。
+			pm, _ := op.Params.(map[string]interface{})
+			ref, _ := pm["ref"].(string)
+			if ref != "" {
+				ops = append(ops, ir.ShowOp{
+					TMs: op.TMs, Kind: ir.ShowVideoPlay, Layer: "video", Ref: ref,
+				})
+			}
 		case "image_hide":
 			ops = append(ops, ir.ShowOp{TMs: op.TMs, Kind: ir.ShowLayerHide, Layer: op.Target})
 		case "layer_set", "layer_fade":

@@ -7,6 +7,7 @@ package ir
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // IRVersion 当前 IR 规范版本。破坏性变更时递增，并配套迁移。
@@ -380,4 +381,47 @@ func CollectAssetHashes(ir *IR) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// HasVideo 判断一个演出事件里有没有影片。
+//
+// 「什么算影片事件」只有这一处口径：各引擎的**表达方式**不同（CatSystem2 是
+// 独立的 video_play 指令，KiriKiri/Artemis 是一种 movie 图层），但判定规则统一，
+// 这样 UI 与事件库都只认一个信号，不必每个引擎各写一套。
+//
+// 引擎要做的是「从自己的语法里认出影片」（那是解析，本来就属于引擎），
+// 然后把台本交到这里判定。
+func HasVideo(ev *Event) bool {
+	if ev == nil {
+		return false
+	}
+	for _, op := range ev.Show {
+		if op.Kind == ShowVideoPlay {
+			return true
+		}
+	}
+	for _, l := range ev.Layers {
+		if l.Kind == LayerMovie {
+			return true
+		}
+	}
+	return false
+}
+
+// videoExts 影片扩展名（唯一口径：解包、播放器、提帧都按这里判断）。
+var videoExts = map[string]bool{
+	".mpg": true, ".mpeg": true, ".wmv": true, ".mp4": true,
+	".avi": true, ".webm": true, ".mov": true, ".mkv": true,
+}
+
+// IsVideoRef 引用是不是影片（按扩展名）。
+//
+// 放在 ir 层是为了让「什么算影片」只有一处：解包要知道该不该提、播放器要知道
+// 该不该当视频图层画、ffmpeg 提帧层要知道能不能解。
+func IsVideoRef(name string) bool {
+	i := strings.LastIndexByte(name, '.')
+	if i < 0 {
+		return false
+	}
+	return videoExts[strings.ToLower(name[i:])]
 }

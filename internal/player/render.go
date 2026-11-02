@@ -70,6 +70,19 @@ func Cached(load Loader) Loader {
 // Compose 把 f 的图层合成到 w×h 的 RGBA 上（w/h <= 0 时按最底层可见层尺寸自动定）。
 // 返回合成图与实际画上去的层清单（"<layer>←<ref>"）。缺素材的层跳过并登记。
 func Compose(f Frame, load Loader, w, h int) (*image.RGBA, []string, error) {
+	return compose(f, load, nil, w, h)
+}
+
+// ComposeWithVideo 与 Compose 相同，但认识「影片图层」：
+// 遇到影片引用时按该图层的**位置/透明度/z 序**画当前帧，而不是当图片加载（那样必然失败）。
+//
+// 为什么不直接把视频永远铺在最上层：KiriKiri/Artemis 的影片是图层，上面还可能压着
+// 立绘、对话框、UI —— 按 z 序画才不会盖掉这些。
+func ComposeWithVideo(f Frame, load Loader, video VideoProvider, w, h int) (*image.RGBA, []string, error) {
+	return compose(f, load, video, w, h)
+}
+
+func compose(f Frame, load Loader, video VideoProvider, w, h int) (*image.RGBA, []string, error) {
 	sts := make([]LayerState, 0, len(f.Layers))
 	for _, st := range f.Layers {
 		if st.Visible && st.Resolved != "" {
@@ -89,10 +102,25 @@ func Compose(f Frame, load Loader, w, h int) (*image.RGBA, []string, error) {
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	var drawn []string
 	for _, st := range sts {
-		img, err := load(st.Resolved)
-		if err != nil {
-			drawn = append(drawn, "✗ "+st.Layer+"←"+st.Resolved)
-			continue
+		var img image.Image
+		if ir.IsVideoRef(st.Resolved) {
+			// 影片图层：不当图片加载（必然失败），交给视频取帧。
+			if video == nil {
+				continue
+			}
+			fr, verr := video(st.Resolved, f.Now-st.StartMs)
+			if verr != nil {
+				drawn = append(drawn, "✗ "+st.Layer+"←"+st.Resolved)
+				continue
+			}
+			img = fr
+		} else {
+			var err error
+			img, err = load(st.Resolved)
+			if err != nil {
+				drawn = append(drawn, "✗ "+st.Layer+"←"+st.Resolved)
+				continue
+			}
 		}
 		if w <= 1 && h <= 1 { // 自动画布
 			b := img.Bounds()
@@ -119,7 +147,11 @@ func Compose(f Frame, load Loader, w, h int) (*image.RGBA, []string, error) {
 		}
 		blendLayer(dst, img, int(math.Round(x)), int(math.Round(y)),
 			int(math.Round(float64(f.QuakeX))), int(math.Round(float64(f.QuakeY))), st.Opacity)
-		drawn = append(drawn, st.Layer+"←"+st.Resolved)
+		if ir.IsVideoRef(st.Resolved) {
+			drawn = append(drawn, st.Layer+"←"+st.Resolved+"（影片）")
+		} else {
+			drawn = append(drawn, st.Layer+"←"+st.Resolved)
+		}
 	}
 	return dst, drawn, nil
 }

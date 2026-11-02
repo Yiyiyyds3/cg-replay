@@ -35,6 +35,7 @@ import (
 	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
+	"ucgr/internal/video"
 )
 
 const (
@@ -43,6 +44,7 @@ const (
 	autoWaitMs  = 2500 // 与 cmd/cgreplay 一致
 	jpegQuality = 88
 	encMinGap   = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
+	videoFPS    = 20                    // 影片流的目标帧率（与渲染上限一致）
 
 	durSnapshots = 240 // 时长估计取样点数
 )
@@ -59,7 +61,8 @@ type replaySession struct {
 	opts player.Options
 	p    *player.Player
 
-	load  player.Loader // 缺素材记账版 loader
+	load  player.Loader            // 缺素材记账版 loader
+	vs    map[string]*video.Stream // 每条影片一条流（惰性打开，按路径缓存）
 	audio *audio.System
 
 	playing  bool
@@ -72,9 +75,10 @@ type replaySession struct {
 
 	missing map[string]string // ref → 最近一次加载错误
 
-	lastSig  string // 上次编码的画面签名；不变就直接复用
-	lastJPEG string
-	lastEnc  time.Time // 上次编码时刻（播放中节流，防 16ms 轮询饿死锁）
+	lastSig   string // 上次编码的画面签名；不变就直接复用
+	lastJPEG  string
+	lastDrawn []string  // 上次编码的实际绘制清单（含影片/缺素材诊断）
+	lastEnc   time.Time // 上次编码时刻（播放中节流，防 16ms 轮询饿死锁）
 
 	// snap 最近一张完整帧快照。s.mu 太忙时 TryLock 不住就直接回它，
 	// 避免轮询请求线性堆积把 mutex 排成分钟级队列（2026-10-21 实证：
@@ -112,6 +116,7 @@ type FrameDTO struct {
 	QuakeX  int        `json:"quake_x"`
 	QuakeY  int        `json:"quake_y"`
 	Missing []string   `json:"missing"`
+	Drawn   []string   `json:"drawn"` // 实际画上的层与失败诊断（含影片取帧错误）
 	Layers  []LayerDTO `json:"layers"`
 	Texts   []BoxDTO   `json:"texts"`
 	Cached  bool       `json:"cached"`
@@ -298,6 +303,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		missing: map[string]string{},
 	}
 	s.opts.FontSize = 48
+	// 影片时长：台本里通常不写，靠 ffprobe 查；失败原因交给播放器写进诊断。
+	s.opts.VideoDur = func(ref string) (int64, error) {
+		p, err := replay.AssetPath(root, ref)
+		if err != nil {
+			return 0, err
+		}
+		return video.Duration(p)
+	}
 	s.load = s.stageLoader(player.Cached(player.Loader(replay.GameLoader(root))))
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {
@@ -352,6 +365,7 @@ func (a *App) closeSessionLocked() {
 	if s.audio != nil {
 		s.audio.Close()
 	}
+	s.closeVideo()
 	s.p = nil
 }
 
@@ -433,23 +447,27 @@ func (s *replaySession) frameLocked() FrameDTO {
 	dto.Cached = sig == s.lastSig
 	if dto.Cached && s.lastJPEG != "" {
 		dto.JPEG = s.lastJPEG
+		dto.Drawn = append([]string(nil), s.lastDrawn...)
 		return dto
 	}
 	if s.playing && time.Since(s.lastEnc) < encMinGap {
 		// 播放中节流窗口未到：回上一张（前端 60ms 后自然拿到新的）。
 		dto.JPEG = s.lastJPEG
 		dto.Cached = true
+		dto.Drawn = append([]string(nil), s.lastDrawn...)
 		return dto
 	}
 	s.lastSig = sig
 	s.lastEnc = time.Now()
-	j, err := renderJPEG(s.p, s.load, f.QuakeX, f.QuakeY)
+	j, drawn, err := renderJPEG(s.p, s.load, s.videoProvider())
 	if err != nil {
 		dto.JPEG = s.lastJPEG // 理论上到不了（stageLoader 已吞素材错）
 		return dto
 	}
 	dto.JPEG = j
+	dto.Drawn = drawn
 	s.lastJPEG = j
+	s.lastDrawn = drawn
 	// 发快照（TryLock 失败的调用方从这里拿最近帧）。
 	s.snapMu.Lock()
 	s.snapLast = dto
@@ -525,18 +543,55 @@ func boxDTOs(f player.Frame) []BoxDTO {
 	return out
 }
 
+// videoProvider 影片取帧：引用 → 解包目录里的真实文件 → ffmpeg 流式解码。
+//
+// 回放时间单调向前，所以开一条进程连续出帧（按时间丢帧），比每帧 seek 省得多；
+// 换片或倒退时 Stream 自己会重开。没有 ffmpeg 时返回错误，渲染层记进缺素材、
+// 不中断播放。
+func (s *replaySession) videoProvider() player.VideoProvider {
+	root := s.root
+	return func(ref string, tMs int64) (image.Image, error) {
+		path, err := replay.AssetPath(root, ref)
+		if err != nil {
+			return nil, err
+		}
+		if s.vs == nil {
+			s.vs = map[string]*video.Stream{}
+		}
+		st, ok := s.vs[path]
+		if !ok {
+			var err error
+			st, err = video.OpenStream(path, stageW, stageH, videoFPS)
+			if err != nil {
+				return nil, err
+			}
+			s.vs[path] = st
+		}
+		return st.Frame(tMs)
+	}
+}
+
+// closeVideo 关掉全部影片流（换事件/关会话时调用）。
+func (s *replaySession) closeVideo() {
+	for path, st := range s.vs {
+		_ = st.Close()
+		delete(s.vs, path)
+	}
+}
+
 // renderJPEG RenderFrame → JPEG dataURL（quake 偏移已由 Compose/定位处理？——
 // RenderFrame 只管图层与框底，前端拿 QuakeX/Y 对 <img> 做位移）。
-func renderJPEG(p *player.Player, load player.Loader, _, _ int) (string, error) {
-	rgba, _, err := player.RenderFrame(p, load, stageW, stageH)
+// drawn 原样返回：影片取帧失败等诊断不能在这里被丢掉。
+func renderJPEG(p *player.Player, load player.Loader, video player.VideoProvider) (string, []string, error) {
+	rgba, drawn, err := player.RenderFrameWithVideo(p, load, video, stageW, stageH)
 	if err != nil {
-		return "", err
+		return "", drawn, err
 	}
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, rgba, &jpeg.Options{Quality: jpegQuality}); err != nil {
-		return "", err
+		return "", drawn, err
 	}
-	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), drawn, nil
 }
 
 // Play 恢复自动推进。
@@ -662,6 +717,7 @@ func (a *App) SeekTo(ms int64) error {
 	s.missing = map[string]string{} // 重建后按新时间点重新记账
 	s.lastSig = ""
 	s.lastJPEG = ""
+	s.lastDrawn = nil
 	s.lastEnc = time.Time{} // 立即允许一次编码
 	s.lastTick = time.Now()
 	return nil

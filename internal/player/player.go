@@ -23,6 +23,7 @@
 package player
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"sort"
@@ -38,14 +39,19 @@ type Loader func(rel string) (image.Image, error)
 // Options 播放策略。注意：自动推进时长是**播放器策略**，不是脚本保真 ——
 // 原作是「等玩家点击」，重演时用字数估算阅读时长（本作无语音可依）。
 type Options struct {
-	Speed      float64 // 时间倍率（默认 1）
-	CharMs     float64 // 每字阅读耗时（默认 75ms）
-	BaseMs     int64   // 每个点击点基础停留（默认 800ms）
-	MinWaitMs  int64   // 自动推进下限（默认 800ms）
-	MaxWaitMs  int64   // 自动推进上限（默认 6000ms）
-	MsgLines   int     // 每个消息层最多保留行数（默认 8）
-	SkipWaits  bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
-	MsgDefault string  // 默认消息层 id（默认 message0）
+	Speed     float64 // 时间倍率（默认 1）
+	CharMs    float64 // 每字阅读耗时（默认 75ms）
+	BaseMs    int64   // 每个点击点基础停留（默认 800ms）
+	MinWaitMs int64   // 自动推进下限（默认 800ms）
+	MaxWaitMs int64   // 自动推进上限（默认 6000ms）
+	MsgLines  int     // 每个消息层最多保留行数（默认 8）
+	SkipWaits bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
+
+	// VideoDur 查询影片时长（毫秒）。OP/ED 的台本里通常不写时长，
+	// 不查就会「播 0 帧立刻结束」。平台层注入 ffprobe 实现，player 不依赖它；
+	// 失败时返回 error，播放器会把原因写进画面的 drawn 诊断，不再静默当成 0。
+	VideoDur   func(ref string) (int64, error)
+	MsgDefault string // 默认消息层 id（默认 message0）
 
 	// 文字样式（Config.tjs 实参；渲染层可再覆盖）
 	FontSize     float64  // 字号（默认 48）
@@ -125,6 +131,8 @@ type LayerState struct {
 	HasClip  bool
 	Z        int
 	Attrs    map[string]string
+	// StartMs 影片图层的起播时刻（相对本事件）；非影片层不用。
+	StartMs int64
 
 	// 图层淡入淡出（CatSystem2 的 fade 带 from/to/duration_ms）。
 	fadeStart, fadeDur int64
@@ -168,6 +176,18 @@ type Frame struct {
 	Waiting       bool  // 停在原作点击点（等自动/手动推进）
 	Now           int64 // 已流逝演出毫秒
 	TransProgress float64
+	Video         *VideoState // 非空表示当前在放影片（OP/ED）
+	// VideoMissing 影片指令定位不到文件的说明（非空 = 这是影片但没文件）
+	VideoMissing string
+	// VideoNote 影片时长探测失败等非致命问题的说明（渲染层会写进 drawn）。
+	VideoNote string
+}
+
+// VideoState 当前影片的播放位置（相对影片开头）。
+type VideoState struct {
+	Ref     string
+	StartMs int64
+	Now     int64
 }
 
 // surface 一个消息层的文字状态。
@@ -202,6 +222,14 @@ type Player struct {
 
 	texts  map[string]*surface
 	curMsg string
+
+	// 当前影片（OP/ED）：videoRef 为空表示没在放。
+	videoRef   string
+	videoStart int64
+	videoEnd   int64 // 预计结束时刻；0 = 时长未知（直到被替换）
+	// videoMissing 影片指令定位不到文件时的说明（如 "state=end"）
+	videoMissing string
+	videoNote    string
 
 	// Audio 非 nil 时按台本回调（BGM/SE/语音交给平台层）。
 	Audio func(ir.ShowOp)
@@ -265,6 +293,10 @@ func (p *Player) pump() {
 		if p.now < p.blockUntil {
 			return
 		}
+		// 影片阻塞点走完：立刻摘掉视频，否则最后一帧会永久盖住后续演出。
+		if p.blockKind == "video" {
+			p.videoRef, p.videoStart, p.videoEnd = "", 0, 0
+		}
 		p.blockKind = ""
 		if p.pc >= len(p.ops) {
 			p.done = true
@@ -302,6 +334,36 @@ func (p *Player) exec(op ir.ShowOp) {
 		p.quakeCount = iattr(op.Attr, "count", 2)
 		if !p.opt.SkipWaits && op.DurMs > 0 {
 			p.blockKind, p.blockUntil = "time", p.now+op.DurMs
+		}
+
+	case ir.ShowVideoPlay:
+		// 影片铺满舞台：记下引用与起点，渲染层按 Now 去提帧。
+		if op.Ref == "" {
+			// 有影片指令但脚本没写文件名（KiriKiri 的 [sysmovie state=end]）：
+			// 记下 state 供上层明确报错，别再假装「什么都没有」。
+			if st := op.Attr["state"]; st != "" {
+				p.videoMissing = "state=" + st
+			}
+			break
+		}
+		p.videoMissing = ""
+		p.videoRef, p.videoStart, p.videoEnd = op.Ref, p.now, 0
+		p.videoNote = ""
+		dur := op.DurMs
+		if dur <= 0 && p.opt.VideoDur != nil {
+			var derr error
+			dur, derr = p.opt.VideoDur(op.Ref)
+			if derr != nil {
+				p.videoNote = fmt.Sprintf("影片 %s 时长未知：%v", op.Ref, derr)
+			}
+		}
+		if dur > 0 {
+			p.videoEnd = p.now + dur
+			if !p.opt.SkipWaits {
+				p.blockKind, p.blockUntil = "video", p.videoEnd
+			}
+		} else if p.videoNote == "" {
+			p.videoNote = fmt.Sprintf("影片 %s 时长未知，按「直到被替换」播放", op.Ref)
 		}
 
 	case ir.ShowWait:
@@ -429,9 +491,13 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 	switch op.Kind {
 	case ir.ShowLayerShow:
 		st.Visible = true
-		if op.Ref != "" {
+		if op.Ref != "" && op.Ref != st.Ref {
 			st.Ref = op.Ref
 			st.Resolved = ResolveRef(p.ev, op.Ref)
+			// 影片图层：记下起播时刻，渲染层按 (now - StartMs) 去提帧。
+			if ir.IsVideoRef(st.Resolved) {
+				st.StartMs = p.now
+			}
 		}
 	case ir.ShowLayerHide:
 		st.Visible = false
@@ -577,6 +643,11 @@ func (p *Player) Frame() Frame {
 		f.QuakeX = int(amp * amp * math.Sin(phase) * p.quakeHmax)
 	}
 	f.Waiting = p.blockKind == "text" && p.now < p.blockUntil
+	if p.videoRef != "" && (p.videoEnd == 0 || p.now < p.videoEnd) {
+		f.Video = &VideoState{Ref: p.videoRef, StartMs: p.videoStart, Now: p.now - p.videoStart}
+	}
+	f.VideoMissing = p.videoMissing
+	f.VideoNote = p.videoNote
 	return f
 }
 

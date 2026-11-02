@@ -15,6 +15,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/catsystem2"
+	"ucgr/internal/ir"
 )
 
 // ScanCS2 扫 CatSystem2 解包目录（scene/*.cst），一份脚本一个场景事件。
@@ -73,10 +74,12 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 			continue
 		}
 		stem := strings.TrimSuffix(name, filepath.Ext(name))
+		hasVideo := ir.HasVideo(ev)
 		lib.Scenes = append(lib.Scenes, SceneEvent{
-			ID:     stem,
-			Title:  stem,
-			Script: rel(p),
+			ID:       stem,
+			Title:    stem,
+			Script:   rel(p),
+			HasVideo: hasVideo,
 		})
 	}
 	if skipped > 0 {

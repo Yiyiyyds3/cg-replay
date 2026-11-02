@@ -354,6 +354,12 @@ export default function Replay({
         </Button>
       </header>
 
+      {/* 渲染失败常驻横幅：影片取帧/图层解码错误不再被吞 */}
+      {f && f.drawn?.some((d) => d.startsWith("✗")) && (
+        <div className="border-b border-amber-900 bg-amber-950/80 px-4 py-1.5 text-xs text-amber-300">
+          {f.drawn.filter((d) => d.startsWith("✗")).join("；")}
+        </div>
+      )}
       {/* 缺素材常驻红横幅（FR-12：不静默） */}
       {f && f.missing.length > 0 && (
         <div className="border-b border-red-900 bg-red-950/80 px-4 py-1.5 text-xs text-red-300">
