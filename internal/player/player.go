@@ -23,6 +23,7 @@
 package player
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"sort"
@@ -38,14 +39,19 @@ type Loader func(rel string) (image.Image, error)
 // Options 播放策略。注意：自动推进时长是**播放器策略**，不是脚本保真 ——
 // 原作是「等玩家点击」，重演时用字数估算阅读时长（本作无语音可依）。
 type Options struct {
-	Speed      float64 // 时间倍率（默认 1）
-	CharMs     float64 // 每字阅读耗时（默认 75ms）
-	BaseMs     int64   // 每个点击点基础停留（默认 800ms）
-	MinWaitMs  int64   // 自动推进下限（默认 800ms）
-	MaxWaitMs  int64   // 自动推进上限（默认 6000ms）
-	MsgLines   int     // 每个消息层最多保留行数（默认 8）
-	SkipWaits  bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
-	MsgDefault string  // 默认消息层 id（默认 message0）
+	Speed     float64 // 时间倍率（默认 1）
+	CharMs    float64 // 每字阅读耗时（默认 75ms）
+	BaseMs    int64   // 每个点击点基础停留（默认 800ms）
+	MinWaitMs int64   // 自动推进下限（默认 800ms）
+	MaxWaitMs int64   // 自动推进上限（默认 6000ms）
+	MsgLines  int     // 每个消息层最多保留行数（默认 8）
+	SkipWaits bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
+
+	// VideoDur 查询影片时长（毫秒）。OP/ED 的台本里通常不写时长，
+	// 不查就会「播 0 帧立刻结束」。平台层注入 ffprobe 实现，player 不依赖它；
+	// 失败时返回 error，播放器会把原因写进画面的 drawn 诊断，不再静默当成 0。
+	VideoDur   func(ref string) (int64, error)
+	MsgDefault string // 默认消息层 id（默认 message0）
 
 	// 文字样式（Config.tjs 实参；渲染层可再覆盖）
 	FontSize     float64  // 字号（默认 48）
@@ -116,6 +122,8 @@ type LayerState struct {
 	X, Y     float64
 	HasPos   bool
 	Opacity  float64 // 0~1（脚本 opacity 为 0~255，已归一）
+	Scale    float64 // 1 = 原始大小；<=0 按 1 处理（兼容旧数据）
+	Anchor   string  // 缩放锚点：空/top-left | center
 	ClipL    float64
 	ClipT    float64
 	ClipW    float64
@@ -123,6 +131,12 @@ type LayerState struct {
 	HasClip  bool
 	Z        int
 	Attrs    map[string]string
+	// StartMs 影片图层的起播时刻（相对本事件）；非影片层不用。
+	StartMs int64
+
+	// 图层淡入淡出（CatSystem2 的 fade 带 from/to/duration_ms）。
+	fadeStart, fadeDur int64
+	fadeFrom, fadeTo   float64
 }
 
 // TextLine 消息层上的一行。
@@ -162,6 +176,18 @@ type Frame struct {
 	Waiting       bool  // 停在原作点击点（等自动/手动推进）
 	Now           int64 // 已流逝演出毫秒
 	TransProgress float64
+	Video         *VideoState // 非空表示当前在放影片（OP/ED）
+	// VideoMissing 影片指令定位不到文件的说明（非空 = 这是影片但没文件）
+	VideoMissing string
+	// VideoNote 影片时长探测失败等非致命问题的说明（渲染层会写进 drawn）。
+	VideoNote string
+}
+
+// VideoState 当前影片的播放位置（相对影片开头）。
+type VideoState struct {
+	Ref     string
+	StartMs int64
+	Now     int64
 }
 
 // surface 一个消息层的文字状态。
@@ -196,6 +222,14 @@ type Player struct {
 
 	texts  map[string]*surface
 	curMsg string
+
+	// 当前影片（OP/ED）：videoRef 为空表示没在放。
+	videoRef   string
+	videoStart int64
+	videoEnd   int64 // 预计结束时刻；0 = 时长未知（直到被替换）
+	// videoMissing 影片指令定位不到文件时的说明（如 "state=end"）
+	videoMissing string
+	videoNote    string
 
 	// Audio 非 nil 时按台本回调（BGM/SE/语音交给平台层）。
 	Audio func(ir.ShowOp)
@@ -259,6 +293,10 @@ func (p *Player) pump() {
 		if p.now < p.blockUntil {
 			return
 		}
+		// 影片阻塞点走完：立刻摘掉视频，否则最后一帧会永久盖住后续演出。
+		if p.blockKind == "video" {
+			p.videoRef, p.videoStart, p.videoEnd = "", 0, 0
+		}
 		p.blockKind = ""
 		if p.pc >= len(p.ops) {
 			p.done = true
@@ -296,6 +334,36 @@ func (p *Player) exec(op ir.ShowOp) {
 		p.quakeCount = iattr(op.Attr, "count", 2)
 		if !p.opt.SkipWaits && op.DurMs > 0 {
 			p.blockKind, p.blockUntil = "time", p.now+op.DurMs
+		}
+
+	case ir.ShowVideoPlay:
+		// 影片铺满舞台：记下引用与起点，渲染层按 Now 去提帧。
+		if op.Ref == "" {
+			// 有影片指令但脚本没写文件名（KiriKiri 的 [sysmovie state=end]）：
+			// 记下 state 供上层明确报错，别再假装「什么都没有」。
+			if st := op.Attr["state"]; st != "" {
+				p.videoMissing = "state=" + st
+			}
+			break
+		}
+		p.videoMissing = ""
+		p.videoRef, p.videoStart, p.videoEnd = op.Ref, p.now, 0
+		p.videoNote = ""
+		dur := op.DurMs
+		if dur <= 0 && p.opt.VideoDur != nil {
+			var derr error
+			dur, derr = p.opt.VideoDur(op.Ref)
+			if derr != nil {
+				p.videoNote = fmt.Sprintf("影片 %s 时长未知：%v", op.Ref, derr)
+			}
+		}
+		if dur > 0 {
+			p.videoEnd = p.now + dur
+			if !p.opt.SkipWaits {
+				p.blockKind, p.blockUntil = "video", p.videoEnd
+			}
+		} else if p.videoNote == "" {
+			p.videoNote = fmt.Sprintf("影片 %s 时长未知，按「直到被替换」播放", op.Ref)
 		}
 
 	case ir.ShowWait:
@@ -414,7 +482,7 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 	}
 	st, ok := m[op.Layer]
 	if !ok {
-		st = &LayerState{Layer: op.Layer, Opacity: 1}
+		st = &LayerState{Layer: op.Layer, Opacity: 1, Scale: 1}
 		m[op.Layer] = st
 	}
 	if st.Attrs == nil {
@@ -423,9 +491,13 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 	switch op.Kind {
 	case ir.ShowLayerShow:
 		st.Visible = true
-		if op.Ref != "" {
+		if op.Ref != "" && op.Ref != st.Ref {
 			st.Ref = op.Ref
 			st.Resolved = ResolveRef(p.ev, op.Ref)
+			// 影片图层：记下起播时刻，渲染层按 (now - StartMs) 去提帧。
+			if ir.IsVideoRef(st.Resolved) {
+				st.StartMs = p.now
+			}
 		}
 	case ir.ShowLayerHide:
 		st.Visible = false
@@ -440,6 +512,16 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 		}
 	}
 	p.applyAttrs(st, op.Attr)
+	// CS2 的 fade：from/to 是起止 alpha，播放器按时间插值（不阻塞台本）。
+	if op.DurMs > 0 {
+		if from, okF := floatAttr(op.Attr, "from"); okF {
+			if to, okT := floatAttr(op.Attr, "to"); okT {
+				st.fadeStart, st.fadeDur = p.now, op.DurMs
+				st.fadeFrom, st.fadeTo = clamp01(from/255), clamp01(to/255)
+				st.Opacity = st.fadeFrom
+			}
+		}
+	}
 	p.ensureOrder(op.Layer)
 }
 
@@ -471,6 +553,13 @@ func (p *Player) applyAttrs(st *LayerState, attrs map[string]string) {
 	// 图像层：opacity = 图层 alpha（0~255，255=不透明）。
 	if v, ok := floatAttr(attrs, "opacity"); ok && !isMessageLayer(st.Layer) {
 		st.Opacity = v / 255
+	}
+	// 图层缩放（CatSystem2 的 scale < 1 表示缩到原尺寸的百分比）。
+	if v, ok := floatAttr(attrs, "scale"); ok && v > 0 {
+		st.Scale = v
+	}
+	if v, ok := attrs["anchor"]; ok {
+		st.Anchor = strings.ToLower(strings.TrimSpace(v))
 	}
 	// 裁剪：clipleft/cliptop/clipwidth/clipheight（宽高齐全才算裁剪生效）
 	cl, hasL := floatAttr(attrs, "clipleft")
@@ -524,6 +613,27 @@ func (p *Player) Frame() Frame {
 	} else {
 		f.Layers = orderedCopy(p.fore, p.order)
 	}
+	// 图层淡入淡出：只在 Frame 里算，不阻塞台本；CS2 用 easeInOutQuad。
+	for i := range f.Layers {
+		st := &f.Layers[i]
+		if st.fadeDur <= 0 {
+			continue
+		}
+		if p.now >= st.fadeStart+st.fadeDur {
+			st.Opacity = st.fadeTo
+			continue
+		}
+		t := float64(p.now-st.fadeStart) / float64(st.fadeDur)
+		if t < 0 {
+			t = 0
+		}
+		if t < 0.5 {
+			t = 2 * t * t
+		} else {
+			t = 1 - (-2*t+2)*(-2*t+2)/2
+		}
+		st.Opacity = st.fadeFrom + (st.fadeTo-st.fadeFrom)*t
+	}
 	// 抖动偏移（衰减振荡：count+1 次来回，振幅按 (1-p)² 收敛）
 	if p.quakeDur > 0 && p.now < p.quakeStart+p.quakeDur {
 		qp := float64(p.now-p.quakeStart) / float64(p.quakeDur)
@@ -533,6 +643,11 @@ func (p *Player) Frame() Frame {
 		f.QuakeX = int(amp * amp * math.Sin(phase) * p.quakeHmax)
 	}
 	f.Waiting = p.blockKind == "text" && p.now < p.blockUntil
+	if p.videoRef != "" && (p.videoEnd == 0 || p.now < p.videoEnd) {
+		f.Video = &VideoState{Ref: p.videoRef, StartMs: p.videoStart, Now: p.now - p.videoStart}
+	}
+	f.VideoMissing = p.videoMissing
+	f.VideoNote = p.videoNote
 	return f
 }
 
@@ -778,6 +893,16 @@ func clamp255(f float64) uint8 {
 		return 255
 	}
 	return uint8(f)
+}
+
+func clamp01(f float64) float64 {
+	if f < 0 {
+		return 0
+	}
+	if f > 1 {
+		return 1
+	}
+	return f
 }
 
 // colorAttr 解析 0xRRGGBB / 0xRRGGBBAA 形式的颜色属性（KAG 的 color 属性）。

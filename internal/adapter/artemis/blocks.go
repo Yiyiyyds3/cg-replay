@@ -87,3 +87,28 @@ func BlockTitles(ast *Ast) []struct {
 	}
 	return out
 }
+
+// BlockMovieFlags 与 BlockTitles 同序：每个 block 是否含影片指令。
+//
+// Artemis 的影片是 `movie` 命令（buildIR 里映射成 ir.LayerMovie）。这里只做
+// 「从 Artemis 语法里认出影片」这一件事，判定「算不算影片事件」交给 ir.HasVideo。
+func BlockMovieFlags(ast *Ast) []bool {
+	if ast == nil {
+		return nil
+	}
+	out := make([]bool, 0, len(ast.Blocks))
+	for _, b := range ast.Blocks {
+		has := false
+		for _, it := range b.Seq {
+			if it.Cmd == nil {
+				continue
+			}
+			if strings.EqualFold(it.Cmd.Tag, "movie") {
+				has = true
+				break
+			}
+		}
+		out = append(out, has)
+	}
+	return out
+}

@@ -306,3 +306,55 @@ func TestDrawBoxBackgroundFrameAndColor(t *testing.T) {
 		t.Fatalf("框外不该被改：%+v", got)
 	}
 }
+
+// TestVideoPlayBlocksForDuration 影片没有台本时长时按 ffprobe 查到的时长阻塞。
+//
+// 不这样做的话，OP/ED 只有 3 条指令（movie + next），播放器会立刻走完，
+// 影片一帧都显示不出来。
+func TestVideoPlayBlocksForDuration(t *testing.T) {
+	ev := &ir.Event{Show: []ir.ShowOp{
+		{TMs: 0, Kind: ir.ShowVideoPlay, Layer: "video", Ref: "op"},
+	}}
+	opt := DefaultOptions()
+	opt.VideoDur = func(ref string) (int64, error) { return 2000, nil }
+	p := New(ev, opt)
+
+	for i := 0; i < 50; i++ { // ≈800ms
+		p.Advance(16, Input{})
+	}
+	if p.Done() {
+		t.Fatal("影片时长 2s，800ms 时不应结束")
+	}
+	if f := p.Frame(); f.Video == nil || f.Video.Ref != "op" {
+		t.Fatalf("帧里应带影片信息：%+v", f.Video)
+	}
+	for i := 0; i < 100; i++ { // 推进到 ≈2.4s
+		p.Advance(16, Input{})
+	}
+	if !p.Done() {
+		t.Fatal("超过影片时长后应结束")
+	}
+	if f := p.Frame(); f.Video != nil {
+		t.Fatalf("影片播完后必须摘掉视频，否则最后一帧会盖住后续演出：%+v", f.Video)
+	}
+}
+
+// TestVideoUnknownDurationWarns 时长探测失败时不能静默按 0 处理：
+// 要保留「直到替换」语义，并把原因写进画面诊断。
+func TestVideoUnknownDurationWarns(t *testing.T) {
+	ev := &ir.Event{Show: []ir.ShowOp{
+		{TMs: 0, Kind: ir.ShowVideoPlay, Layer: "video", Ref: "op"},
+	}}
+	opt := DefaultOptions()
+	opt.VideoDur = func(ref string) (int64, error) { return 0, errNotFound{"ffprobe"} }
+	p := New(ev, opt)
+	p.Advance(16, Input{})
+
+	f := p.Frame()
+	if f.Video == nil {
+		t.Fatal("时长未知时应按「直到替换」继续播放，而不是立刻摘掉")
+	}
+	if f.VideoNote == "" {
+		t.Fatal("时长探测失败必须留下诊断说明")
+	}
+}

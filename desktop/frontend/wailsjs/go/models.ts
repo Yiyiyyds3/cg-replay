@@ -57,6 +57,7 @@ export namespace library {
 	    title: string;
 	    script: string;
 	    label?: string;
+	    has_video?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SceneEvent(source);
@@ -68,6 +69,7 @@ export namespace library {
 	        this.title = source["title"];
 	        this.script = source["script"];
 	        this.label = source["label"];
+	        this.has_video = source["has_video"];
 	    }
 	}
 	export class Library {
@@ -462,6 +464,7 @@ export namespace main {
 	    quake_x: number;
 	    quake_y: number;
 	    missing: string[];
+	    drawn: string[];
 	    layers: LayerDTO[];
 	    texts: BoxDTO[];
 	    cached: boolean;
@@ -483,6 +486,7 @@ export namespace main {
 	        this.quake_x = source["quake_x"];
 	        this.quake_y = source["quake_y"];
 	        this.missing = source["missing"];
+	        this.drawn = source["drawn"];
 	        this.layers = this.convertValues(source["layers"], LayerDTO);
 	        this.texts = this.convertValues(source["texts"], BoxDTO);
 	        this.cached = source["cached"];

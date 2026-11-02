@@ -182,7 +182,7 @@ export interface SpeakerDTO {
 /** 卡片网格统一事件视图（kind 定位三个来源）。 */
 export type CardItem =
   | { kind: "cg"; id: string; title: string; note: string; ok: true }
-  | { kind: "scene"; id: string; title: string; note: ""; ok: true }
+  | { kind: "scene"; id: string; title: string; note: ""; ok: true; video?: boolean }
   | { kind: "chapter"; id: string; title: string; note: string; ok: true }
   | { kind: string; id: string; title: string; note: string; ok: false };
 
@@ -326,6 +326,7 @@ export interface FrameDTO {
   quake_y: number;
   cached: boolean;
   missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
+  drawn: string[]; // 实际绘制清单与失败诊断（影片取帧错误在这里）
   layers: LayerDTO[]; // 调试抽屉 D
   texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
 }

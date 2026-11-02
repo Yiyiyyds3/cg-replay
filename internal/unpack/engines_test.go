@@ -217,6 +217,9 @@ func TestCatSystem2ScriptRefs(t *testing.T) {
 	if len(info.Labels) != 1 {
 		t.Fatalf("事件数 = %d, want 1（一脚本一事件）", len(info.Labels))
 	}
+	if !info.Dynamic {
+		t.Fatal("CS2 有运行时拼名引用，Dynamic 必须为 true，否则闭包不全时零告警")
+	}
 	has := func(want string) bool {
 		for _, r := range info.Refs {
 			if r == want {
@@ -252,7 +255,12 @@ func TestUnpackExplainsWrongContainer(t *testing.T) {
 		want string
 	}{
 		{"update.xp3", []byte("PK\x03\x04fake zip body"), "ZIP"},
+		{"empty.xp3", []byte("PK\x05\x06\x00\x00\x00\x00"), "空 ZIP"},
+		{"split.xp3", []byte("PK\x07\x08\x00\x00\x00\x00"), "分卷 ZIP"},
 		{"Monkeys_cn.xp3", []byte("EVB\x00\x40\x00\x00\x00rest"), "EVB"},
+		{"data.pfs", []byte("pf6\x00\x00\x00\x00rest"), "PFS"},
+		{"data.pfs", []byte("pf8\x00\x00\x00\x00rest"), "PFS"},
+		{"script.arc", []byte("BurikoCompiledScript\x00\x00rest"), "BGI"},
 	}
 	for _, c := range cases {
 		dir := t.TempDir()
@@ -269,6 +277,43 @@ func TestUnpackExplainsWrongContainer(t *testing.T) {
 		if !strings.Contains(plan.Reason, c.want) {
 			t.Fatalf("%s: 原因里应提到 %s，实际 %q", c.name, c.want, plan.Reason)
 		}
+	}
+}
+
+// TestUnpackSkipsBrokenArchive 一个坏归档不该拖垮整场解包。
+//
+// 实测：游戏目录里混着扩展名骗人的文件（GrisaiaAno1_cn.int 其实是 EVB），
+// 以前会让整个预览直接失败；现在应跳过它、继续处理其余归档，并把原因写进 notes。
+func TestUnpackSkipsBrokenArchive(t *testing.T) {
+	dir := t.TempDir()
+	// 正常归档（PFS v6）
+	writePFS(t, filepath.Join(dir, "data.pfs"), map[string][]byte{
+		"scenario/01_01.ast":  []byte(testAST),
+		"image/ev_cut_001_00": []byte("CG1"),
+		"image/black":         []byte("BG"),
+	})
+	// 坏归档：扩展名 .pfs，内容却是 ZIP
+	if err := os.WriteFile(filepath.Join(dir, "update.pfs"), []byte("PK\x03\x04oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Preview(dir)
+	if err != nil {
+		t.Fatalf("Preview 不应因单个坏归档失败：%v", err)
+	}
+	if plan.Unsupported {
+		t.Fatalf("应继续解析其余归档（%+v）", plan)
+	}
+	if plan.ScenarioFiles == 0 {
+		t.Fatalf("好归档里的剧本应被认出：%+v", plan)
+	}
+	var noted bool
+	for _, n := range plan.Notes {
+		if strings.Contains(n, "跳过无法解析的归档") && strings.Contains(n, "ZIP") {
+			noted = true
+		}
+	}
+	if !noted {
+		t.Fatalf("notes 里应说明跳过了哪个坏归档及原因：%v", plan.Notes)
 	}
 }
 

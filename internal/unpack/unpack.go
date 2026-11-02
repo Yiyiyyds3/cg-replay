@@ -8,8 +8,9 @@
 //   - Artemis（PFS + 明文 Lua .ast）/ BGI（ARC + .bs）：能解出最小集合，
 //     但**事件库接入（登记进游戏库）仍只支持 KiriKiri**（library.Scan 是
 //     KiriKiri 形状的）。
-//   - CatSystem2（.int/.kif + .cst）：完整支持（2026-10-26 接上；此前误判为
-//     「无脚本解析」）。事件粒度 = 一份 .cst 一个事件（与 BuildIR 同口径）。
+//   - CatSystem2（.int/.kif + .cst）：解包已接上（事件粒度 = 一份 .cst
+//     一个事件，与 BuildIR 同口径）；事件库登记仍由下一条 PR 的 library
+//     分派接入，本分支不改变登记行为。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
 //
 // 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
@@ -200,12 +201,17 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 			Reason:      fmt.Sprintf("引擎 %s 暂不支持自动解包", engine),
 		}, nil
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
 		// 解析失败要说清「它其实是什么」——实测有 .xp3 里装着 ZIP / EVB。
+		// 嗅探必须针对真正失败的那个归档，而不是 archives[0]。
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
 		hint := ""
-		if len(archives) > 0 {
-			hint = sniffHint(archives[0])
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
 		}
 		reason := err.Error()
 		if hint != "" {
@@ -227,7 +233,10 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		Root:      strings.Join(archives, " "),
 		Kind:      "archive",
 		Archives:  archives,
-		Encrypted: len(assets.encrypted),
+		Encrypted: len(assets.adlr), // 只算 XP3 的 adlr（CS2 的 Blowfish 会自动解）
+	}
+	if deps.ScriptNote != "" {
+		p.Notes = append(p.Notes, deps.ScriptNote)
 	}
 	refs := map[string]bool{}
 	for path, e := range assets.entries {
@@ -271,10 +280,22 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 			}
 		}
 	}
+	if len(assets.skipped) > 0 {
+		for _, sk := range assets.skipped {
+			p.Notes = append(p.Notes, "跳过无法解析的归档 —— "+sk)
+		}
+	}
+	p.Notes = append(p.Notes, assets.warnings...)
 	if p.Encrypted > 0 {
-		p.Notes = append(p.Notes, fmt.Sprintf(
-			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
-			p.Encrypted))
+		if engine == "kirikiri" {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
+				p.Encrypted))
+		} else {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带加密标记，当前不会自动解密；若解出的内容是乱码，需要每作密钥",
+				p.Encrypted))
+		}
 	}
 	if p.Unsupported {
 		p.Notes = append(p.Notes, p.Reason)
@@ -289,11 +310,15 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	if !ok {
 		return nil, fmt.Errorf("引擎 %s 暂不支持自动解包", engine)
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
 		hint := ""
-		if len(archives) > 0 {
-			hint = sniffHint(archives[0])
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
 		}
 		if hint != "" {
 			return nil, fmt.Errorf("%w；%s", err, hint)
@@ -315,6 +340,13 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	if prev != nil && !archivesUnchanged {
 		res.Warnings = append(res.Warnings,
 			"源归档与上次解包时不一致（换了补丁或更新过），本次全部重解")
+	}
+	for _, sk := range assets.skipped {
+		res.Warnings = append(res.Warnings, "跳过无法解析的归档 —— "+sk)
+	}
+	res.Warnings = append(res.Warnings, assets.warnings...)
+	if deps.ScriptNote != "" {
+		res.Warnings = append(res.Warnings, deps.ScriptNote)
 	}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
@@ -386,7 +418,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			res.SkippedVideo++
 			continue
 		}
-		if e.encrypted && opts.Decrypt == SchemeNone {
+		if e.encrypted && opts.Decrypt == SchemeNone && strings.EqualFold(e.segs[0].KeyHint, "adlr") {
 			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
 			// 真解不开时上面的解析失败告警会指出。
 			res.Encrypted = append(res.Encrypted, e.path)

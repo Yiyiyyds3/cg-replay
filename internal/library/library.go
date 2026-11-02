@@ -39,6 +39,8 @@ type SceneEvent struct {
 	Script string `json:"script"` // 相对 root 的脚本路径
 	// Label 引擎内的定位串（KiriKiri 不用；Artemis = block 序号）。
 	Label string `json:"label,omitempty"`
+	// HasVideo 该事件里含影片指令（OP/ED）——前端给 ▶ 角标，别让人误以为是坏图。
+	HasVideo bool `json:"has_video,omitempty"`
 }
 
 // ChapterEvent 一个「演出段落」= 原作自己的章节标记 `*labelNN|显示名`。
@@ -59,14 +61,21 @@ type ChapterEvent struct {
 	ContLabelPos int    `json:"cont_label_pos,omitempty"` // 下一场景首章的 LabelPos（定位章前段截止处）
 }
 
+// SchemaVersion 库清单能力版本。新增字段（如 has_video）时递增，
+// 桌面端发现旧缓存版本不符就重扫，避免升级后永远读不到新标记。
+const SchemaVersion = 2
+
 // Library 事件库清单。
 type Library struct {
+	Schema      int            `json:"schema,omitempty"`
 	Root        string         `json:"root"`
 	Game        string         `json:"game,omitempty"`
 	GeneratedAt string         `json:"generated_at"`
 	CGs         []CGEvent      `json:"cgs"`
 	Scenes      []SceneEvent   `json:"scenes"`
 	Chapters    []ChapterEvent `json:"chapters,omitempty"`
+	// Warnings 扫描时可以跳过但不应静默的问题（坏脚本、读取失败等）。
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 var (
@@ -118,6 +127,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	}
 	if strings.EqualFold(conv.EngineID, "bgi") {
 		return ScanBGI(root, conv)
+	}
+	if strings.EqualFold(conv.EngineID, "catsystem2") {
+		return ScanCS2(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
@@ -227,11 +239,53 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	sort.Strings(names)
 	for _, name := range names {
 		id := strings.TrimSuffix(name, filepath.Ext(name))
+		// 影片场景（OP/ED）：KiriKiri 的 .ks 是明文脚本，认一下自己的语法即可。
+		hasVideo := false
+		if data, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
+			hasVideo = kirikiri.ScriptHasMovie(data)
+		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
-			ID:     id,
-			Title:  id,
-			Script: rel(filepath.Join(dir, name)),
+			ID:       id,
+			Title:    id,
+			Script:   rel(filepath.Join(dir, name)),
+			HasVideo: hasVideo,
 		})
+	}
+
+	// ③′ 影片脚本（OP/ED）：KiriKiri 把它们放在 raw/data/sysscn/ 之类的系统目录，
+	// 不在剧本目录，所以上面扫不到。这里只收**含影片指令**的脚本——那个目录里
+	// 几十个 .ks 全是系统 UI 脚本（brows/save/option…），收进来是噪声。
+	for _, md := range conv.MovieDirs {
+		mdir := filepath.Join(root, filepath.FromSlash(md))
+		ents, err := os.ReadDir(mdir)
+		if err != nil {
+			continue // 没有这个目录很正常（不是每个游戏都有）
+		}
+		ext := conv.ScriptExt
+		if ext == "" {
+			ext = ".ks"
+		}
+		for _, e := range ents {
+			if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ext) {
+				continue
+			}
+			p := filepath.Join(mdir, e.Name())
+			data, err := os.ReadFile(p)
+			if err != nil || !kirikiri.ScriptHasMovie(data) {
+				continue
+			}
+			id := strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+			if lib.hasSceneID(id) {
+				// 与剧本目录里的同名脚本撞了：加目录前缀区分
+				id = filepath.Base(mdir) + "_" + id
+			}
+			lib.Scenes = append(lib.Scenes, SceneEvent{
+				ID:       id,
+				Title:    id,
+				Script:   rel(p),
+				HasVideo: true,
+			})
+		}
 	}
 
 	// ④ 演出段落：场景脚本里原作自己的章节标记（*labelNN|显示名）。
@@ -342,6 +396,7 @@ func fallbackStoryScenes(dir string) []string {
 
 // Save 写库清单（JSON）。
 func (l *Library) Save(path string) error {
+	l.Schema = SchemaVersion
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
@@ -448,4 +503,14 @@ func tailDigits(s string) string {
 		i--
 	}
 	return s[i:]
+}
+
+// hasSceneID 事件库里是否已有这个 ID（收影片脚本时避免与剧本目录撞名）。
+func (l *Library) hasSceneID(id string) bool {
+	for _, s := range l.Scenes {
+		if s.ID == id {
+			return true
+		}
+	}
+	return false
 }
