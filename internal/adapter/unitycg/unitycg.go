@@ -70,6 +70,9 @@ type SpineInfo struct {
 	Slots      int       `json:"slots"`
 	Skins      []string  `json:"skins"`
 	Animations []AnimRef `json:"animations"`
+	// Error 骨架统计失败的原因（导出器返回 {"error": ...} 时）。
+	// 不能只留零值，否则卡片会显示「0 骨骼 0 动画」看不出是失败。
+	Error string `json:"error,omitempty"`
 }
 
 // AnimRef 一段动画。
@@ -90,7 +93,40 @@ func LoadIndex(root string) (*Index, error) {
 	if err := json.Unmarshal(data, &idx); err != nil {
 		return nil, fmt.Errorf("解析 CG 索引 %s 失败：%w", p, err)
 	}
+	// 索引来自游戏/导出器，不能直接拼进文件路径：拒绝任何带分隔符或 ..
+	// 的 id/文件名，避免 filepath.Join(root, ...) 被带出 root。
+	for _, cg := range idx.CGs {
+		if !validSegment(cg.ID) {
+			return nil, fmt.Errorf("CG 索引里的 id 非法：%q", cg.ID)
+		}
+		for _, f := range cg.Frames {
+			if !validSegment(f) {
+				return nil, fmt.Errorf("CG %s 的帧文件名非法：%q", cg.ID, f)
+			}
+		}
+		for _, f := range cg.Files.PNG {
+			if !validSegment(f) {
+				return nil, fmt.Errorf("CG %s 的 PNG 文件名非法：%q", cg.ID, f)
+			}
+		}
+		for _, f := range cg.Files.Text {
+			if !validSegment(f) {
+				return nil, fmt.Errorf("CG %s 的文本文件名非法：%q", cg.ID, f)
+			}
+		}
+	}
 	return &idx, nil
+}
+
+// validSegment 只接受单个路径分量：不含分隔符、盘符或 ..。
+func validSegment(s string) bool {
+	if s == "" || s == "." || s == ".." {
+		return false
+	}
+	if strings.ContainsAny(s, "/\\:\x00") {
+		return false
+	}
+	return true
 }
 
 // Playable 这部 CG 现在能不能放（spine 还没接渲染）。
@@ -98,17 +134,26 @@ func Playable(cg CG) bool { return cg.Kind == "frames" || cg.Kind == "still" }
 
 var numRe = regexp.MustCompile(`(\d+)`)
 
-// sortFrames 按文件名里的数字排序（1,2,10 而不是 1,10,2）。
+// lastNum 取文件名里最后一个数字串。
+// CG 名常自带编号（Witch01_2.png），取第一个数字串会让所有帧比较恒等，
+// 退化成字典序；末尾数字才是帧序号。
+func lastNum(s string) (int, bool) {
+	all := numRe.FindAllString(s, -1)
+	if len(all) == 0 {
+		return 0, false
+	}
+	n, err := strconv.Atoi(all[len(all)-1])
+	return n, err == nil
+}
+
+// sortFrames 按文件名里的帧序号排序（1,2,10 而不是 1,10,2）。
 func sortFrames(files []string) []string {
 	out := append([]string(nil), files...)
 	sort.SliceStable(out, func(i, j int) bool {
-		ni, nj := numRe.FindString(out[i]), numRe.FindString(out[j])
-		if ni != "" && nj != "" {
-			a, _ := strconv.Atoi(ni)
-			b, _ := strconv.Atoi(nj)
-			if a != b {
-				return a < b
-			}
+		a, aok := lastNum(out[i])
+		b, bok := lastNum(out[j])
+		if aok && bok && a != b {
+			return a < b
 		}
 		return out[i] < out[j]
 	})
@@ -133,11 +178,23 @@ func BuildShow(cg CG) (*ir.Event, error) {
 	if len(frames) == 0 && cg.Kind == "still" {
 		frames = cg.Files.PNG
 	}
+	if !validSegment(cg.ID) {
+		return nil, fmt.Errorf("CG id 非法：%q", cg.ID)
+	}
 	if len(frames) == 0 {
 		if cg.Kind == "spine" {
-			return nil, fmt.Errorf("%s 是 Spine 骨骼动画（%d 段动画），渲染器尚未接入", cg.ID, len(cg.SpineAnimations()))
+			reason := ""
+			if cg.Spine != nil && cg.Spine.Error != "" {
+				reason = "：" + cg.Spine.Error
+			}
+			return nil, fmt.Errorf("%s 是 Spine 骨骼动画（%d 段动画）%s；渲染器尚未接入", cg.ID, len(cg.SpineAnimations()), reason)
 		}
 		return nil, fmt.Errorf("%s 没有可播放的帧（kind=%s）", cg.ID, cg.Kind)
+	}
+	for _, f := range frames {
+		if !validSegment(f) {
+			return nil, fmt.Errorf("CG %s 的帧文件名非法：%q", cg.ID, f)
+		}
 	}
 
 	step := int64(1000 / FPS)
@@ -178,6 +235,14 @@ func (cg CG) SpineAnimations() []AnimRef {
 }
 
 // Ref 素材引用：相对游戏根的路径，桌面加载器会先按 root+rel 直接找。
+// 调用前应已通过 LoadIndex/BuildShow 校验；这里再做一次兜底，非法名
+// 不会被拼成可穿越的路径。
 func Ref(cgID, file string) string {
+	if !validSegment(cgID) {
+		cgID = "_"
+	}
+	if !validSegment(file) {
+		file = "_"
+	}
 	return strings.Join([]string{"cg", cgID, file}, "/")
 }
