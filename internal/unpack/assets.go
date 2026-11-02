@@ -56,33 +56,45 @@ type archiveSet struct {
 	entries   map[string]archiveEntry
 	owner     map[string]string // 条目路径 → 所属归档
 	encrypted []string
-	warnings  []string // 跳过/降级的归档，交给上层展示
+	// adlr 专指 XP3 的 adlr 校验和块（KeyHint=adlr）；CS2 的 KIF 是 Blowfish
+	// 加密、读取时自动解密，不该被算成「带 adlr」。
+	adlr     []string
+	skipped  []string // 解析失败的归档（含原因）——不阻断其余归档
+	warnings []string // 非致命问题（如解密读取器打不开）
+
+	// 引擎自带的条目读取器（CS2 的 KIF 需要解密）；缺省走通用 seek+zlib。
+	readers map[string]func([]adapter.ArchiveEntry) ([]byte, error)
+	closers []func() error
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
 //
-// 单个坏归档不再拖垮整批：解析失败的归档记 warning 后跳过，其余归档照常
+// 单个坏归档不再拖垮整批：解析失败的归档记 skipped 后跳过，其余归档照常
 // 建索引；只有「一个都打不开」时才返回错误，并带上第一个失败归档的路径。
-func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry, error)) (*archiveSet, error) {
+func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry, error), openReader func(string) (func([]adapter.ArchiveEntry) ([]byte, error), func() error, error)) (*archiveSet, error) {
 	s := &archiveSet{
 		archives: archives,
 		files:    map[string]*os.File{},
 		entries:  map[string]archiveEntry{},
 		owner:    map[string]string{},
+		readers:  map[string]func([]adapter.ArchiveEntry) ([]byte, error){},
 	}
-	opened := 0
 	var firstErr *archiveParseError
 	for _, arch := range archives {
 		segs, err := parse(arch)
 		if err != nil {
+			// 一个坏归档不该拖垮整场解包：实测有的游戏目录里混着扩展名骗人的
+			// 文件（如 .int 其实是 EVB）。记下来，继续处理其余归档。
 			if firstErr == nil {
 				firstErr = &archiveParseError{Path: arch, Err: err}
 			}
-			s.warnings = append(s.warnings,
-				fmt.Sprintf("跳过归档 %s：%v", filepath.Base(arch), err))
+			msg := fmt.Sprintf("%s：%v", filepath.Base(arch), err)
+			if hint := sniffHint(arch); hint != "" {
+				msg += "（" + hint + "）"
+			}
+			s.skipped = append(s.skipped, msg)
 			continue
 		}
-		opened++
 		order := []string{}
 		grouped := map[string][]adapter.ArchiveEntry{}
 		enc := map[string]bool{}
@@ -95,22 +107,44 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 				enc[e.Path] = true
 			}
 		}
+		if openReader != nil {
+			if read, closeFn, rerr := openReader(arch); rerr == nil {
+				s.readers[arch] = read
+				if closeFn != nil {
+					s.closers = append(s.closers, closeFn)
+				}
+			} else {
+				// 不能静默回落：通用读取只做 zlib，KIF 的 Blowfish 数据会
+				// 原样读成密文，最后表现为「脚本解析失败」而看不到根因。
+				s.warnings = append(s.warnings,
+					fmt.Sprintf("%s 的解密读取器打不开：%v", filepath.Base(arch), rerr))
+			}
+		}
 		for _, p := range order {
 			if _, exists := s.entries[p]; exists {
 				// 同名条目以后出现的归档为准：补丁包（update.xp3 等）通常
 				// 排在 base 之后，先到先得会拿到旧脚本。
 				s.encrypted = removeString(s.encrypted, p)
+				s.adlr = removeString(s.adlr, p)
 			}
 			s.entries[p] = archiveEntry{path: p, segs: grouped[p], encrypted: enc[p]}
 			s.owner[p] = arch
 			if enc[p] {
 				s.encrypted = append(s.encrypted, p)
+				if strings.EqualFold(grouped[p][0].KeyHint, "adlr") {
+					s.adlr = append(s.adlr, p)
+				}
 			}
 		}
 	}
-	if opened == 0 && firstErr != nil {
+	if len(s.entries) == 0 {
 		s.close()
-		return nil, firstErr
+		if firstErr != nil {
+			return nil, firstErr
+		}
+		if len(s.skipped) > 0 {
+			return nil, fmt.Errorf("所有归档都无法解析：%s", strings.Join(s.skipped, "；"))
+		}
 	}
 	sort.Strings(s.encrypted)
 	return s, nil
@@ -143,6 +177,10 @@ func (s *archiveSet) close() {
 		_ = f.Close()
 	}
 	s.files = map[string]*os.File{}
+	for _, c := range s.closers {
+		_ = c()
+	}
+	s.closers = nil
 }
 
 // read 读一个条目的完整内容（多段顺序拼接，每段各自解压）。
@@ -150,6 +188,9 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 	arch, ok := s.owner[e.path]
 	if !ok {
 		return nil, fmt.Errorf("条目 %s 不知道属于哪个归档", e.path)
+	}
+	if read, ok := s.readers[arch]; ok {
+		return read(e.segs)
 	}
 	f, ok := s.files[arch]
 	if !ok {

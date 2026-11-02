@@ -341,6 +341,8 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 		libPath = old.Library
 	}
 	g, _ := reg.Ensure(clean, libPath)
+	// 登记时把识别出的引擎写回：OpenEvent 的分派与卡片展示都靠它。
+	g.Engine = conv.EngineID
 	reg.Active = g.ID
 	if err := lib.Save(g.Library); err != nil {
 		return nil, err

@@ -65,11 +65,12 @@ type Archive struct {
 	Entries []Entry
 	Skipped int // 越界条目数（数据范围超文件尾，已跳过）
 
-	file  *os.File
-	bf    *blowfish
-	plain bool     // 明文布局：名字与数据都不加密
-	idx   []int    // Entries[i] 的名字槽下标 i+1
-	raw   [][]byte // Entries[i] 的原始（混淆）名字字节
+	file    *os.File
+	bf      *blowfish
+	plain   bool     // 明文布局：名字与数据都不加密
+	idx     []int    // Entries[i] 的名字槽下标 i+1
+	raw     [][]byte // Entries[i] 的原始（混淆）名字字节
+	byRange map[[2]int64]Entry
 }
 
 // Open 打开 KIF 归档并解出全部条目名。
@@ -161,7 +162,23 @@ func (a *Archive) readIndex() error {
 			e.NameKind = NameUnknownKind
 		}
 	}
+	a.buildRangeIndex()
 	return nil
+}
+
+// buildRangeIndex 建 offset+size → Entry 的索引。名字在缺 main_key 时大小写不可靠，
+// 解包侧只能用 range 定位；线性扫在每次读脚本时都是 O(n²)。
+func (a *Archive) buildRangeIndex() {
+	a.byRange = make(map[[2]int64]Entry, len(a.Entries))
+	for _, e := range a.Entries {
+		a.byRange[[2]int64{e.Offset, e.Size}] = e
+	}
+}
+
+// Lookup 按 offset+size 找条目。
+func (a *Archive) Lookup(offset, size int64) (Entry, bool) {
+	e, ok := a.byRange[[2]int64{offset, size}]
+	return e, ok
 }
 
 // readPlainIndex 解析明文布局（@8 不是 __key__.dat）：名字明文 CP932、数据不加密。
@@ -200,6 +217,7 @@ func (a *Archive) readPlainIndex(count int, size int64) error {
 		if len(ents) == count {
 			a.plain = true
 			a.Entries = ents
+			a.buildRangeIndex()
 			return nil
 		}
 		if lastErr == nil {

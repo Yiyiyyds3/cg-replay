@@ -67,6 +67,8 @@ type Library struct {
 	CGs         []CGEvent      `json:"cgs"`
 	Scenes      []SceneEvent   `json:"scenes"`
 	Chapters    []ChapterEvent `json:"chapters,omitempty"`
+	// Warnings 扫描时可以跳过但不应静默的问题（坏脚本、读取失败等）。
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 var (
@@ -118,6 +120,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	}
 	if strings.EqualFold(conv.EngineID, "bgi") {
 		return ScanBGI(root, conv)
+	}
+	if strings.EqualFold(conv.EngineID, "catsystem2") {
+		return ScanCS2(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)

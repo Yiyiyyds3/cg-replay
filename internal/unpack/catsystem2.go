@@ -11,11 +11,13 @@
 package unpack
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/catsystem2"
+	"ucgr/internal/kif"
 )
 
 func init() {
@@ -25,6 +27,27 @@ func init() {
 		// 归档是 KIF（.int 内部包 / .kif 明文包）；.cst 剧本通常在归档里。
 		ArchiveExts:  []string{".int", ".kif"},
 		ParseArchive: a.ParseArchive,
+		// KIF 条目是 Blowfish 加密的（通用读取只做 zlib，读出来是密文）——
+		// 必须走 kif.Archive.Read。Open 一次索引，读取器缓存整份 Archive。
+		OpenReader: func(archPath string) (func([]adapter.ArchiveEntry) ([]byte, error), func() error, error) {
+			arc, err := kif.Open(archPath)
+			if err != nil {
+				return nil, nil, err
+			}
+			read := func(segs []adapter.ArchiveEntry) ([]byte, error) {
+				if len(segs) == 0 {
+					return nil, fmt.Errorf("条目没有段信息")
+				}
+				want := segs[0]
+				// 名字可能有大小写歧义，按 offset+size 匹配更可靠。
+				e, ok := arc.Lookup(want.Offset, want.Size)
+				if !ok {
+					return nil, fmt.Errorf("KIF 里找不到条目（offset=%d size=%d）", want.Offset, want.Size)
+				}
+				return arc.Read(e)
+			}
+			return read, arc.Close, nil
+		},
 		IsScript: func(p string) bool {
 			return strings.EqualFold(filepath.Ext(p), ".cst")
 		},
@@ -48,9 +71,6 @@ func init() {
 			}, nil
 		},
 		ScriptExt: ".cst",
-		// KIF 条目是 Blowfish 加密的。本分支还没有注册 OpenReader，解出的
-		// .cst 会是密文；下一条 feat/cs2-library 接入后清空这条提示。
-		ScriptNote: "CatSystem2 的 .cst 由 KIF/Blowfish 加密，当前版本尚未接入解密读取，解出的脚本可能是密文",
 		// CS2 解包树里剧本在 scene/ 下，素材在 image/ 下。
 		ScriptDir: "scene",
 		ImageDir:  "image",
