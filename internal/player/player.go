@@ -120,6 +120,8 @@ type LayerState struct {
 	X, Y     float64
 	HasPos   bool
 	Opacity  float64 // 0~1（脚本 opacity 为 0~255，已归一）
+	Scale    float64 // 1 = 原始大小；<=0 按 1 处理（兼容旧数据）
+	Anchor   string  // 缩放锚点：空/top-left | center
 	ClipL    float64
 	ClipT    float64
 	ClipW    float64
@@ -129,6 +131,10 @@ type LayerState struct {
 	Attrs    map[string]string
 	// StartMs 影片图层的起播时刻（相对本事件）；非影片层不用。
 	StartMs int64
+
+	// 图层淡入淡出（CatSystem2 的 fade 带 from/to/duration_ms）。
+	fadeStart, fadeDur int64
+	fadeFrom, fadeTo   float64
 }
 
 // TextLine 消息层上的一行。
@@ -456,7 +462,7 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 	}
 	st, ok := m[op.Layer]
 	if !ok {
-		st = &LayerState{Layer: op.Layer, Opacity: 1}
+		st = &LayerState{Layer: op.Layer, Opacity: 1, Scale: 1}
 		m[op.Layer] = st
 	}
 	if st.Attrs == nil {
@@ -486,6 +492,16 @@ func (p *Player) applyLayer(op ir.ShowOp) {
 		}
 	}
 	p.applyAttrs(st, op.Attr)
+	// CS2 的 fade：from/to 是起止 alpha，播放器按时间插值（不阻塞台本）。
+	if op.DurMs > 0 {
+		if from, okF := floatAttr(op.Attr, "from"); okF {
+			if to, okT := floatAttr(op.Attr, "to"); okT {
+				st.fadeStart, st.fadeDur = p.now, op.DurMs
+				st.fadeFrom, st.fadeTo = clamp01(from/255), clamp01(to/255)
+				st.Opacity = st.fadeFrom
+			}
+		}
+	}
 	p.ensureOrder(op.Layer)
 }
 
@@ -517,6 +533,13 @@ func (p *Player) applyAttrs(st *LayerState, attrs map[string]string) {
 	// 图像层：opacity = 图层 alpha（0~255，255=不透明）。
 	if v, ok := floatAttr(attrs, "opacity"); ok && !isMessageLayer(st.Layer) {
 		st.Opacity = v / 255
+	}
+	// 图层缩放（CatSystem2 的 scale < 1 表示缩到原尺寸的百分比）。
+	if v, ok := floatAttr(attrs, "scale"); ok && v > 0 {
+		st.Scale = v
+	}
+	if v, ok := attrs["anchor"]; ok {
+		st.Anchor = strings.ToLower(strings.TrimSpace(v))
 	}
 	// 裁剪：clipleft/cliptop/clipwidth/clipheight（宽高齐全才算裁剪生效）
 	cl, hasL := floatAttr(attrs, "clipleft")
@@ -569,6 +592,27 @@ func (p *Player) Frame() Frame {
 		f.Layers = p.blend(prog)
 	} else {
 		f.Layers = orderedCopy(p.fore, p.order)
+	}
+	// 图层淡入淡出：只在 Frame 里算，不阻塞台本；CS2 用 easeInOutQuad。
+	for i := range f.Layers {
+		st := &f.Layers[i]
+		if st.fadeDur <= 0 {
+			continue
+		}
+		if p.now >= st.fadeStart+st.fadeDur {
+			st.Opacity = st.fadeTo
+			continue
+		}
+		t := float64(p.now-st.fadeStart) / float64(st.fadeDur)
+		if t < 0 {
+			t = 0
+		}
+		if t < 0.5 {
+			t = 2 * t * t
+		} else {
+			t = 1 - (-2*t+2)*(-2*t+2)/2
+		}
+		st.Opacity = st.fadeFrom + (st.fadeTo-st.fadeFrom)*t
 	}
 	// 抖动偏移（衰减振荡：count+1 次来回，振幅按 (1-p)² 收敛）
 	if p.quakeDur > 0 && p.now < p.quakeStart+p.quakeDur {
@@ -828,6 +872,16 @@ func clamp255(f float64) uint8 {
 		return 255
 	}
 	return uint8(f)
+}
+
+func clamp01(f float64) float64 {
+	if f < 0 {
+		return 0
+	}
+	if f > 1 {
+		return 1
+	}
+	return f
 }
 
 // colorAttr 解析 0xRRGGBB / 0xRRGGBBAA 形式的颜色属性（KAG 的 color 属性）。

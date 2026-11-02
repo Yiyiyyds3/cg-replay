@@ -15,6 +15,7 @@ import (
 	"image"
 	"math"
 	"sort"
+	"strings"
 
 	"ucgr/internal/ir"
 )
@@ -129,7 +130,22 @@ func compose(f Frame, load Loader, video VideoProvider, w, h int) (*image.RGBA, 
 		if st.HasClip {
 			img = cropImage(img, st.ClipL, st.ClipT, st.ClipW, st.ClipH)
 		}
-		blendLayer(dst, img, int(math.Round(st.X)), int(math.Round(st.Y)),
+		x, y := st.X, st.Y
+		scale := st.Scale
+		if scale <= 0 {
+			scale = 1
+		}
+		if scale != 1 {
+			ob := img.Bounds()
+			img = scaleImage(img, scale)
+			if strings.EqualFold(st.Anchor, "center") {
+				// 锚点=中心：缩放前后中心不动。
+				nb := img.Bounds()
+				x -= float64(nb.Dx()-ob.Dx()) / 2
+				y -= float64(nb.Dy()-ob.Dy()) / 2
+			}
+		}
+		blendLayer(dst, img, int(math.Round(x)), int(math.Round(y)),
 			int(math.Round(float64(f.QuakeX))), int(math.Round(float64(f.QuakeY))), st.Opacity)
 		if ir.IsVideoRef(st.Resolved) {
 			drawn = append(drawn, st.Layer+"←"+st.Resolved+"（影片）")
@@ -173,6 +189,34 @@ func cropImage(img image.Image, x, y, w, h float64) image.Image {
 		}
 	}
 	return out
+}
+
+// scaleImage 最近邻缩放（保留 alpha；不引入 x/image 依赖）。
+func scaleImage(src image.Image, scale float64) image.Image {
+	b := src.Bounds()
+	w := int(math.Round(float64(b.Dx()) * scale))
+	h := int(math.Round(float64(b.Dy()) * scale))
+	if w < 1 {
+		w = 1
+	}
+	if h < 1 {
+		h = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		sy := b.Min.Y + int(float64(y)/scale)
+		if sy >= b.Max.Y {
+			sy = b.Max.Y - 1
+		}
+		for x := 0; x < w; x++ {
+			sx := b.Min.X + int(float64(x)/scale)
+			if sx >= b.Max.X {
+				sx = b.Max.X - 1
+			}
+			dst.Set(x, y, src.At(sx, sy))
+		}
+	}
+	return dst
 }
 
 // blendLayer alpha-over 贴图（dst 不透明底；整体不透明度 opacity 0~1；越界裁剪）。

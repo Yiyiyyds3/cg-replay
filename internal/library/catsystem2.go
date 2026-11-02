@@ -47,16 +47,30 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 		names = append(names, e.Name())
 	}
 	sort.Strings(names)
+	skipped := 0
+	firstErr := ""
 	for _, name := range names {
 		p := filepath.Join(dir, name)
 		data, err := os.ReadFile(p)
 		if err != nil {
+			skipped++
+			if firstErr == "" {
+				firstErr = fmt.Sprintf("%s：%v", name, err)
+			}
 			continue
 		}
 		// 能解析**且**能构建出演出才算可回放（坏文件、空脚本都不列进库——
 		// 否则会出现「库里列着但点开播不出来」）。
 		ev, err := catsystem2.BuildShowScript(data, name)
 		if err != nil || len(ev.Show) == 0 {
+			skipped++
+			if firstErr == "" {
+				if err != nil {
+					firstErr = fmt.Sprintf("%s：%v", name, err)
+				} else {
+					firstErr = fmt.Sprintf("%s：没有可回放的演出", name)
+				}
+			}
 			continue
 		}
 		stem := strings.TrimSuffix(name, filepath.Ext(name))
@@ -68,8 +82,12 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 			HasVideo: hasVideo,
 		})
 	}
+	if skipped > 0 {
+		lib.Warnings = append(lib.Warnings,
+			fmt.Sprintf("%d 份 .cst 无法回放，已跳过（首条：%s）", skipped, firstErr))
+	}
 	if len(lib.Scenes) == 0 {
-		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .cst）", conv.ScenarioDir)
+		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .cst；%s）", conv.ScenarioDir, firstErr)
 	}
 	return lib, nil
 }

@@ -216,6 +216,9 @@ func TestCatSystem2ScriptRefs(t *testing.T) {
 	if len(info.Labels) != 1 {
 		t.Fatalf("事件数 = %d, want 1（一脚本一事件）", len(info.Labels))
 	}
+	if !info.Dynamic {
+		t.Fatal("CS2 有运行时拼名引用，Dynamic 必须为 true，否则闭包不全时零告警")
+	}
 	has := func(want string) bool {
 		for _, r := range info.Refs {
 			if r == want {
@@ -251,7 +254,12 @@ func TestUnpackExplainsWrongContainer(t *testing.T) {
 		want string
 	}{
 		{"update.xp3", []byte("PK\x03\x04fake zip body"), "ZIP"},
+		{"empty.xp3", []byte("PK\x05\x06\x00\x00\x00\x00"), "空 ZIP"},
+		{"split.xp3", []byte("PK\x07\x08\x00\x00\x00\x00"), "分卷 ZIP"},
 		{"Monkeys_cn.xp3", []byte("EVB\x00\x40\x00\x00\x00rest"), "EVB"},
+		{"data.pfs", []byte("pf6\x00\x00\x00\x00rest"), "PFS"},
+		{"data.pfs", []byte("pf8\x00\x00\x00\x00rest"), "PFS"},
+		{"script.arc", []byte("BurikoCompiledScript\x00\x00rest"), "BGI"},
 	}
 	for _, c := range cases {
 		dir := t.TempDir()

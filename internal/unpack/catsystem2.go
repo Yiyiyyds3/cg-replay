@@ -39,13 +39,12 @@ func init() {
 					return nil, fmt.Errorf("条目没有段信息")
 				}
 				want := segs[0]
-				for _, e := range arc.Entries {
-					// 名字可能有大小写歧义，按 offset+size 匹配更可靠。
-					if e.Offset == want.Offset && e.Size == want.Size {
-						return arc.Read(e)
-					}
+				// 名字可能有大小写歧义，按 offset+size 匹配更可靠。
+				e, ok := arc.Lookup(want.Offset, want.Size)
+				if !ok {
+					return nil, fmt.Errorf("KIF 里找不到条目（offset=%d size=%d）", want.Offset, want.Size)
 				}
-				return nil, fmt.Errorf("KIF 里找不到条目（offset=%d size=%d）", want.Offset, want.Size)
+				return arc.Read(e)
 			}
 			return read, arc.Close, nil
 		},
@@ -62,11 +61,13 @@ func init() {
 				return scriptInfo{}, errTypeMismatch
 			}
 			refs := dedupSorted(ast.ExtractRefs())
-			// 一脚本一事件（与 BuildIR 口径一致）。
+			// 一脚本一事件（与 BuildIR 口径一致）。CS2 有运行时拼文件名的
+			// 引用，静态闭包不可能覆盖全，必须让上层发「闭包可能不全」告警。
 			return scriptInfo{
 				Labels:  []string{"script"},
 				Refs:    refs,
 				AllRefs: refs,
+				Dynamic: true,
 			}, nil
 		},
 		ScriptExt: ".cst",

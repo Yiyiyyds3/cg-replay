@@ -69,6 +69,8 @@ type Library struct {
 	CGs         []CGEvent      `json:"cgs"`
 	Scenes      []SceneEvent   `json:"scenes"`
 	Chapters    []ChapterEvent `json:"chapters,omitempty"`
+	// Warnings 扫描时可以跳过但不应静默的问题（坏脚本、读取失败等）。
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 var (
