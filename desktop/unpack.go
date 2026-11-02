@@ -9,13 +9,26 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
 	"ucgr/internal/unpack"
 )
+
+// destLocks 同一个产物目录同一时间只允许一个导入任务写入，
+// 避免两个窗口/两次点击同时解包同一游戏时互相覆盖。
+var destLocks sync.Map
+
+func lockDest(dest string) func() {
+	v, _ := destLocks.LoadOrStore(dest, &sync.Mutex{})
+	mu := v.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
 
 // UnpackPlanDTO 解包预览（前端展示用）。
 type UnpackPlanDTO struct {
@@ -25,10 +38,20 @@ type UnpackPlanDTO struct {
 	ScenarioFiles int      `json:"scenario_files"`
 	Labels        int      `json:"labels"` // 预计事件数（KiriKiri=画廊槽位；其它引擎=脚本事件）
 	Refs          int      `json:"refs"`   // 预计引用到的素材数
-	Encrypted     int      `json:"encrypted"`
-	Notes         []string `json:"notes"`
-	Unsupported   bool     `json:"unsupported"`
-	Reason        string   `json:"reason"`
+	Videos        int      `json:"videos"` // 其中影片（OP/ED）条目数
+	VideoBytes    int64    `json:"video_bytes"`
+	// ImportedVideos 该源**已经解包过**的目录里现有多少影片。
+	// >0 表示之前提过：重解不会删它们，也不用再问「要不要提取」。
+	ImportedVideos int `json:"imported_videos"`
+	// Imported 该源之前已解包过（产物目录非空）→ 重读时给「复用 / 强制重解」选项
+	Imported bool `json:"imported"`
+	// EstBytes/EstFiles 这次解包预计产出多少字节/文件
+	EstBytes    int64    `json:"est_bytes"`
+	EstFiles    int      `json:"est_files"`
+	Encrypted   int      `json:"encrypted"`
+	Notes       []string `json:"notes"`
+	Unsupported bool     `json:"unsupported"`
+	Reason      string   `json:"reason"`
 }
 
 // UnpackImportDTO 导入结果（解包 + 登记）。
@@ -41,7 +64,11 @@ type UnpackImportDTO struct {
 	Missing   []string `json:"missing"`
 	Encrypted []string `json:"encrypted"`
 	Warnings  []string `json:"warnings"`
-	GameID    string   `json:"game_id"`
+	// SkippedVideo 按「不提取影片」选项跳过的数量
+	SkippedVideo int `json:"skipped_video,omitempty"`
+	// Reused 已存在且大小一致、直接复用的文件数（增量解包）
+	Reused int    `json:"reused,omitempty"`
+	GameID string `json:"game_id"`
 	// Connected=false 表示素材已解出，但事件库接入失败（例如该引擎扫描不到事件）。
 	// 这不是解包失败：产物保留在 Dest，前端要给打开目录/手动退路，不能只弹一句错。
 	Connected bool   `json:"connected"`
@@ -57,31 +84,49 @@ func (a *App) UnpackPreview(path string) (*UnpackPlanDTO, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 这个源如果之前解过，看看产物目录里现有多少影片（按磁盘实况，不看记忆）。
+	existing := 0
+	imported := false
+	if clean := filepath.Clean(strings.TrimSpace(path)); clean != "" {
+		dest := filepath.Join(dataDir(), "games", registry.IDFor(clean))
+		if st, statErr := os.Stat(dest); statErr == nil && st.IsDir() {
+			imported = !emptyDir(dest)
+			existing = unpack.ExistingVideos(dest)
+		}
+	}
 	return &UnpackPlanDTO{
-		EngineID:      plan.EngineID,
-		Kind:          plan.Kind,
-		Archives:      plan.Archives,
-		ScenarioFiles: plan.ScenarioFiles,
-		Labels:        plan.Labels,
-		Refs:          plan.Refs,
-		Encrypted:     plan.Encrypted,
-		Notes:         plan.Notes,
-		Unsupported:   plan.Unsupported,
-		Reason:        plan.Reason,
+		EngineID:       plan.EngineID,
+		ImportedVideos: existing,
+		Imported:       imported,
+		EstBytes:       plan.EstBytes,
+		EstFiles:       plan.EstFiles,
+		Kind:           plan.Kind,
+		Archives:       plan.Archives,
+		ScenarioFiles:  plan.ScenarioFiles,
+		Labels:         plan.Labels,
+		Refs:           plan.Refs,
+		Videos:         plan.Videos,
+		VideoBytes:     plan.VideoBytes,
+		Encrypted:      plan.Encrypted,
+		Notes:          plan.Notes,
+		Unsupported:    plan.Unsupported,
+		Reason:         plan.Reason,
 	}, nil
 }
 
 // UnpackImportDecrypt 带解密方案地解包（方案名见 unpack.SchemeFromString；
 // 固定密钥 key 供 "xor" 方案用；其余方案由条目自身的 adlr 派生密钥）。
-func (a *App) UnpackImportDecrypt(path, scheme string, key int) (*UnpackImportDTO, error) {
+func (a *App) UnpackImportDecrypt(path, scheme string, key int, skipVideo, force bool) (*UnpackImportDTO, error) {
 	sc, err := unpack.SchemeFromString(scheme)
 	if err != nil {
 		return nil, err
 	}
 	return a.unpackImport(path, unpack.Options{
-		Scope:   unpack.ScopeCG,
-		Decrypt: sc,
-		Key:     byte(key),
+		Scope:     unpack.ScopeCG,
+		Decrypt:   sc,
+		Key:       byte(key),
+		SkipVideo: skipVideo,
+		Force:     force,
 	})
 }
 
@@ -90,8 +135,8 @@ func (a *App) UnpackImportDecrypt(path, scheme string, key int) (*UnpackImportDT
 // 目标目录固定为 `%LOCALAPPDATA%\cgreplay-ui\games\<源路径 id>`，同一份源
 // 重复导入落在同一处（幂等）。登记时以**解包产物目录**为游戏根目录，
 // 播放器直接就能读。
-func (a *App) UnpackImport(path string) (*UnpackImportDTO, error) {
-	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG})
+func (a *App) UnpackImport(path string, skipVideo, force bool) (*UnpackImportDTO, error) {
+	return a.unpackImport(path, unpack.Options{Scope: unpack.ScopeCG, SkipVideo: skipVideo, Force: force})
 }
 
 // unpackImport 真正的解包 + 登记流程（两种入口共用）。
@@ -114,11 +159,14 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 	// 目标目录：按源路径 id 固定，重复导入幂等。
 	id := registry.IDFor(src)
 	dest := filepath.Join(dataDir(), "games", id)
+	unlock := lockDest(dest)
+	defer unlock()
 	res, err := unpack.ExtractWith(src, dest, opts)
 	if err != nil {
 		return nil, err
 	}
-	if res.Files == 0 {
+	// 全量复用（第二次导入同一游戏）时 Files=0 但 Reused>0，产物是完好的。
+	if res.Files+res.Reused == 0 {
 		return nil, fmt.Errorf("解包后没有任何文件（%s）", src)
 	}
 
@@ -127,33 +175,53 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 	lib, err := a.AddGame(dest)
 	if err != nil {
 		return &UnpackImportDTO{
-			Dest:      res.Dest,
-			EngineID:  res.EngineID,
-			Events:    res.Events,
-			Files:     res.Files,
-			Bytes:     res.Bytes,
-			Missing:   res.Missing,
-			Encrypted: res.Encrypted,
-			Warnings:  res.Warnings,
-			GameID:    registry.IDFor(filepath.Clean(dest)),
-			Connected: false,
-			Reason:    err.Error(),
+			Dest:         res.Dest,
+			EngineID:     res.EngineID,
+			Events:       res.Events,
+			Files:        res.Files,
+			Bytes:        res.Bytes,
+			Missing:      res.Missing,
+			Encrypted:    res.Encrypted,
+			SkippedVideo: res.SkippedVideo,
+			Reused:       res.Reused,
+			Warnings:     res.Warnings,
+			GameID:       registry.IDFor(filepath.Clean(dest)),
+			Connected:    false,
+			Reason:       err.Error(),
 			Hint: fmt.Sprintf(
 				"解包产物已保存在 %s。可以打开目录检查；修复上述原因后，"+
 					"也能用「添加游戏」把这个目录手动登记。", dest),
 		}, nil
 	}
 	return &UnpackImportDTO{
-		Dest:      res.Dest,
-		EngineID:  res.EngineID,
-		Events:    res.Events,
-		Files:     res.Files,
-		Bytes:     res.Bytes,
-		Missing:   res.Missing,
-		Encrypted: res.Encrypted,
-		Warnings:  res.Warnings,
-		GameID:    registry.IDFor(filepath.Clean(dest)),
-		Connected: true,
-		Library:   lib,
+		Dest:         res.Dest,
+		EngineID:     res.EngineID,
+		Events:       res.Events,
+		Files:        res.Files,
+		Bytes:        res.Bytes,
+		Missing:      res.Missing,
+		Encrypted:    res.Encrypted,
+		SkippedVideo: res.SkippedVideo,
+		Warnings:     res.Warnings,
+		GameID:       registry.IDFor(filepath.Clean(dest)),
+		Connected:    true,
+		Library:      lib,
 	}, nil
+}
+
+// emptyDir 目录里是否一个文件都没有（够判断「解过没」）。
+func emptyDir(dir string) bool {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	for _, e := range ents {
+		if !e.IsDir() {
+			return false
+		}
+		if !emptyDir(filepath.Join(dir, e.Name())) {
+			return false
+		}
+	}
+	return true
 }

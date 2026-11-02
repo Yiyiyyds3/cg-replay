@@ -625,6 +625,8 @@ export namespace main {
 	    missing: string[];
 	    encrypted: string[];
 	    warnings: string[];
+	    skipped_video?: number;
+	    reused?: number;
 	    game_id: string;
 	    connected: boolean;
 	    reason?: string;
@@ -645,6 +647,8 @@ export namespace main {
 	        this.missing = source["missing"];
 	        this.encrypted = source["encrypted"];
 	        this.warnings = source["warnings"];
+	        this.skipped_video = source["skipped_video"];
+	        this.reused = source["reused"];
 	        this.game_id = source["game_id"];
 	        this.connected = source["connected"];
 	        this.reason = source["reason"];
@@ -677,6 +681,12 @@ export namespace main {
 	    scenario_files: number;
 	    labels: number;
 	    refs: number;
+	    videos: number;
+	    video_bytes: number;
+	    imported_videos: number;
+	    imported: boolean;
+	    est_bytes: number;
+	    est_files: number;
 	    encrypted: number;
 	    notes: string[];
 	    unsupported: boolean;
@@ -694,6 +704,12 @@ export namespace main {
 	        this.scenario_files = source["scenario_files"];
 	        this.labels = source["labels"];
 	        this.refs = source["refs"];
+	        this.videos = source["videos"];
+	        this.video_bytes = source["video_bytes"];
+	        this.imported_videos = source["imported_videos"];
+	        this.imported = source["imported"];
+	        this.est_bytes = source["est_bytes"];
+	        this.est_files = source["est_files"];
 	        this.encrypted = source["encrypted"];
 	        this.notes = source["notes"];
 	        this.unsupported = source["unsupported"];

@@ -25,6 +25,9 @@ type scriptInfo struct {
 	Refs    []string // 事件用到的静态资源引用（ScopeCG 用）
 	AllRefs []string // 整份剧本的静态资源引用（ScopeAll 用）
 	Dynamic bool     // 有动态引用（运行时拼文件名）→ 闭包必然不全
+	// VideoRefs 影片引用（OP/ED）。它们通常不在 CG 画廊的引用里，
+	// 但用户要能看 OP/ED，所以单独列出来、总是并入闭包（可用 SkipVideo 去掉）。
+	VideoRefs []string
 }
 
 // engineDeps 一个引擎的解包能力。

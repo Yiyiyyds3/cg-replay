@@ -45,6 +45,20 @@ func init() {
 				info.Refs = append(info.Refs, kirikiri.SegmentRefs(ast, label)...)
 			}
 			info.Refs = dedupSorted(info.Refs)
+			// 影片单独收集：OP/ED 一般不在画廊槽位的引用里，不单独收就永远解不出来。
+			for i := range ast.Commands {
+				c := &ast.Commands[i]
+				switch strings.ToLower(c.Tag) {
+				case "movie", "video", "sysmovie":
+					for _, k := range []string{"storage", "file", "src"} {
+						if v := strings.TrimSpace(c.Attrs[k]); v != "" {
+							info.VideoRefs = append(info.VideoRefs, v)
+							break
+						}
+					}
+				}
+			}
+			info.VideoRefs = dedupSorted(info.VideoRefs)
 			return info, nil
 		},
 		ScriptExt: ".ks",
