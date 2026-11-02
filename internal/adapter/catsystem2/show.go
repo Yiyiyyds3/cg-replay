@@ -77,23 +77,25 @@ func BuildShowFromEvent(ev *ir.Event) []ir.ShowOp {
 		case "image_show":
 			pm, _ := op.Params.(map[string]interface{})
 			ref, _ := pm["ref"].(string)
-			attr := map[string]string{}
-			for k, v := range pm {
-				if k == "ref" {
-					continue
-				}
-				attr[k] = fmt.Sprint(v)
-			}
 			ops = append(ops, ir.ShowOp{
 				TMs:   op.TMs,
 				Kind:  ir.ShowLayerShow,
 				Layer: op.Target,
 				Ref:   ref,
-				Attr:  attr,
+				Attr:  cs2Attrs(pm),
 				DurMs: durFromParams(pm),
 			})
 		case "image_hide":
 			ops = append(ops, ir.ShowOp{TMs: op.TMs, Kind: ir.ShowLayerHide, Layer: op.Target})
+		case "layer_set", "layer_fade":
+			pm, _ := op.Params.(map[string]interface{})
+			ops = append(ops, ir.ShowOp{
+				TMs:   op.TMs,
+				Kind:  ir.ShowLayerAttr,
+				Layer: op.Target,
+				Attr:  cs2Attrs(pm),
+				DurMs: durFromParams(pm),
+			})
 		}
 	}
 	for ; ti < len(texts); ti++ {
@@ -102,12 +104,47 @@ func BuildShowFromEvent(ev *ir.Event) []ir.ShowOp {
 	return ops
 }
 
-// durFromParams 从属性里取时长（time/dur/ms，毫秒）。
+// cs2Attrs 把 CS2 的参数字典转成播放器属性。
+//
+// CS2 的 opacity/from/to 是 0~1（FelineSystem2 的 alpha），播放器统一按
+// 0~255 解释；转换侧在这里乘 255，避免改掉其它引擎（KAG）的口径。
+func cs2Attrs(params map[string]interface{}) map[string]string {
+	attr := map[string]string{}
+	for k, v := range params {
+		switch k {
+		case "ref", "time", "dur", "ms", "duration", "duration_ms":
+			continue
+		case "opacity", "from", "to":
+			if f, ok := numFromAny(v); ok && f >= 0 && f <= 1 {
+				attr[k] = strconv.FormatFloat(f*255, 'f', -1, 64)
+				continue
+			}
+		}
+		attr[k] = fmt.Sprint(v)
+	}
+	return attr
+}
+
+func numFromAny(v interface{}) (float64, bool) {
+	switch t := v.(type) {
+	case int:
+		return float64(t), true
+	case int64:
+		return float64(t), true
+	case float64:
+		return t, true
+	case float32:
+		return float64(t), true
+	}
+	return 0, false
+}
+
+// durFromParams 从属性里取时长（time/dur/ms/duration_ms，毫秒）。
 func durFromParams(params map[string]interface{}) int64 {
 	if params == nil {
 		return 0
 	}
-	for _, k := range []string{"time", "dur", "ms", "duration"} {
+	for _, k := range []string{"duration_ms", "time", "dur", "ms", "duration"} {
 		v, ok := params[k]
 		if !ok {
 			continue

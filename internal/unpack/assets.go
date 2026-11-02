@@ -58,8 +58,9 @@ type archiveSet struct {
 	encrypted []string
 	// adlr 专指 XP3 的 adlr 校验和块（KeyHint=adlr）；CS2 的 KIF 是 Blowfish
 	// 加密、读取时自动解密，不该被算成「带 adlr」。
-	adlr    []string
-	skipped []string // 解析失败的归档（含原因）——不阻断其余归档
+	adlr     []string
+	skipped  []string // 解析失败的归档（含原因）——不阻断其余归档
+	warnings []string // 非致命问题（如解密读取器打不开）
 
 	// 引擎自带的条目读取器（CS2 的 KIF 需要解密）；缺省走通用 seek+zlib。
 	readers map[string]func([]adapter.ArchiveEntry) ([]byte, error)
@@ -112,6 +113,11 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 				if closeFn != nil {
 					s.closers = append(s.closers, closeFn)
 				}
+			} else {
+				// 不能静默回落：通用读取只做 zlib，KIF 的 Blowfish 数据会
+				// 原样读成密文，最后表现为「脚本解析失败」而看不到根因。
+				s.warnings = append(s.warnings,
+					fmt.Sprintf("%s 的解密读取器打不开：%v", filepath.Base(arch), rerr))
 			}
 		}
 		for _, p := range order {

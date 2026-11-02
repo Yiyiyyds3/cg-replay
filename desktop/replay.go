@@ -255,19 +255,25 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		return SessionMeta{}, fmt.Errorf("%s 没有脚本信息", title)
 	}
 	sp := filepath.Join(root, filepath.FromSlash(script))
+	// 引擎号以磁盘约定文件为准：旧登记里的 g.Engine 可能为空（历史数据），
+	// 直接按空串分派会全部落到 KiriKiri 解析器。
+	engineID := g.Engine
+	if conv, cerr := gameConvention(root, g.Engine); cerr == nil && conv.EngineID != "" {
+		engineID = conv.EngineID
+	}
 	var ev *ir.Event
 	switch {
 	case chapterPos >= 0 && chEvent != nil:
 		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)
-	case strings.EqualFold(g.Engine, "artemis"):
+	case strings.EqualFold(engineID, "artemis"):
 		// Artemis：事件单位是剧本里的 block，Label 记 block 序号。
 		ev, err = buildArtemisShow(sp, label)
-	case strings.EqualFold(g.Engine, "bgi"):
+	case strings.EqualFold(engineID, "bgi"):
 		// BGI：事件由适配器按换背景/换事件切出，Label 记事件序号；
 		// builder 已经产好 Show 台本，直接用。
 		ev, err = buildBGIShow(sp, label)
-	case strings.EqualFold(g.Engine, "catsystem2"):
+	case strings.EqualFold(engineID, "catsystem2"):
 		// CS2：一份 .cst 一个事件（无 Label），构建时把 Timeline 转成 Show。
 		ev, err = buildCS2Show(sp)
 	default:

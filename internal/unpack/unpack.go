@@ -249,6 +249,7 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 			p.Notes = append(p.Notes, "跳过无法解析的归档 —— "+sk)
 		}
 	}
+	p.Notes = append(p.Notes, assets.warnings...)
 	if p.Encrypted > 0 {
 		if engine == "kirikiri" {
 			p.Notes = append(p.Notes, fmt.Sprintf(
@@ -296,6 +297,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	for _, sk := range assets.skipped {
 		res.Warnings = append(res.Warnings, "跳过无法解析的归档 —— "+sk)
 	}
+	res.Warnings = append(res.Warnings, assets.warnings...)
 	if deps.ScriptNote != "" {
 		res.Warnings = append(res.Warnings, deps.ScriptNote)
 	}
