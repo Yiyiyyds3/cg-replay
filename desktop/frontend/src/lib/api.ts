@@ -313,6 +313,7 @@ export interface FrameDTO {
   quake_y: number;
   cached: boolean;
   missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
+  drawn: string[]; // 实际绘制清单与失败诊断（影片取帧错误在这里）
   layers: LayerDTO[]; // 调试抽屉 D
   texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
 }

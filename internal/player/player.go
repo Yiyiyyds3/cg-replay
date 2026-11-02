@@ -23,6 +23,7 @@
 package player
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"sort"
@@ -46,9 +47,10 @@ type Options struct {
 	MsgLines  int     // 每个消息层最多保留行数（默认 8）
 	SkipWaits bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
 
-	// VideoDur 查询影片时长（毫秒，0=未知）。OP/ED 的台本里通常不写时长，
-	// 不查就会「播 0 帧立刻结束」。平台层注入 ffprobe 实现，player 不依赖它。
-	VideoDur   func(ref string) int64
+	// VideoDur 查询影片时长（毫秒）。OP/ED 的台本里通常不写时长，
+	// 不查就会「播 0 帧立刻结束」。平台层注入 ffprobe 实现，player 不依赖它；
+	// 失败时返回 error，播放器会把原因写进画面的 drawn 诊断，不再静默当成 0。
+	VideoDur   func(ref string) (int64, error)
 	MsgDefault string // 默认消息层 id（默认 message0）
 
 	// 文字样式（Config.tjs 实参；渲染层可再覆盖）
@@ -177,6 +179,8 @@ type Frame struct {
 	Video         *VideoState // 非空表示当前在放影片（OP/ED）
 	// VideoMissing 影片指令定位不到文件的说明（非空 = 这是影片但没文件）
 	VideoMissing string
+	// VideoNote 影片时长探测失败等非致命问题的说明（渲染层会写进 drawn）。
+	VideoNote string
 }
 
 // VideoState 当前影片的播放位置（相对影片开头）。
@@ -222,8 +226,10 @@ type Player struct {
 	// 当前影片（OP/ED）：videoRef 为空表示没在放。
 	videoRef   string
 	videoStart int64
+	videoEnd   int64 // 预计结束时刻；0 = 时长未知（直到被替换）
 	// videoMissing 影片指令定位不到文件时的说明（如 "state=end"）
 	videoMissing string
+	videoNote    string
 
 	// Audio 非 nil 时按台本回调（BGM/SE/语音交给平台层）。
 	Audio func(ir.ShowOp)
@@ -287,6 +293,10 @@ func (p *Player) pump() {
 		if p.now < p.blockUntil {
 			return
 		}
+		// 影片阻塞点走完：立刻摘掉视频，否则最后一帧会永久盖住后续演出。
+		if p.blockKind == "video" {
+			p.videoRef, p.videoStart, p.videoEnd = "", 0, 0
+		}
 		p.blockKind = ""
 		if p.pc >= len(p.ops) {
 			p.done = true
@@ -337,13 +347,23 @@ func (p *Player) exec(op ir.ShowOp) {
 			break
 		}
 		p.videoMissing = ""
-		p.videoRef, p.videoStart = op.Ref, p.now
+		p.videoRef, p.videoStart, p.videoEnd = op.Ref, p.now, 0
+		p.videoNote = ""
 		dur := op.DurMs
 		if dur <= 0 && p.opt.VideoDur != nil {
-			dur = p.opt.VideoDur(op.Ref)
+			var derr error
+			dur, derr = p.opt.VideoDur(op.Ref)
+			if derr != nil {
+				p.videoNote = fmt.Sprintf("影片 %s 时长未知：%v", op.Ref, derr)
+			}
 		}
-		if dur > 0 && !p.opt.SkipWaits {
-			p.blockKind, p.blockUntil = "video", p.now+dur
+		if dur > 0 {
+			p.videoEnd = p.now + dur
+			if !p.opt.SkipWaits {
+				p.blockKind, p.blockUntil = "video", p.videoEnd
+			}
+		} else if p.videoNote == "" {
+			p.videoNote = fmt.Sprintf("影片 %s 时长未知，按「直到被替换」播放", op.Ref)
 		}
 
 	case ir.ShowWait:
@@ -623,10 +643,11 @@ func (p *Player) Frame() Frame {
 		f.QuakeX = int(amp * amp * math.Sin(phase) * p.quakeHmax)
 	}
 	f.Waiting = p.blockKind == "text" && p.now < p.blockUntil
-	if p.videoRef != "" {
+	if p.videoRef != "" && (p.videoEnd == 0 || p.now < p.videoEnd) {
 		f.Video = &VideoState{Ref: p.videoRef, StartMs: p.videoStart, Now: p.now - p.videoStart}
 	}
 	f.VideoMissing = p.videoMissing
+	f.VideoNote = p.videoNote
 	return f
 }
 

@@ -61,8 +61,13 @@ type ChapterEvent struct {
 	ContLabelPos int    `json:"cont_label_pos,omitempty"` // 下一场景首章的 LabelPos（定位章前段截止处）
 }
 
+// SchemaVersion 库清单能力版本。新增字段（如 has_video）时递增，
+// 桌面端发现旧缓存版本不符就重扫，避免升级后永远读不到新标记。
+const SchemaVersion = 2
+
 // Library 事件库清单。
 type Library struct {
+	Schema      int            `json:"schema,omitempty"`
 	Root        string         `json:"root"`
 	Game        string         `json:"game,omitempty"`
 	GeneratedAt string         `json:"generated_at"`
@@ -391,6 +396,7 @@ func fallbackStoryScenes(dir string) []string {
 
 // Save 写库清单（JSON）。
 func (l *Library) Save(path string) error {
+	l.Schema = SchemaVersion
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err

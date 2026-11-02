@@ -42,6 +42,9 @@ func RenderFrameWithVideo(p *Player, load Loader, video VideoProvider, w, h int)
 	if err != nil {
 		return nil, nil, err
 	}
+	if f.VideoNote != "" {
+		drawn = append(drawn, "⚠ "+f.VideoNote)
+	}
 	for _, box := range f.Texts {
 		if box.Frame == "" || !box.Visible {
 			continue
@@ -62,7 +65,7 @@ func RenderFrameWithVideo(p *Player, load Loader, video VideoProvider, w, h int)
 	}
 	img, verr := video(f.Video.Ref, f.Video.Now)
 	if verr != nil {
-		return rgba, append(drawn, "✗ video←"+f.Video.Ref), nil
+		return rgba, append(drawn, "✗ video←"+f.Video.Ref+"："+verr.Error()), nil
 	}
 	blitFit(rgba, img, f.QuakeX, f.QuakeY)
 	return rgba, append(drawn, "video←"+f.Video.Ref), nil

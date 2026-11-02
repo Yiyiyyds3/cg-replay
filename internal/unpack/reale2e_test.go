@@ -189,10 +189,10 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 		opt := player.DefaultOptions()
 		opt.CharMs, opt.BaseMs, opt.MinWaitMs, opt.MaxWaitMs = 1, 1, 1, 1
 		// 影片时长（台本里不写）——与桌面端一致，用 ffprobe 查
-		opt.VideoDur = func(ref string) int64 {
+		opt.VideoDur = func(ref string) (int64, error) {
 			pth, err := replay.AssetPath(root, ref)
 			if err != nil {
-				return 0
+				return 0, err
 			}
 			return video.Duration(pth)
 		}

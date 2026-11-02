@@ -316,7 +316,7 @@ func TestVideoPlayBlocksForDuration(t *testing.T) {
 		{TMs: 0, Kind: ir.ShowVideoPlay, Layer: "video", Ref: "op"},
 	}}
 	opt := DefaultOptions()
-	opt.VideoDur = func(ref string) int64 { return 2000 }
+	opt.VideoDur = func(ref string) (int64, error) { return 2000, nil }
 	p := New(ev, opt)
 
 	for i := 0; i < 50; i++ { // ≈800ms
@@ -333,5 +333,28 @@ func TestVideoPlayBlocksForDuration(t *testing.T) {
 	}
 	if !p.Done() {
 		t.Fatal("超过影片时长后应结束")
+	}
+	if f := p.Frame(); f.Video != nil {
+		t.Fatalf("影片播完后必须摘掉视频，否则最后一帧会盖住后续演出：%+v", f.Video)
+	}
+}
+
+// TestVideoUnknownDurationWarns 时长探测失败时不能静默按 0 处理：
+// 要保留「直到替换」语义，并把原因写进画面诊断。
+func TestVideoUnknownDurationWarns(t *testing.T) {
+	ev := &ir.Event{Show: []ir.ShowOp{
+		{TMs: 0, Kind: ir.ShowVideoPlay, Layer: "video", Ref: "op"},
+	}}
+	opt := DefaultOptions()
+	opt.VideoDur = func(ref string) (int64, error) { return 0, errNotFound{"ffprobe"} }
+	p := New(ev, opt)
+	p.Advance(16, Input{})
+
+	f := p.Frame()
+	if f.Video == nil {
+		t.Fatal("时长未知时应按「直到替换」继续播放，而不是立刻摘掉")
+	}
+	if f.VideoNote == "" {
+		t.Fatal("时长探测失败必须留下诊断说明")
 	}
 }

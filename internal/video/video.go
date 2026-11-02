@@ -134,45 +134,48 @@ func toRGBA(img image.Image) *image.RGBA {
 	return dst
 }
 
-// Duration 用 ffprobe 取时长（毫秒）；失败返回 0（调用方按「未知」处理）。
-// 结果按路径缓存 —— 影片时长不会变。
+// Duration 用 ffprobe 取时长（毫秒），失败时返回具体原因而不是静默的 0。
+// 成功结果按路径缓存 —— 影片时长不会变；失败不缓存，装上 ffprobe 后重试即可。
 var durMu sync.Mutex
 var durCache = map[string]int64{}
 
-func Duration(path string) int64 {
+func Duration(path string) (int64, error) {
 	durMu.Lock()
 	if d, ok := durCache[path]; ok {
 		durMu.Unlock()
-		return d
+		return d, nil
 	}
 	durMu.Unlock()
 
 	exe := Locate()
 	if exe == "" {
-		return 0
+		return 0, fmt.Errorf("未检测到 ffmpeg，无法读取影片时长")
 	}
 	probe := filepath.Join(filepath.Dir(exe), "ffprobe.exe")
 	if st, err := os.Stat(probe); err != nil || st.IsDir() {
 		if p, err := exec.LookPath("ffprobe"); err == nil {
 			probe = p
 		} else {
-			return 0
+			return 0, fmt.Errorf("未找到 ffprobe（应与 ffmpeg 同目录或加入 PATH）")
 		}
 	}
 	cmd := exec.Command(probe, "-v", "error",
 		"-show_entries", "format=duration", "-of", "csv=p=0", path)
 	hideConsole(cmd)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("ffprobe 读取时长失败：%v（%s）", err, trim(stderr.String()))
 	}
-	secs, err := strconv.ParseFloat(string(bytes.TrimSpace(out)), 64)
+	raw := string(bytes.TrimSpace(out))
+	secs, err := strconv.ParseFloat(raw, 64)
 	if err != nil || secs <= 0 {
-		return 0
+		return 0, fmt.Errorf("ffprobe 输出无法解析为时长：%q", raw)
 	}
 	ms := int64(secs * 1000)
 	durMu.Lock()
 	durCache[path] = ms
 	durMu.Unlock()
-	return ms
+	return ms, nil
 }

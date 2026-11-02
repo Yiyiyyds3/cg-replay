@@ -50,7 +50,9 @@ func (s *Stream) start(fromFrame int) error {
 		"-v", "error",
 		"-ss", fmt.Sprintf("%.3f", secs),
 		"-i", s.path,
-		"-vf", fmt.Sprintf("scale=%d:%d", s.w, s.h),
+		// 等比缩放后补黑边：直接 scale=w:h 会把 16:9 的 OP 纵向拉成 4:3。
+		"-vf", fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease,"+
+			"pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=black", s.w, s.h, s.w, s.h),
 		"-r", fmt.Sprint(s.fps),
 		"-f", "rawvideo", "-pix_fmt", "rgba", "-",
 	)
@@ -64,6 +66,7 @@ func (s *Stream) start(fromFrame int) error {
 		return err
 	}
 	s.cmd, s.out, s.cur = cmd, out, fromFrame
+	s.last = nil // 跳到新位置后旧帧不再有效（否则读完片尾会回放旧画面）
 	return nil
 }
 
@@ -76,7 +79,9 @@ func (s *Stream) Frame(tMs int64) (image.Image, error) {
 		tMs = 0
 	}
 	target := int(tMs) * s.fps / 1000
-	if target < s.cur-1 { // 倒退超过一帧：重开
+	// 倒退超过一帧，或前进跨度超过 2 秒：都重开进程用 -ss 直接跳，
+	// 避免为一次 seek 顺序解码上千帧（并且全程占着会话锁）。
+	if target < s.cur-1 || target-s.cur > 2*s.fps {
 		s.Close()
 		if err := s.start(target); err != nil {
 			return nil, err
