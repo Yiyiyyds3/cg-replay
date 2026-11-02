@@ -1,9 +1,12 @@
 package unpack
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -142,10 +145,10 @@ func TestUnpackArtemisPFS(t *testing.T) {
 // TestDetectEngineByArchiveExt：按归档后缀认出引擎。
 func TestDetectEngineByArchiveExt(t *testing.T) {
 	cases := map[string]string{
-		"data.xp3": "kirikiri",
-		"data.pfs": "artemis",
-		"pack.arc": "bgi",
-		"data.cst": "catsystem2",
+		"data.xp3":  "kirikiri",
+		"data.pfs":  "artemis",
+		"pack.arc":  "bgi",
+		"scene.int": "catsystem2", // CS2 的归档是 .int/.kif；.cst 是剧本不是归档
 	}
 	for name, want := range cases {
 		if got := detectEngine(name); got != want {
@@ -157,24 +160,121 @@ func TestDetectEngineByArchiveExt(t *testing.T) {
 	}
 }
 
-// TestCatSystem2UnsupportedWithoutScriptParser：CatSystem2 没有脚本解析
-// → 预览要明说「暂不支持」并给退路，不能含糊报错。
-func TestCatSystem2UnsupportedWithoutScriptParser(t *testing.T) {
-	dir := t.TempDir()
-	// 造一个最小 .cst（KIF 归档）；内容随意——重点是走完「认出引擎 → 尝试
-	// 解析剧本 → 明确报不支持」这条路径。
-	if err := os.WriteFile(filepath.Join(dir, "data.cst"), []byte("KIF"), 0o644); err != nil {
+// ---------------------------------------------------------------
+// CatSystem2（.cst）夹具
+// ---------------------------------------------------------------
+
+// cstEntry .cst 解压后的一个条目（0x01 + 类型 + 内容 + \0）。
+type cstEntry struct {
+	typ  byte // 0x20 对白 / 0x21 角色名 / 0x30 命令
+	body string
+}
+
+// buildCST 造一份最小 CatScene 文件（魔数 + u32 压缩长 + 16 字节头 + zlib）。
+func buildCST(t *testing.T, entries []cstEntry) []byte {
+	t.Helper()
+	var raw []byte
+	for _, e := range entries {
+		raw = append(raw, 0x01, e.typ)
+		raw = append(raw, []byte(e.body)...)
+		raw = append(raw, 0)
+	}
+	var zbuf bytes.Buffer
+	zw := zlib.NewWriter(&zbuf)
+	if _, err := zw.Write(raw); err != nil {
 		t.Fatal(err)
 	}
-	p, err := Preview(dir)
-	if err != nil {
-		// 认不出或解析失败都可以，但必须带明确说明，不能是空错误。
-		if err.Error() == "" {
-			t.Fatal("错误信息不能为空")
-		}
-		return
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
 	}
-	if p.EngineID != "catsystem2" && !p.Unsupported {
-		t.Fatalf("认出引擎应为 catsystem2 或明确不支持：%+v", p)
+	comp := zbuf.Bytes()
+	head := make([]byte, 16)
+	copy(head, "CatScene")
+	binary.LittleEndian.PutUint32(head[8:12], uint32(len(comp)))
+	return append(head, comp...)
+}
+
+// TestCatSystem2ScriptRefs CS2 接进解包后：.cst 能解析、引用能提取。
+//
+// 修正说明：此前 unpack 层认为 CS2「没有脚本解析」而拒绝解包 —— 实为误判，
+// 适配器早有 ParseScript/ExtractRefs。本用例守住这条能力不再回退。
+func TestCatSystem2ScriptRefs(t *testing.T) {
+	deps, ok := engineFor("catsystem2")
+	if !ok {
+		t.Fatal("catsystem2 引擎未注册")
+	}
+	cst := buildCST(t, []cstEntry{
+		{0x30, "bg 0 bg01"},
+		{0x30, "pcm voice001"},
+		{0x21, "名前"},
+		{0x20, "一行目"},
+	})
+	info, err := deps.ParseScript(cst, "01.cst")
+	if err != nil {
+		t.Fatalf("ParseScript(.cst): %v", err)
+	}
+	if len(info.Labels) != 1 {
+		t.Fatalf("事件数 = %d, want 1（一脚本一事件）", len(info.Labels))
+	}
+	if !info.Dynamic {
+		t.Fatal("CS2 有运行时拼名引用，Dynamic 必须为 true，否则闭包不全时零告警")
+	}
+	has := func(want string) bool {
+		for _, r := range info.Refs {
+			if r == want {
+				return true
+			}
+		}
+		return false
+	}
+	for _, want := range []string{"bg01", "voice001"} {
+		if !has(want) {
+			t.Fatalf("引用里缺 %q（实际 %v）", want, info.Refs)
+		}
+	}
+}
+
+// TestCatSystem2DetectByArchiveExt：CS2 归档后缀能被认出来。
+func TestCatSystem2DetectByArchiveExt(t *testing.T) {
+	for _, name := range []string{"scene.int", "update01.kif"} {
+		if got := detectEngine(name); got != "catsystem2" {
+			t.Errorf("detectEngine(%q) = %q, want catsystem2", name, got)
+		}
+	}
+}
+
+// TestUnpackExplainsWrongContainer 扩展名骗人时要说清「它到底是什么」。
+//
+// 实测踩到：ambitious_mission/update.xp3 其实是 ZIP，Monkeys!!_cn.xp3 其实是
+// EVB（E-mote 产物）。解析器拒绝是对的，但必须给人一句可用的话。
+func TestUnpackExplainsWrongContainer(t *testing.T) {
+	cases := []struct {
+		name string
+		head []byte
+		want string
+	}{
+		{"update.xp3", []byte("PK\x03\x04fake zip body"), "ZIP"},
+		{"empty.xp3", []byte("PK\x05\x06\x00\x00\x00\x00"), "空 ZIP"},
+		{"split.xp3", []byte("PK\x07\x08\x00\x00\x00\x00"), "分卷 ZIP"},
+		{"Monkeys_cn.xp3", []byte("EVB\x00\x40\x00\x00\x00rest"), "EVB"},
+		{"data.pfs", []byte("pf6\x00\x00\x00\x00rest"), "PFS"},
+		{"data.pfs", []byte("pf8\x00\x00\x00\x00rest"), "PFS"},
+		{"script.arc", []byte("BurikoCompiledScript\x00\x00rest"), "BGI"},
+	}
+	for _, c := range cases {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, c.name), c.head, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		plan, err := Preview(dir)
+		if err != nil {
+			t.Fatalf("%s: Preview 应返回计划而不是错误: %v", c.name, err)
+		}
+		if !plan.Unsupported {
+			t.Fatalf("%s: 应为不支持（%+v）", c.name, plan)
+		}
+		if !strings.Contains(plan.Reason, c.want) {
+			t.Fatalf("%s: 原因里应提到 %s，实际 %q", c.name, c.want, plan.Reason)
+		}
 	}
 }

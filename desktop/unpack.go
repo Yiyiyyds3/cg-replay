@@ -20,10 +20,10 @@ import (
 // UnpackPlanDTO 解包预览（前端展示用）。
 type UnpackPlanDTO struct {
 	EngineID      string   `json:"engine_id"`
-	Kind          string   `json:"kind"` // loose / xp3
+	Kind          string   `json:"kind"` // loose=已解包目录 / archive=归档 / unknown / file
 	Archives      []string `json:"archives"`
 	ScenarioFiles int      `json:"scenario_files"`
-	Labels        int      `json:"labels"` // 预计的 CG 事件数
+	Labels        int      `json:"labels"` // 预计事件数（KiriKiri=画廊槽位；其它引擎=脚本事件）
 	Refs          int      `json:"refs"`   // 预计引用到的素材数
 	Encrypted     int      `json:"encrypted"`
 	Notes         []string `json:"notes"`

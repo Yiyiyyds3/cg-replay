@@ -8,7 +8,9 @@
 //   - Artemis（PFS + 明文 Lua .ast）/ BGI（ARC + .bs）：能解出最小集合，
 //     但**事件库接入（登记进游戏库）仍只支持 KiriKiri**（library.Scan 是
 //     KiriKiri 形状的）。
-//   - CatSystem2：脚本格式尚未接入解析 → 无从算闭包，明确报「暂不支持」。
+//   - CatSystem2（.int/.kif + .cst）：解包已接上（事件粒度 = 一份 .cst
+//     一个事件，与 BuildIR 同口径）；事件库登记仍由下一条 PR 的 library
+//     分派接入，本分支不改变登记行为。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
 //
 // 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
@@ -16,7 +18,6 @@
 package unpack
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,9 +26,6 @@ import (
 
 	"ucgr/internal/adapter"
 )
-
-// errNoScriptParser 引擎没有脚本解析能力（算不出依赖闭包 → 不能做最小集合）。
-var errNoScriptParser = errors.New("该引擎的剧本格式尚未接入解析，无法计算「只够重演」的依赖闭包")
 
 // Scope 最小集合的取材范围。
 type Scope string
@@ -189,7 +187,28 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 	}
 	assets, err := openArchives(archives, deps.ParseArchive)
 	if err != nil {
-		return nil, err
+		// 解析失败要说清「它其实是什么」——实测有 .xp3 里装着 ZIP / EVB。
+		// 嗅探必须针对真正失败的那个归档，而不是 archives[0]。
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
+		hint := ""
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
+		}
+		reason := err.Error()
+		if hint != "" {
+			reason += "；" + hint
+		}
+		return &Plan{
+			Root:        strings.Join(archives, " "),
+			Kind:        "archive",
+			EngineID:    engine,
+			Archives:    archives,
+			Unsupported: true,
+			Reason:      reason,
+		}, nil
 	}
 	defer assets.close()
 
@@ -199,6 +218,10 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		Kind:      "archive",
 		Archives:  archives,
 		Encrypted: len(assets.encrypted),
+		Notes:     append([]string(nil), assets.warnings...),
+	}
+	if deps.ScriptNote != "" {
+		p.Notes = append(p.Notes, deps.ScriptNote)
 	}
 	refs := map[string]bool{}
 	for path, e := range assets.entries {
@@ -213,11 +236,6 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				p.Unsupported = true
-				p.Reason = fmt.Sprintf("%s 引擎的剧本格式尚未接入解析，无法算「只够重演」的依赖闭包；可手动解包后用「添加游戏」登记", engine)
-				continue
-			}
 			p.Notes = append(p.Notes, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
@@ -228,9 +246,15 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 	}
 	p.Refs = len(refs)
 	if p.Encrypted > 0 {
-		p.Notes = append(p.Notes, fmt.Sprintf(
-			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
-			p.Encrypted))
+		if engine == "kirikiri" {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
+				p.Encrypted))
+		} else {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带加密标记，当前不会自动解密；若解出的内容是乱码，需要每作密钥",
+				p.Encrypted))
+		}
 	}
 	if p.Unsupported {
 		p.Notes = append(p.Notes, p.Reason)
@@ -247,6 +271,17 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	}
 	assets, err := openArchives(archives, deps.ParseArchive)
 	if err != nil {
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
+		hint := ""
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
+		}
+		if hint != "" {
+			return nil, fmt.Errorf("%w；%s", err, hint)
+		}
 		return nil, err
 	}
 	defer assets.close()
@@ -254,6 +289,10 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+	res.Warnings = append(res.Warnings, assets.warnings...)
+	if deps.ScriptNote != "" {
+		res.Warnings = append(res.Warnings, deps.ScriptNote)
+	}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
 		if !deps.IsScript(path) {
@@ -276,9 +315,6 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				return nil, fmt.Errorf("%s 引擎的剧本格式尚未接入解析，无法算依赖闭包；请手动解包后用「添加游戏」登记", engine)
-			}
 			res.Warnings = append(res.Warnings, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
