@@ -330,6 +330,11 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+	// 先建目标目录：素材/剧本都可能一条都写不出（比如脚本里全是动态引用），
+	// 那时约定文件仍要落盘，否则加载器读不到这份解包目录。
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return nil, fmt.Errorf("建解包目录 %s 失败：%w", dest, err)
+	}
 	var videoNames []string // 解出的影片（相对产物根），写进清单备查
 	totalFiles, totalBytes := 0, int64(0)
 
@@ -352,10 +357,9 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		res.Warnings = append(res.Warnings, deps.ScriptNote)
 	}
 	refSet := map[string]bool{}
-	for path, e := range assets.entries {
-		if !deps.IsScript(path) {
-			continue
-		}
+	scripts, scriptWarns := pickScripts(assets, deps.IsScript)
+	res.Warnings = append(res.Warnings, scriptWarns...)
+	for _, e := range scripts {
 		data, err := assets.read(e)
 		if err != nil {
 			res.Warnings = append(res.Warnings, fmt.Sprintf("读 %s 失败：%v", e.base(), err))
@@ -411,6 +415,24 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			res.Bytes += int64(len(data))
 		}
 		res.Events += len(info.Labels)
+		// 兼容台本：宏家族（Mai@KF.dll 一系）的 .wks 用自定义宏画图，现有台本
+		// 构建器只认标准 KAG 标签——不翻一份就播不出画面。翻出来的 .ks 与
+		// 加载器的扫描口径一致（场景脚本），原脚本同时保留。
+		if deps.ScriptCompat != nil {
+			compat, warns := deps.ScriptCompat(data, e.base(), func(ref string) bool {
+				_, ok := assets.lookup(ref)
+				return ok
+			})
+			res.Warnings = append(res.Warnings, warns...)
+			if len(compat) > 0 {
+				cp := filepath.Join(dest, filepath.FromSlash(deps.ScriptDir), e.stem()+".ks")
+				if err := os.WriteFile(cp, compat, 0o644); err != nil {
+					return nil, err
+				}
+				res.Files++
+				res.Bytes += int64(len(compat))
+			}
+		}
 	}
 	// 素材落盘（只解被引用的）。
 	for ref := range refSet {
@@ -501,36 +523,115 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	return res, nil
 }
 
-// findArchives 在目录里找某引擎的归档（顶层 + 两层子目录，避免扫全盘）。
+// pickScripts 取出全部脚本条目，并按「基名」去重成确定的一份。
+//
+// 真机语料里 scenario.xp3 与 append.xp3 会有同名脚本（append 是补丁层，
+// 路径不带子目录；scenario 里是 00/SKAC_001r.wks 这种），内容几乎一致。
+// 两份都落盘会互相覆盖（map 迭代顺序随机 → 解出的版本会飘），所以按基名
+// 只留一份：append/patch 归档优先，其次路径短、再字典序，并给出告警。
+func pickScripts(s *archiveSet, isScript func(string) bool) ([]archiveEntry, []string) {
+	type cand struct {
+		e     archiveEntry
+		owner string
+	}
+	groups := map[string][]cand{}
+	var keys []string
+	for p, e := range s.entries {
+		if !isScript(p) {
+			continue
+		}
+		k := strings.ToLower(e.base())
+		if _, ok := groups[k]; !ok {
+			keys = append(keys, k)
+		}
+		groups[k] = append(groups[k], cand{e: e, owner: s.owner[p]})
+	}
+	sort.Strings(keys)
+	out := make([]archiveEntry, 0, len(keys))
+	var warns []string
+	for _, k := range keys {
+		cs := groups[k]
+		sort.Slice(cs, func(i, j int) bool {
+			pi, pj := archPriority(cs[i].owner), archPriority(cs[j].owner)
+			if pi != pj {
+				return pi < pj
+			}
+			if len(cs[i].e.path) != len(cs[j].e.path) {
+				return len(cs[i].e.path) < len(cs[j].e.path)
+			}
+			return cs[i].e.path < cs[j].e.path
+		})
+		out = append(out, cs[0].e)
+		if len(cs) > 1 {
+			others := make([]string, 0, len(cs)-1)
+			for _, c := range cs[1:] {
+				others = append(others, filepath.Base(c.owner)+":"+c.e.path)
+			}
+			warns = append(warns, fmt.Sprintf("脚本 %s 在多个归档里有同名副本，已取 %s:%s（忽略 %s）",
+				cs[0].e.base(), filepath.Base(cs[0].owner), cs[0].e.path, strings.Join(others, "、")))
+		}
+	}
+	return out, warns
+}
+
+// archPriority 归档优先级：append/patch 是补丁层，同名文件以它为准。
+func archPriority(arch string) int {
+	b := strings.ToLower(filepath.Base(arch))
+	if strings.HasPrefix(b, "append") || strings.HasPrefix(b, "patch") {
+		return 0
+	}
+	return 1
+}
+
+// maxArchiveDepth 归档搜索的目录层数（含根）：根 + 两级子目录。
+// 整合包常把 xp3 放在 <game>/data/ 之类的位置，只搜一层会漏；再往下收益低，
+// 还容易扫到存档、备份目录。
+const maxArchiveDepth = 3
+
+// findArchives 在目录里找某引擎的归档（根 + 两级子目录，避免扫全盘）。
 func findArchives(root, engine string) ([]string, error) {
 	deps, ok := engineFor(engine)
 	if !ok {
 		return nil, nil
 	}
+	// 不用 filepath.WalkDir：Windows 目录联接（游戏库里常见）会被它当成
+	// 单个文件（Lstat 不跟随），导致「目录明明在、归档却一个没找到」。
+	// 手动递归 + 深度上限。
 	var out []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	var walk func(dir string, depth int)
+	walk = func(dir string, depth int) {
+		ents, err := os.ReadDir(dir)
 		if err != nil {
-			return nil // 单个目录读不了就跳过
+			return
 		}
-		if d.IsDir() {
-			rel, _ := filepath.Rel(root, path)
-			if rel != "." && strings.Count(filepath.ToSlash(rel), "/") >= 2 {
-				return filepath.SkipDir
+		for _, d := range ents {
+			path := filepath.Join(dir, d.Name())
+			// 注意：ReadDir 的条目对 Windows 目录联接报 IsDir()=false，Type 也不带
+			// ModeSymlink——只有 Stat 会跟随重解析点。所以「不是目录」时要再 Stat
+			// 兜底，否则联接子目录整片看不见（实测：语料根下 15 个联接全被漏掉）。
+			// Stat 只在下探还有余量时做，末层不再付这个代价。
+			isDir := d.IsDir()
+			if !isDir && depth+1 < maxArchiveDepth {
+				if st, err := os.Stat(path); err == nil && st.IsDir() {
+					isDir = true
+				}
 			}
-			return nil
-		}
-		ext := strings.ToLower(filepath.Ext(path))
-		for _, ae := range deps.ArchiveExts {
-			if ext == strings.ToLower(ae) {
-				out = append(out, path)
-				break
+			if isDir {
+				if depth+1 < maxArchiveDepth {
+					walk(path, depth+1)
+				}
+				continue
+			}
+			ext := strings.ToLower(filepath.Ext(path))
+			for _, ae := range deps.ArchiveExts {
+				if ext == strings.ToLower(ae) {
+					out = append(out, path)
+					break
+				}
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("扫描归档失败：%w", err)
 	}
+	walk(root, 0)
 	sort.Strings(out)
 	return out, nil
 }

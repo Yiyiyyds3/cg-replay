@@ -6,6 +6,7 @@ package adapter
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 
@@ -159,18 +160,18 @@ func IdentifyPath(path string) (string, error) {
 	return hits[0].id, nil
 }
 
-// ReadArchiveEntry 按条目读取并解压完整内容（段拼接 + zlib）。
+// ReadArchiveEntry 按条目读取**原始字节**（多段由调用方归并），**不做解压**。
+//
+// 解压统一放在解包层（internal/unpack/assets.go）：那里才知道「先解压、再对整份
+// 数据解密」的引擎口径（见 internal/unpack/decrypt.go），放进本层会把这条顺序
+// 固化到不懂引擎差异的地方，并与 kirikiri 自带的解压形成两份口径。
 func ReadArchiveEntry(f *os.File, e ArchiveEntry) ([]byte, error) {
 	if _, err := f.Seek(e.Offset, 0); err != nil {
 		return nil, err
 	}
 	raw := make([]byte, e.Size)
-	if _, err := f.Read(raw); err != nil {
+	if _, err := io.ReadFull(f, raw); err != nil {
 		return nil, fmt.Errorf("读取段失败 %s: %w", e.Path, err)
-	}
-	if e.Compression == CompZlib {
-		// 延迟到调用方解压：某些引擎压缩段外还叠加密层
-		return raw, nil
 	}
 	return raw, nil
 }

@@ -549,6 +549,9 @@ func (p *Player) applyAttrs(st *LayerState, attrs map[string]string) {
 	if v, ok := floatAttr(attrs, "top"); ok {
 		st.Y, st.HasPos = v, true
 	}
+	if v, ok := floatAttr(attrs, "scale"); ok && v > 0 {
+		st.Scale = v
+	}
 	// 消息层：opacity = frameOpacity（底色不透明度），不改图层 alpha。
 	// 图像层：opacity = 图层 alpha（0~255，255=不透明）。
 	if v, ok := floatAttr(attrs, "opacity"); ok && !isMessageLayer(st.Layer) {

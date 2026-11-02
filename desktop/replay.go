@@ -29,6 +29,7 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/rmmz"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
@@ -282,6 +283,9 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 			return SessionMeta{}, cerr
 		}
 		ev, err = unitycg.BuildShow(cg)
+	case engine == "rmmz":
+		// RPG Maker：Script 是 data 目录下的 JSON，dataDir 从它反推。
+		ev, err = rmmz.BuildShow(root, filepath.ToSlash(filepath.Dir(script)), id)
 	case chapterPos >= 0 && chEvent != nil:
 		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)

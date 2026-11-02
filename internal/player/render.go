@@ -269,6 +269,71 @@ func blendLayer(dst *image.RGBA, src image.Image, x, y, dx, dy int, opacity floa
 	}
 }
 
+// blendLayerScaled 同 blendLayer，但按 scale 放大/缩小（最近邻，够用即可）。
+func blendLayerScaled(dst *image.RGBA, src image.Image, x, y, dx, dy int, opacity, scale float64) {
+	if scale <= 0 || scale == 1 {
+		blendLayer(dst, src, x, y, dx, dy, opacity)
+		return
+	}
+	if opacity <= 0 {
+		return
+	}
+	if opacity > 1 {
+		opacity = 1
+	}
+	x -= dx
+	y -= dy
+	sb, db := src.Bounds(), dst.Bounds()
+	sw := int(math.Round(float64(sb.Dx()) * scale))
+	sh := int(math.Round(float64(sb.Dy()) * scale))
+	if sw <= 0 || sh <= 0 {
+		return
+	}
+	x0, y0 := x, y
+	x1, y1 := x+sw, y+sh
+	if x0 < db.Min.X {
+		x0 = db.Min.X
+	}
+	if y0 < db.Min.Y {
+		y0 = db.Min.Y
+	}
+	if x1 > db.Max.X {
+		x1 = db.Max.X
+	}
+	if y1 > db.Max.Y {
+		y1 = db.Max.Y
+	}
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	for yy := y0; yy < y1; yy++ {
+		sy := sb.Min.Y + int((float64(yy-y)+0.5)/scale)
+		if sy < sb.Min.Y || sy >= sb.Max.Y {
+			continue
+		}
+		for xx := x0; xx < x1; xx++ {
+			sx := sb.Min.X + int((float64(xx-x)+0.5)/scale)
+			if sx < sb.Min.X || sx >= sb.Max.X {
+				continue
+			}
+			sr, sg, sb8, sa := src.At(sx, sy).RGBA()
+			if sa == 0 {
+				continue
+			}
+			a := float64(sa>>8) / 255 * opacity
+			if a <= 0 {
+				continue
+			}
+			i := dst.PixOffset(xx, yy)
+			dr, dg, dbb := float64(dst.Pix[i]), float64(dst.Pix[i+1]), float64(dst.Pix[i+2])
+			dst.Pix[i] = uint8(clampF(dr + (float64(sr>>8)-dr)*a))
+			dst.Pix[i+1] = uint8(clampF(dg + (float64(sg>>8)-dg)*a))
+			dst.Pix[i+2] = uint8(clampF(dbb + (float64(sb8>>8)-dbb)*a))
+			dst.Pix[i+3] = 255
+		}
+	}
+}
+
 func clampF(v float64) float64 {
 	if v < 0 {
 		return 0

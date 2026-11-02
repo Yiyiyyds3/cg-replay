@@ -69,12 +69,26 @@ func DefaultKiriKiri() Convention {
 	}
 }
 
+// DefaultRMMZ RPG Maker MV/MZ 的默认约定。
+//
+// MV 的 data 目录在 www/data，MZ 在 data；实际使用前由 rmmz.FindDataDir
+// 探测，这里给的 www/data 只是让 ScanWith 有个非空默认值。
+func DefaultRMMZ() Convention {
+	return Convention{
+		EngineID:    "rmmz",
+		ScenarioDir: "www/data",
+		ScriptExt:   ".json",
+	}
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
 	switch strings.ToLower(strings.TrimSpace(engineID)) {
 	case "kirikiri", "":
 		return DefaultKiriKiri(), true
+	case "rmmz":
+		return DefaultRMMZ(), true
 	default:
 		return Convention{}, false
 	}
