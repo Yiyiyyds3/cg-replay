@@ -62,11 +62,13 @@ func init() {
 				return scriptInfo{}, errTypeMismatch
 			}
 			refs := dedupSorted(ast.ExtractRefs())
-			// 一脚本一事件（与 BuildIR 口径一致）。
+			// 一脚本一事件（与 BuildIR 口径一致）。CS2 有运行时拼文件名的
+			// 引用，静态闭包不可能覆盖全，必须让上层发「闭包可能不全」告警。
 			return scriptInfo{
 				Labels:  []string{"script"},
 				Refs:    refs,
 				AllRefs: refs,
+				Dynamic: true,
 			}, nil
 		},
 		ScriptExt: ".cst",

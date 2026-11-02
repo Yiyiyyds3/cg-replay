@@ -788,7 +788,9 @@ export default function EventGrid({
                     引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
                     预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
                     {unpackPlan.encrypted > 0 &&
-                      ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`}
+                      (unpackPlan.engine_id === "kirikiri"
+                        ? ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`
+                        : ` · ${unpackPlan.encrypted} 个条目带加密标记（当前不会自动解密）`)}
                   </div>
                 )}
                 {unpackPlan.kind === "archive" && unpackPlan.engine_id === "kirikiri" && (
