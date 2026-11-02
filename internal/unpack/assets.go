@@ -10,6 +10,7 @@
 package unpack
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,19 @@ import (
 
 	"ucgr/internal/adapter"
 )
+
+// archiveParseError 带上「是哪个归档解析失败」，供上层按真实文件嗅探格式。
+// 只返回 error 文本的话，调用方只能拿 archives[0] 去猜，多归档时经常猜错。
+type archiveParseError struct {
+	Path string
+	Err  error
+}
+
+func (e *archiveParseError) Error() string {
+	return fmt.Sprintf("解析归档 %s 失败：%v", filepath.Base(e.Path), e.Err)
+}
+
+func (e *archiveParseError) Unwrap() error { return e.Err }
 
 // archiveEntry 归档里的一个文件（多段已归并）。
 type archiveEntry struct {
@@ -42,9 +56,13 @@ type archiveSet struct {
 	entries   map[string]archiveEntry
 	owner     map[string]string // 条目路径 → 所属归档
 	encrypted []string
+	warnings  []string // 跳过/降级的归档，交给上层展示
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
+//
+// 单个坏归档不再拖垮整批：解析失败的归档记 warning 后跳过，其余归档照常
+// 建索引；只有「一个都打不开」时才返回错误，并带上第一个失败归档的路径。
 func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry, error)) (*archiveSet, error) {
 	s := &archiveSet{
 		archives: archives,
@@ -52,12 +70,19 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 		entries:  map[string]archiveEntry{},
 		owner:    map[string]string{},
 	}
+	opened := 0
+	var firstErr *archiveParseError
 	for _, arch := range archives {
 		segs, err := parse(arch)
 		if err != nil {
-			s.close()
-			return nil, fmt.Errorf("解析归档 %s 失败：%w", filepath.Base(arch), err)
+			if firstErr == nil {
+				firstErr = &archiveParseError{Path: arch, Err: err}
+			}
+			s.warnings = append(s.warnings,
+				fmt.Sprintf("跳过归档 %s：%v", filepath.Base(arch), err))
+			continue
 		}
+		opened++
 		order := []string{}
 		grouped := map[string][]adapter.ArchiveEntry{}
 		enc := map[string]bool{}
@@ -72,7 +97,9 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 		}
 		for _, p := range order {
 			if _, exists := s.entries[p]; exists {
-				continue // 同名条目以先出现的归档为准
+				// 同名条目以后出现的归档为准：补丁包（update.xp3 等）通常
+				// 排在 base 之后，先到先得会拿到旧脚本。
+				s.encrypted = removeString(s.encrypted, p)
 			}
 			s.entries[p] = archiveEntry{path: p, segs: grouped[p], encrypted: enc[p]}
 			s.owner[p] = arch
@@ -81,8 +108,33 @@ func openArchives(archives []string, parse func(string) ([]adapter.ArchiveEntry,
 			}
 		}
 	}
+	if opened == 0 && firstErr != nil {
+		s.close()
+		return nil, firstErr
+	}
 	sort.Strings(s.encrypted)
 	return s, nil
+}
+
+// failedArchivePath 从 openArchives 的错误里取出真正失败的那个归档。
+// 不是 archiveParseError（例如所有归档都为空）时返回空串，调用方再回退。
+func failedArchivePath(err error) string {
+	var ae *archiveParseError
+	if errors.As(err, &ae) {
+		return ae.Path
+	}
+	return ""
+}
+
+// removeString 删掉切片里所有等于 v 的元素（保持顺序）。
+func removeString(in []string, v string) []string {
+	out := in[:0]
+	for _, s := range in {
+		if s != v {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // close 关掉所有归档句柄。

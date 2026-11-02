@@ -38,14 +38,19 @@ func init() {
 				return scriptInfo{}, errTypeMismatch
 			}
 			refs := dedupSorted(ast.ExtractRefs())
-			// 一脚本一事件（与 BuildIR 口径一致）。
+			// 一脚本一事件（与 BuildIR 口径一致）。CS2 有运行时拼文件名的
+			// 引用，静态闭包不可能覆盖全，必须让上层发「闭包可能不全」告警。
 			return scriptInfo{
 				Labels:  []string{"script"},
 				Refs:    refs,
 				AllRefs: refs,
+				Dynamic: true,
 			}, nil
 		},
 		ScriptExt: ".cst",
+		// KIF 条目是 Blowfish 加密的。本分支还没有注册 OpenReader，解出的
+		// .cst 会是密文；下一条 feat/cs2-library 接入后清空这条提示。
+		ScriptNote: "CatSystem2 的 .cst 由 KIF/Blowfish 加密，当前版本尚未接入解密读取，解出的脚本可能是密文",
 		// CS2 解包树里剧本在 scene/ 下，素材在 image/ 下。
 		ScriptDir: "scene",
 		ImageDir:  "image",

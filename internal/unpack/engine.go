@@ -6,8 +6,8 @@
 //  3. 解析剧本 → 事件标签 + 资源引用 + 是否有动态引用
 //  4. 落盘约定（剧本目录 / 素材目录）
 //
-// 阶段 1 只做了 KiriKiri；Artemis 与 BGI 走同一套框架，CatSystem2 因
-// **脚本格式尚未接入解析**（无从算依赖闭包）明确报「暂不支持」。
+// 四个引擎（KiriKiri / Artemis / BGI / CatSystem2）都走同一套框架；
+// CatSystem2 的脚本解析已接入，事件库登记由 library 侧单独分派。
 package unpack
 
 import (
@@ -39,6 +39,9 @@ type engineDeps struct {
 	ImageDir  string
 	// ScriptExt 剧本后缀（如 .ks / .ast / .bs）——写进约定文件。
 	ScriptExt string
+	// ScriptNote 剧本格式的已知限制（例如加密尚未接入），会出现在预览与
+	// 解包告警里；接入解密读取后由对应引擎清空。
+	ScriptNote string
 }
 
 // engineRegistry 引擎 id → 能力表（按引擎注册，核心不感知差异）。
