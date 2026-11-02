@@ -29,6 +29,7 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
@@ -267,7 +268,20 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		engineID = conv.EngineID
 	}
 	var ev *ir.Event
+	// 按**库扫出来的引擎**分派：registry 里的 Engine 可能为空，
+	// 约定文件（ucgr-convention.json）才是权威。
+	engine := strings.ToLower(strings.TrimSpace(lib.EngineID))
+	if engine == "" {
+		engine = strings.ToLower(strings.TrimSpace(g.Engine))
+	}
 	switch {
+	case engine == "unity":
+		// Unity 的 CG 没有剧本：台本由 cg-index.json + 帧序列拼出来。
+		cg, cerr := library.BuildUnityEvent(root, id)
+		if cerr != nil {
+			return SessionMeta{}, cerr
+		}
+		ev, err = unitycg.BuildShow(cg)
 	case chapterPos >= 0 && chEvent != nil:
 		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)

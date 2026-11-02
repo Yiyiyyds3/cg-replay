@@ -147,3 +147,15 @@ desktop.ini
 *.swo
 # WorkBuddy 本地记忆（个人数据，不公开）
 .workbuddy/
+
+# archify 生成的图（本地查看用，不入库）
+.archify/
+
+# CG 导出产物（tools/unity_cg_export.py）
+# 导出器默认拒绝写进 git 仓库（--allow-repo-output 才放行）；这里兜底忽略
+# 仓库根的常见输出目录。`/cg-index.json` 只锚根，不误伤 fixtures 里的样本索引。
+/cg-index.json
+/cg/
+/out/
+/export/
+/cg_out/
