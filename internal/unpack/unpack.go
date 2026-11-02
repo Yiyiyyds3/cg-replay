@@ -331,12 +331,15 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
 	var videoNames []string // 解出的影片（相对产物根），写进清单备查
+	totalFiles, totalBytes := 0, int64(0)
 
 	// 增量是否可信：只有「源归档与上次解包时一致」才允许复用已存在的文件。
-	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了。
+	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了；
+	// 解密方案/密钥变了同样不可复用（旧产物是另一套字节）。
 	curMarks := markArchives(archives)
 	prev := readManifest(dest)
-	archivesUnchanged := prev != nil && sameMarks(prev.Archives, curMarks)
+	archivesUnchanged := prev != nil && sameMarks(prev.Archives, curMarks) &&
+		prev.Decrypt == string(opts.Decrypt) && prev.Key == int(opts.Key)
 	if prev != nil && !archivesUnchanged {
 		res.Warnings = append(res.Warnings,
 			"源归档与上次解包时不一致（换了补丁或更新过），本次全部重解")
@@ -395,6 +398,8 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
+		totalFiles++
+		totalBytes += int64(len(data))
 		if !opts.Force && archivesUnchanged && sameSize(p, int64(len(data))) {
 			// 已经解过且大小一致：内容来自同一份归档，不重写（增量）。
 			res.Reused++
@@ -432,6 +437,14 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		// 只在不解密时按此判定：解密会改变字节数，大小对不上就老老实实重解。
 		if !opts.Force && archivesUnchanged && opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
 			res.Reused++
+			totalFiles++
+			totalBytes += want
+			if isVideoPath(e.path) {
+				rel, rerr := filepath.Rel(dest, assetPath)
+				if rerr == nil {
+					videoNames = append(videoNames, filepath.ToSlash(rel))
+				}
+			}
 			continue
 		}
 		data, err := assets.read(e)
@@ -455,6 +468,8 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		res.Files++
 		res.Bytes += int64(len(data))
+		totalFiles++
+		totalBytes += int64(len(data))
 		if isVideoPath(e.path) {
 			rel, rerr := filepath.Rel(dest, assetPath)
 			if rerr == nil {
@@ -463,7 +478,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 	}
 	// 记下这次依据的归档指纹，供下次判断「能不能复用」。
-	if err := writeManifest(dest, archives, videoNames, res.Files, res.Bytes); err != nil {
+	if err := writeManifest(dest, archives, videoNames, totalFiles, totalBytes, opts); err != nil {
 		res.Warnings = append(res.Warnings, "写归档指纹失败："+err.Error())
 	}
 

@@ -12,11 +12,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
 	"ucgr/internal/unpack"
 )
+
+// destLocks 同一个产物目录同一时间只允许一个导入任务写入，
+// 避免两个窗口/两次点击同时解包同一游戏时互相覆盖。
+var destLocks sync.Map
+
+func lockDest(dest string) func() {
+	v, _ := destLocks.LoadOrStore(dest, &sync.Mutex{})
+	mu := v.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
 
 // UnpackPlanDTO 解包预览（前端展示用）。
 type UnpackPlanDTO struct {
@@ -147,11 +159,14 @@ func (a *App) unpackImport(path string, opts unpack.Options) (*UnpackImportDTO, 
 	// 目标目录：按源路径 id 固定，重复导入幂等。
 	id := registry.IDFor(src)
 	dest := filepath.Join(dataDir(), "games", id)
+	unlock := lockDest(dest)
+	defer unlock()
 	res, err := unpack.ExtractWith(src, dest, opts)
 	if err != nil {
 		return nil, err
 	}
-	if res.Files == 0 {
+	// 全量复用（第二次导入同一游戏）时 Files=0 但 Reused>0，产物是完好的。
+	if res.Files+res.Reused == 0 {
 		return nil, fmt.Errorf("解包后没有任何文件（%s）", src)
 	}
 

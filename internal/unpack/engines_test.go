@@ -386,6 +386,31 @@ func TestCountVideos(t *testing.T) {
 	}
 }
 
+// TestExistingVideosManifest 清单里的影片要按「非空文件」计数，且不能越出产物目录。
+func TestExistingVideosManifest(t *testing.T) {
+	dest := t.TempDir()
+	for _, name := range []string{"op.mpg", "ed.wmv"} {
+		if err := os.WriteFile(filepath.Join(dest, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dest, "empty.mpg"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := Options{Decrypt: SchemeXor, Key: 0x5A}
+	if err := writeManifest(dest, nil,
+		[]string{"op.mpg", "ed.wmv", "empty.mpg", "../outside.mpg"}, 4, 2, opts); err != nil {
+		t.Fatal(err)
+	}
+	m := readManifest(dest)
+	if m == nil || m.Decrypt != string(SchemeXor) || m.Key != 0x5A {
+		t.Fatalf("清单应记录解密方案/密钥：%+v", m)
+	}
+	if got := ExistingVideos(dest); got != 2 {
+		t.Fatalf("空文件与越界路径都不该计数，实际 %d", got)
+	}
+}
+
 // TestUnpackIncremental 重复解包是增量的：已存在且大小一致的文件不重写。
 //
 // 动机：解包原来是「每次全量重写」，重复导入一个已解好的游戏会把几百 MB~几 GB
@@ -417,6 +442,13 @@ func TestUnpackIncremental(t *testing.T) {
 	}
 	if r2.Reused != r1.Files {
 		t.Fatalf("第二次应全部复用：reused=%d，第一次写了 %d", r2.Reused, r1.Files)
+	}
+	// 全复用不能把清单里的产物统计清空：否则下次预览体积显示为 0。
+	if m := readManifest(dest); m == nil {
+		t.Fatal("第二次解包后清单丢了")
+	} else if m.Files != r1.Files || m.Bytes != r1.Bytes {
+		t.Fatalf("全复用后清单统计应保持 %d 个/%d 字节，实际 %d/%d",
+			r1.Files, r1.Bytes, m.Files, m.Bytes)
 	}
 
 	// 删掉一个文件 → 只补那一个

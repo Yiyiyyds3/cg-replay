@@ -889,7 +889,9 @@ export default function EventGrid({
                     {(unpackPlan.imported_videos ?? 0) < unpackPlan.videos ? (
                       <span className="text-amber-300">
                         已有 {unpackPlan.imported_videos} / {unpackPlan.videos} 个影片 ·
-                        重解会补上差的 {unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个
+                        {extractVideo
+                          ? `重解会补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`
+                          : `当前设为跳过影片；勾选下方「提取 OP/ED 影片」后再重解可补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`}
                       </span>
                     ) : (
                       <span className="text-emerald-400">
@@ -898,9 +900,7 @@ export default function EventGrid({
                     )}
                   </div>
                 )}
-                {!unpackPlan.unsupported &&
-                  unpackPlan.videos > 0 &&
-                  (unpackPlan.imported_videos ?? 0) === 0 && (
+                {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
                   <div className="pt-1">
                     <label
                       className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
@@ -914,8 +914,9 @@ export default function EventGrid({
                         className="h-3.5 w-3.5 accent-primary"
                       />
                       <span>
-                        提取 OP/ED 影片（共 {unpackPlan.videos} 个 ·{" "}
-                        {(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）
+                        {(unpackPlan.imported_videos ?? 0) > 0
+                          ? `补齐缺失的 OP/ED 影片（已有 ${unpackPlan.imported_videos} / 共 ${unpackPlan.videos} 个）`
+                          : `提取 OP/ED 影片（共 ${unpackPlan.videos} 个 · ${(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）`}
                       </span>
                     </label>
                   </div>
@@ -929,7 +930,7 @@ export default function EventGrid({
                       <Button
                         size="sm"
                         onClick={() => {
-                          setExtractVideoPref(true);
+                          setExtractVideo(true); // 只影响本次；持久默认值在 ⚙ 设置里改
                           void runUnpack(false, forceReextract);
                         }}
                         disabled={unpacking || busy}
@@ -940,7 +941,7 @@ export default function EventGrid({
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          setExtractVideoPref(false);
+                          setExtractVideo(false); // 只影响本次；持久默认值在 ⚙ 设置里改
                           void runUnpack(true, forceReextract);
                         }}
                         disabled={unpacking || busy}
@@ -951,7 +952,9 @@ export default function EventGrid({
                         再想想
                       </Button>
                     </div>
-                    <div className="mt-1.5 text-[10px] text-muted-foreground">选择会记住，可在 ⚙ 设置里改</div>
+                    <div className="mt-1.5 text-[10px] text-muted-foreground">
+                      仅本次生效；默认值可在 ⚙ 设置里改
+                    </div>
                   </div>
                 )}
                 {!unpackPlan.unsupported && unpackPlan.imported && (
@@ -989,9 +992,11 @@ export default function EventGrid({
                   <Button
                     size="sm"
                     onClick={() => {
-                      // 默认提取 → 有影片就先问一次；用户已取消勾选则直接按跳过走。
-                      const already = (unpackPlan.imported_videos ?? 0) > 0;
-                      if (extractVideo && !already && unpackPlan.videos > 0 && !askVideo) {
+                      // 默认提取 → 有影片（或还有缺的影片）就先问一次；
+                      // 用户已取消勾选则直接按跳过走。
+                      const allImported =
+                        (unpackPlan.imported_videos ?? 0) >= unpackPlan.videos;
+                      if (extractVideo && !allImported && unpackPlan.videos > 0 && !askVideo) {
                         setAskVideo(true);
                         return;
                       }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -20,10 +21,14 @@ type manifest struct {
 	Version  int           `json:"version"`
 	Written  string        `json:"written"`
 	Archives []archiveMark `json:"archives"`
+	// Decrypt/Key 上次解包用的方案与密钥。只看归档大小/mtime 不够：
+	// 换了 XOR 方案后旧产物虽然大小一致，内容却不可复用。
+	Decrypt string `json:"decrypt,omitempty"`
+	Key     int    `json:"key,omitempty"`
 	// Videos 解出来的影片文件名（相对产物根）。有了它，「已含几个影片」
 	// 只需 stat 这几个文件，不必扫整个产物目录（1.6 万个文件要 200+ ms）。
 	Videos []string `json:"videos,omitempty"`
-	// Files/Bytes 这次解出来的文件数与字节数（用于预览显示体积）。
+	// Files/Bytes 产物总文件数与总字节数（含复用的文件，用于预览显示体积）。
 	Files int   `json:"files"`
 	Bytes int64 `json:"bytes"`
 }
@@ -73,7 +78,7 @@ func readManifest(dest string) *manifest {
 		return nil
 	}
 	var m manifest
-	if err := json.Unmarshal(data, &m); err != nil || m.Version != 1 {
+	if err := json.Unmarshal(data, &m); err != nil || m.Version != 2 {
 		return nil
 	}
 	return &m
@@ -86,8 +91,13 @@ func ExistingVideos(dest string) int {
 	if m := readManifest(dest); m != nil && len(m.Videos) > 0 {
 		n := 0
 		for _, name := range m.Videos {
-			if _, err := os.Stat(filepath.Join(dest, filepath.FromSlash(name))); err == nil {
-				n++
+			full := filepath.Join(dest, filepath.FromSlash(name))
+			rel, rerr := filepath.Rel(dest, full)
+			if rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue // 清单被改坏时不越出产物目录
+			}
+			if st, err := os.Stat(full); err == nil && !st.IsDir() && st.Size() > 0 {
+				n++ // 空文件/截断文件不算「已提取」
 			}
 		}
 		return n
@@ -96,11 +106,13 @@ func ExistingVideos(dest string) int {
 }
 
 // writeManifest 落盘清单（失败不影响解包结果，只让下次退化成「归档变了→重解」）。
-func writeManifest(dest string, archives []string, videos []string, files int, bytes int64) error {
+func writeManifest(dest string, archives []string, videos []string, files int, bytes int64, opts Options) error {
 	m := manifest{
-		Version:  1,
+		Version:  2,
 		Written:  time.Now().Format(time.RFC3339),
 		Archives: markArchives(archives),
+		Decrypt:  string(opts.Decrypt),
+		Key:      int(opts.Key),
 		Videos:   videos,
 		Files:    files,
 		Bytes:    bytes,
@@ -109,5 +121,15 @@ func writeManifest(dest string, archives []string, videos []string, files int, b
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dest, manifestName), data, 0o644)
+	// 先写临时文件再改名：进程中途退出不会留下半截 JSON（下次会退化成全量重解）。
+	path := filepath.Join(dest, manifestName)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
