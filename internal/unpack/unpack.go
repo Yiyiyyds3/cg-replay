@@ -8,7 +8,9 @@
 //   - Artemis（PFS + 明文 Lua .ast）/ BGI（ARC + .bs）：能解出最小集合，
 //     但**事件库接入（登记进游戏库）仍只支持 KiriKiri**（library.Scan 是
 //     KiriKiri 形状的）。
-//   - CatSystem2：脚本格式尚未接入解析 → 无从算闭包，明确报「暂不支持」。
+//   - CatSystem2（.int/.kif + .cst）：解包已接上（事件粒度 = 一份 .cst
+//     一个事件，与 BuildIR 同口径）；事件库登记仍由下一条 PR 的 library
+//     分派接入，本分支不改变登记行为。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
 //
 // 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
@@ -16,7 +18,6 @@
 package unpack
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,9 +26,6 @@ import (
 
 	"ucgr/internal/adapter"
 )
-
-// errNoScriptParser 引擎没有脚本解析能力（算不出依赖闭包 → 不能做最小集合）。
-var errNoScriptParser = errors.New("该引擎的剧本格式尚未接入解析，无法计算「只够重演」的依赖闭包")
 
 // Scope 最小集合的取材范围。
 type Scope string
@@ -48,10 +46,15 @@ type Plan struct {
 	ScenarioFiles int      `json:"scenario_files"` // 剧本文件数
 	Labels        int      `json:"labels"`         // 事件（标签）数
 	Refs          int      `json:"refs"`           // 引用到的素材数
-	Encrypted     int      `json:"encrypted"`      // 加密条目数（不解，要密钥）
-	Notes         []string `json:"notes"`
-	Unsupported   bool     `json:"unsupported"` // 引擎暂不支持自动解包
-	Reason        string   `json:"reason"`      // 不支持的原因（对用户明说）
+	Videos        int      `json:"videos"`         // 其中影片（OP/ED）条目数
+	VideoBytes    int64    `json:"video_bytes"`    // 影片原始体积（估算）
+	// EstBytes/EstFiles 这次解包预计产出多少字节/文件（闭包里的引用总量）
+	EstBytes    int64    `json:"est_bytes"`
+	EstFiles    int      `json:"est_files"`
+	Encrypted   int      `json:"encrypted"` // 加密条目数（不解，要密钥）
+	Notes       []string `json:"notes"`
+	Unsupported bool     `json:"unsupported"` // 引擎暂不支持自动解包
+	Reason      string   `json:"reason"`      // 不支持的原因（对用户明说）
 }
 
 // Result 解包结果。
@@ -64,6 +67,10 @@ type Result struct {
 	Missing   []string `json:"missing"`   // 引用了但归档里找不到的素材
 	Encrypted []string `json:"encrypted"` // 加密条目（跳过）
 	Warnings  []string `json:"warnings"`
+	// SkippedVideo 按选项跳过的影片数
+	SkippedVideo int `json:"skipped_video,omitempty"`
+	// Reused 已存在且大小一致、直接复用没有重写的文件数（增量解包）
+	Reused int `json:"reused,omitempty"`
 }
 
 // Preview 预览一个游戏目录/归档，不落盘（解包前先给用户看「会解出什么」）。
@@ -127,6 +134,13 @@ type Options struct {
 	Scope   Scope  // 取材范围
 	Decrypt Scheme // 解密方案（空 = 不解密）
 	Key     byte   // 固定密钥（SchemeXor 用）
+	// SkipVideo 不提取影片（OP/ED）。单个影片就 100~300 MB，全解出来很占盘；
+	// 关掉后视频事件仍在事件库里，只是播放时缺素材（零值 = 提取，向后兼容）。
+	SkipVideo bool
+	// Force 忽略「已存在且大小一致就复用」的增量优化，全部重写。
+	// 用途：换了汉化/修正补丁但文件大小碰巧没变时，增量会误判为「没变」，
+	// 用户看到一个按钮就能强制重来（比默认存哈希清单便宜）。
+	Force bool
 }
 
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
@@ -187,9 +201,30 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 			Reason:      fmt.Sprintf("引擎 %s 暂不支持自动解包", engine),
 		}, nil
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
-		return nil, err
+		// 解析失败要说清「它其实是什么」——实测有 .xp3 里装着 ZIP / EVB。
+		// 嗅探必须针对真正失败的那个归档，而不是 archives[0]。
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
+		hint := ""
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
+		}
+		reason := err.Error()
+		if hint != "" {
+			reason += "；" + hint
+		}
+		return &Plan{
+			Root:        strings.Join(archives, " "),
+			Kind:        "archive",
+			EngineID:    engine,
+			Archives:    archives,
+			Unsupported: true,
+			Reason:      reason,
+		}, nil
 	}
 	defer assets.close()
 
@@ -198,7 +233,10 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		Root:      strings.Join(archives, " "),
 		Kind:      "archive",
 		Archives:  archives,
-		Encrypted: len(assets.encrypted),
+		Encrypted: len(assets.adlr), // 只算 XP3 的 adlr（CS2 的 Blowfish 会自动解）
+	}
+	if deps.ScriptNote != "" {
+		p.Notes = append(p.Notes, deps.ScriptNote)
 	}
 	refs := map[string]bool{}
 	for path, e := range assets.entries {
@@ -213,11 +251,6 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				p.Unsupported = true
-				p.Reason = fmt.Sprintf("%s 引擎的剧本格式尚未接入解析，无法算「只够重演」的依赖闭包；可手动解包后用「添加游戏」登记", engine)
-				continue
-			}
 			p.Notes = append(p.Notes, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
@@ -225,12 +258,44 @@ func planEngine(engine string, archives []string) (*Plan, error) {
 		for _, r := range info.Refs {
 			refs[r] = true
 		}
+		for _, r := range info.VideoRefs {
+			refs[r] = true
+		}
 	}
 	p.Refs = len(refs)
+	// 顺便数出影片条目与体积：用户据此决定「要不要把它们一起解出来」。
+	for r := range refs {
+		e, ok := assets.lookup(r)
+		if !ok {
+			continue
+		}
+		for _, sg := range e.segs {
+			p.EstBytes += sg.Size
+		}
+		p.EstFiles++
+		if isVideoPath(e.path) {
+			p.Videos++
+			for _, sg := range e.segs {
+				p.VideoBytes += sg.Size
+			}
+		}
+	}
+	if len(assets.skipped) > 0 {
+		for _, sk := range assets.skipped {
+			p.Notes = append(p.Notes, "跳过无法解析的归档 —— "+sk)
+		}
+	}
+	p.Notes = append(p.Notes, assets.warnings...)
 	if p.Encrypted > 0 {
-		p.Notes = append(p.Notes, fmt.Sprintf(
-			"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
-			p.Encrypted))
+		if engine == "kirikiri" {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）",
+				p.Encrypted))
+		} else {
+			p.Notes = append(p.Notes, fmt.Sprintf(
+				"有 %d 个条目带加密标记，当前不会自动解密；若解出的内容是乱码，需要每作密钥",
+				p.Encrypted))
+		}
 	}
 	if p.Unsupported {
 		p.Notes = append(p.Notes, p.Reason)
@@ -245,8 +310,19 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	if !ok {
 		return nil, fmt.Errorf("引擎 %s 暂不支持自动解包", engine)
 	}
-	assets, err := openArchives(archives, deps.ParseArchive)
+	assets, err := openArchives(archives, deps.ParseArchive, deps.OpenReader)
 	if err != nil {
+		hintPath := failedArchivePath(err)
+		if hintPath == "" && len(archives) > 0 {
+			hintPath = archives[0]
+		}
+		hint := ""
+		if hintPath != "" {
+			hint = sniffHint(hintPath)
+		}
+		if hint != "" {
+			return nil, fmt.Errorf("%w；%s", err, hint)
+		}
 		return nil, err
 	}
 	defer assets.close()
@@ -254,6 +330,27 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	// Encrypted 记「本次实际碰到、且带 adlr 校验和」的条目——它们可能被加密，
 	// 也可能只是校验和（解出来是乱码时再选解密方案）。
 	res := &Result{Dest: dest, EngineID: engine}
+	var videoNames []string // 解出的影片（相对产物根），写进清单备查
+	totalFiles, totalBytes := 0, int64(0)
+
+	// 增量是否可信：只有「源归档与上次解包时一致」才允许复用已存在的文件。
+	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了；
+	// 解密方案/密钥变了同样不可复用（旧产物是另一套字节）。
+	curMarks := markArchives(archives)
+	prev := readManifest(dest)
+	archivesUnchanged := prev != nil && sameMarks(prev.Archives, curMarks) &&
+		prev.Decrypt == string(opts.Decrypt) && prev.Key == int(opts.Key)
+	if prev != nil && !archivesUnchanged {
+		res.Warnings = append(res.Warnings,
+			"源归档与上次解包时不一致（换了补丁或更新过），本次全部重解")
+	}
+	for _, sk := range assets.skipped {
+		res.Warnings = append(res.Warnings, "跳过无法解析的归档 —— "+sk)
+	}
+	res.Warnings = append(res.Warnings, assets.warnings...)
+	if deps.ScriptNote != "" {
+		res.Warnings = append(res.Warnings, deps.ScriptNote)
+	}
 	refSet := map[string]bool{}
 	for path, e := range assets.entries {
 		if !deps.IsScript(path) {
@@ -276,9 +373,6 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		}
 		info, err := deps.ParseScript(data, e.base())
 		if err != nil {
-			if errors.Is(err, errNoScriptParser) {
-				return nil, fmt.Errorf("%s 引擎的剧本格式尚未接入解析，无法算依赖闭包；请手动解包后用「添加游戏」登记", engine)
-			}
 			res.Warnings = append(res.Warnings, fmt.Sprintf("解析 %s 失败：%v", e.base(), err))
 			continue
 		}
@@ -293,16 +387,29 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		for _, r := range refs {
 			refSet[r] = true
 		}
+		// 影片总是并入（OP/ED 不在 CG 画廊引用里）；SkipVideo 时反而不并。
+		if !opts.SkipVideo {
+			for _, r := range info.VideoRefs {
+				refSet[r] = true
+			}
+		}
 		// 剧本落盘
 		p := filepath.Join(dest, filepath.FromSlash(deps.ScriptDir), e.base())
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			return nil, err
+		totalFiles++
+		totalBytes += int64(len(data))
+		if !opts.Force && archivesUnchanged && sameSize(p, int64(len(data))) {
+			// 已经解过且大小一致：内容来自同一份归档，不重写（增量）。
+			res.Reused++
+		} else {
+			if err := os.WriteFile(p, data, 0o644); err != nil {
+				return nil, err
+			}
+			res.Files++
+			res.Bytes += int64(len(data))
 		}
-		res.Files++
-		res.Bytes += int64(len(data))
 		res.Events += len(info.Labels)
 	}
 	// 素材落盘（只解被引用的）。
@@ -312,10 +419,33 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			res.Missing = append(res.Missing, ref)
 			continue
 		}
-		if e.encrypted && opts.Decrypt == SchemeNone {
+		if opts.SkipVideo && isVideoPath(e.path) {
+			res.SkippedVideo++
+			continue
+		}
+		if e.encrypted && opts.Decrypt == SchemeNone && strings.EqualFold(e.segs[0].KeyHint, "adlr") {
 			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
 			// 真解不开时上面的解析失败告警会指出。
 			res.Encrypted = append(res.Encrypted, e.path)
+		}
+		assetPath := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
+		want := int64(0)
+		for _, sg := range e.segs {
+			want += sg.Size
+		}
+		// 增量：已存在且大小与归档记录一致 → 连归档都不用读（省 IO 与解密）。
+		// 只在不解密时按此判定：解密会改变字节数，大小对不上就老老实实重解。
+		if !opts.Force && archivesUnchanged && opts.Decrypt == SchemeNone && sameSize(assetPath, want) {
+			res.Reused++
+			totalFiles++
+			totalBytes += want
+			if isVideoPath(e.path) {
+				rel, rerr := filepath.Rel(dest, assetPath)
+				if rerr == nil {
+					videoNames = append(videoNames, filepath.ToSlash(rel))
+				}
+			}
+			continue
 		}
 		data, err := assets.read(e)
 		if err != nil {
@@ -330,16 +460,28 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			}
 			data = plain
 		}
-		p := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(assetPath), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
+		if err := os.WriteFile(assetPath, data, 0o644); err != nil {
 			return nil, err
 		}
 		res.Files++
 		res.Bytes += int64(len(data))
+		totalFiles++
+		totalBytes += int64(len(data))
+		if isVideoPath(e.path) {
+			rel, rerr := filepath.Rel(dest, assetPath)
+			if rerr == nil {
+				videoNames = append(videoNames, filepath.ToSlash(rel))
+			}
+		}
 	}
+	// 记下这次依据的归档指纹，供下次判断「能不能复用」。
+	if err := writeManifest(dest, archives, videoNames, totalFiles, totalBytes, opts); err != nil {
+		res.Warnings = append(res.Warnings, "写归档指纹失败："+err.Error())
+	}
+
 	sort.Strings(res.Missing)
 
 	// 写约定文件（加载器按它找剧本目录）。非 KiriKiri 引擎的画廊/标签规则
@@ -401,4 +543,42 @@ func archiveExtsHint() string {
 	}
 	sort.Strings(exts)
 	return strings.Join(exts, " / ")
+}
+
+// videoExts 影片扩展名。解包层只关心「要不要提取」，
+// 不需要依赖解码实现（internal/video 是 ffmpeg 提帧那一层）。
+var videoExts = map[string]bool{
+	".mpg": true, ".mpeg": true, ".wmv": true, ".mp4": true,
+	".avi": true, ".webm": true, ".mov": true, ".mkv": true,
+}
+
+func isVideoPath(p string) bool {
+	return videoExts[strings.ToLower(filepath.Ext(p))]
+}
+
+// CountVideos 数一个目录里已有的影片文件（用于「这个游戏之前提过没」的判断）。
+//
+// 以磁盘实况为准而不是记一个布尔标记：用户可能手动拷过影片、也可能删过，
+// 只有实际文件才决定「能不能播」。
+func CountVideos(root string) int {
+	n := 0
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if isVideoPath(p) {
+			n++
+		}
+		return nil
+	})
+	return n
+}
+
+// sameSize 目标文件是否已存在且大小一致（增量解包的判定口径）。
+//
+// 只比大小不比内容：这些文件来自同一份归档，大小一致即可放心复用；
+// 换成哈希就要把文件读一遍，反而把省下的 IO 花回去。
+func sameSize(path string, want int64) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir() && st.Size() == want
 }

@@ -43,6 +43,10 @@ type Convention struct {
 	// SceneRe 场景脚本文件正则（如 `^\d{2}[A-Za-z_0-9]*\.ks$`）。
 	// 空 = 场景由 fallbackStoryScenes 兜底（按章节标记找）。
 	SceneRe string `json:"scene_re"`
+	// MovieDirs 影片脚本目录（相对 root）。KiriKiri 的 OP/ED 放在
+	// raw/data/sysscn/ 之类的系统目录里，不在剧本目录，所以收不到。
+	// 这些目录里**只收含影片指令的脚本**（别的都是系统 UI 脚本，收进来是噪声）。
+	MovieDirs []string `json:"movie_dirs,omitempty"`
 }
 
 // ConventionFileName 游戏根目录下的约定覆盖文件名。
@@ -61,6 +65,7 @@ func DefaultKiriKiri() Convention {
 		GalleryIndex: "cgrai00.ks",
 		CGLabelRe:    `^cg\d+$`,
 		SceneRe:      `^\d{2}[A-Za-z_0-9]*\.ks$`,
+		MovieDirs:    []string{filepath.Join("raw", "data", "sysscn")},
 	}
 }
 
@@ -153,6 +158,9 @@ func (c Convention) Merge(base Convention) Convention {
 	}
 	if c.SceneRe != "" {
 		out.SceneRe = c.SceneRe
+	}
+	if len(c.MovieDirs) > 0 {
+		out.MovieDirs = c.MovieDirs
 	}
 	return out
 }

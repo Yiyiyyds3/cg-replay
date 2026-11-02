@@ -195,6 +195,30 @@ func (b *irBuilder) buildShow(seq []SeqItem) []ir.ShowOp {
 			add(ir.ShowOp{Kind: ir.ShowSEFadeOut, DurMs: ms, Attr: copyAttrs(attrs)})
 		case tag == "stopse":
 			add(ir.ShowOp{Kind: ir.ShowSEStop, Attr: copyAttrs(attrs)})
+		case tag == "movie" || tag == "sysmovie":
+			// 影片：KiriKiri 的 [movie storage="op.mpg"] 是整屏播放，语义与 CS2 的
+			// video_play 一致 → 发同一种指令，播放器只有一条影片渲染路径。
+			// （此前这里没有分支，OP/ED 的影片指令被整条丢掉，点开必然是黑的。）
+			if ref := firstResourceRef(c); ref != "" {
+				add(ir.ShowOp{Kind: ir.ShowVideoPlay, Ref: ref, Attr: copyAttrs(attrs)})
+			} else if st := strings.TrimSpace(attrs["state"]); st != "" {
+				// [sysmovie state=end]：影片由引擎按 state 名自己找，脚本里没有文件名
+				// （9nine 就是这种，实际文件是 nine_ED.mpg）。没有通用映射规则，
+				// 所以仍然记成影片事件（角标有意义），只是播放时报「定位不到」。
+				add(ir.ShowOp{Kind: ir.ShowVideoPlay, Attr: map[string]string{
+					"state": st, "unresolved": "1",
+				}})
+			}
+
+		case tag == "video":
+			// [video] 两种用法：visible=false 是关掉视频图层（不是播片），跳过；
+			// 其余带 storage/file 的按整屏影片处理（与 [movie] 同路径）。
+			if !strings.EqualFold(strings.TrimSpace(attrs["visible"]), "false") {
+				if ref := firstResourceRef(c); ref != "" {
+					add(ir.ShowOp{Kind: ir.ShowVideoPlay, Ref: ref, Attr: copyAttrs(attrs)})
+				}
+			}
+
 		case tag == "vo" || tag == "playvo":
 			add(ir.ShowOp{Kind: ir.ShowVoicePlay, Ref: voiceRef(c), Attr: copyAttrs(attrs)})
 

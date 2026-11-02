@@ -1,10 +1,14 @@
 package unpack
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------
@@ -142,10 +146,10 @@ func TestUnpackArtemisPFS(t *testing.T) {
 // TestDetectEngineByArchiveExt：按归档后缀认出引擎。
 func TestDetectEngineByArchiveExt(t *testing.T) {
 	cases := map[string]string{
-		"data.xp3": "kirikiri",
-		"data.pfs": "artemis",
-		"pack.arc": "bgi",
-		"data.cst": "catsystem2",
+		"data.xp3":  "kirikiri",
+		"data.pfs":  "artemis",
+		"pack.arc":  "bgi",
+		"scene.int": "catsystem2", // CS2 的归档是 .int/.kif；.cst 是剧本不是归档
 	}
 	for name, want := range cases {
 		if got := detectEngine(name); got != want {
@@ -157,24 +161,401 @@ func TestDetectEngineByArchiveExt(t *testing.T) {
 	}
 }
 
-// TestCatSystem2UnsupportedWithoutScriptParser：CatSystem2 没有脚本解析
-// → 预览要明说「暂不支持」并给退路，不能含糊报错。
-func TestCatSystem2UnsupportedWithoutScriptParser(t *testing.T) {
-	dir := t.TempDir()
-	// 造一个最小 .cst（KIF 归档）；内容随意——重点是走完「认出引擎 → 尝试
-	// 解析剧本 → 明确报不支持」这条路径。
-	if err := os.WriteFile(filepath.Join(dir, "data.cst"), []byte("KIF"), 0o644); err != nil {
+// ---------------------------------------------------------------
+// CatSystem2（.cst）夹具
+// ---------------------------------------------------------------
+
+// cstEntry .cst 解压后的一个条目（0x01 + 类型 + 内容 + \0）。
+type cstEntry struct {
+	typ  byte // 0x20 对白 / 0x21 角色名 / 0x30 命令
+	body string
+}
+
+// buildCST 造一份最小 CatScene 文件（魔数 + u32 压缩长 + 16 字节头 + zlib）。
+func buildCST(t *testing.T, entries []cstEntry) []byte {
+	t.Helper()
+	var raw []byte
+	for _, e := range entries {
+		raw = append(raw, 0x01, e.typ)
+		raw = append(raw, []byte(e.body)...)
+		raw = append(raw, 0)
+	}
+	var zbuf bytes.Buffer
+	zw := zlib.NewWriter(&zbuf)
+	if _, err := zw.Write(raw); err != nil {
 		t.Fatal(err)
 	}
-	p, err := Preview(dir)
-	if err != nil {
-		// 认不出或解析失败都可以，但必须带明确说明，不能是空错误。
-		if err.Error() == "" {
-			t.Fatal("错误信息不能为空")
-		}
-		return
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
 	}
-	if p.EngineID != "catsystem2" && !p.Unsupported {
-		t.Fatalf("认出引擎应为 catsystem2 或明确不支持：%+v", p)
+	comp := zbuf.Bytes()
+	head := make([]byte, 16)
+	copy(head, "CatScene")
+	binary.LittleEndian.PutUint32(head[8:12], uint32(len(comp)))
+	return append(head, comp...)
+}
+
+// TestCatSystem2ScriptRefs CS2 接进解包后：.cst 能解析、引用能提取。
+//
+// 修正说明：此前 unpack 层认为 CS2「没有脚本解析」而拒绝解包 —— 实为误判，
+// 适配器早有 ParseScript/ExtractRefs。本用例守住这条能力不再回退。
+func TestCatSystem2ScriptRefs(t *testing.T) {
+	deps, ok := engineFor("catsystem2")
+	if !ok {
+		t.Fatal("catsystem2 引擎未注册")
+	}
+	cst := buildCST(t, []cstEntry{
+		{0x30, "bg 0 bg01"},
+		{0x30, "pcm voice001"},
+		{0x21, "名前"},
+		{0x20, "一行目"},
+	})
+	info, err := deps.ParseScript(cst, "01.cst")
+	if err != nil {
+		t.Fatalf("ParseScript(.cst): %v", err)
+	}
+	if len(info.Labels) != 1 {
+		t.Fatalf("事件数 = %d, want 1（一脚本一事件）", len(info.Labels))
+	}
+	if !info.Dynamic {
+		t.Fatal("CS2 有运行时拼名引用，Dynamic 必须为 true，否则闭包不全时零告警")
+	}
+	has := func(want string) bool {
+		for _, r := range info.Refs {
+			if r == want {
+				return true
+			}
+		}
+		return false
+	}
+	for _, want := range []string{"bg01", "voice001"} {
+		if !has(want) {
+			t.Fatalf("引用里缺 %q（实际 %v）", want, info.Refs)
+		}
+	}
+}
+
+// TestCatSystem2DetectByArchiveExt：CS2 归档后缀能被认出来。
+func TestCatSystem2DetectByArchiveExt(t *testing.T) {
+	for _, name := range []string{"scene.int", "update01.kif"} {
+		if got := detectEngine(name); got != "catsystem2" {
+			t.Errorf("detectEngine(%q) = %q, want catsystem2", name, got)
+		}
+	}
+}
+
+// TestUnpackExplainsWrongContainer 扩展名骗人时要说清「它到底是什么」。
+//
+// 实测踩到：ambitious_mission/update.xp3 其实是 ZIP，Monkeys!!_cn.xp3 其实是
+// EVB（E-mote 产物）。解析器拒绝是对的，但必须给人一句可用的话。
+func TestUnpackExplainsWrongContainer(t *testing.T) {
+	cases := []struct {
+		name string
+		head []byte
+		want string
+	}{
+		{"update.xp3", []byte("PK\x03\x04fake zip body"), "ZIP"},
+		{"empty.xp3", []byte("PK\x05\x06\x00\x00\x00\x00"), "空 ZIP"},
+		{"split.xp3", []byte("PK\x07\x08\x00\x00\x00\x00"), "分卷 ZIP"},
+		{"Monkeys_cn.xp3", []byte("EVB\x00\x40\x00\x00\x00rest"), "EVB"},
+		{"data.pfs", []byte("pf6\x00\x00\x00\x00rest"), "PFS"},
+		{"data.pfs", []byte("pf8\x00\x00\x00\x00rest"), "PFS"},
+		{"script.arc", []byte("BurikoCompiledScript\x00\x00rest"), "BGI"},
+	}
+	for _, c := range cases {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, c.name), c.head, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		plan, err := Preview(dir)
+		if err != nil {
+			t.Fatalf("%s: Preview 应返回计划而不是错误: %v", c.name, err)
+		}
+		if !plan.Unsupported {
+			t.Fatalf("%s: 应为不支持（%+v）", c.name, plan)
+		}
+		if !strings.Contains(plan.Reason, c.want) {
+			t.Fatalf("%s: 原因里应提到 %s，实际 %q", c.name, c.want, plan.Reason)
+		}
+	}
+}
+
+// TestUnpackSkipsBrokenArchive 一个坏归档不该拖垮整场解包。
+//
+// 实测：游戏目录里混着扩展名骗人的文件（GrisaiaAno1_cn.int 其实是 EVB），
+// 以前会让整个预览直接失败；现在应跳过它、继续处理其余归档，并把原因写进 notes。
+func TestUnpackSkipsBrokenArchive(t *testing.T) {
+	dir := t.TempDir()
+	// 正常归档（PFS v6）
+	writePFS(t, filepath.Join(dir, "data.pfs"), map[string][]byte{
+		"scenario/01_01.ast":  []byte(testAST),
+		"image/ev_cut_001_00": []byte("CG1"),
+		"image/black":         []byte("BG"),
+	})
+	// 坏归档：扩展名 .pfs，内容却是 ZIP
+	if err := os.WriteFile(filepath.Join(dir, "update.pfs"), []byte("PK\x03\x04oops"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Preview(dir)
+	if err != nil {
+		t.Fatalf("Preview 不应因单个坏归档失败：%v", err)
+	}
+	if plan.Unsupported {
+		t.Fatalf("应继续解析其余归档（%+v）", plan)
+	}
+	if plan.ScenarioFiles == 0 {
+		t.Fatalf("好归档里的剧本应被认出：%+v", plan)
+	}
+	var noted bool
+	for _, n := range plan.Notes {
+		if strings.Contains(n, "跳过无法解析的归档") && strings.Contains(n, "ZIP") {
+			noted = true
+		}
+	}
+	if !noted {
+		t.Fatalf("notes 里应说明跳过了哪个坏归档及原因：%v", plan.Notes)
+	}
+}
+
+// TestUnpackSkipVideo 「不提取影片」开关：影片条目不落盘，其余照常。
+//
+// 动机：单个 OP/ED 就 100~300 MB，全解出来很占盘；很多用户只想看剧情 CG。
+func TestUnpackSkipVideo(t *testing.T) {
+	makeArchive := func(t *testing.T) string {
+		dir := t.TempDir()
+		xp3 := filepath.Join(dir, "data.xp3")
+		ks := "[movie storage=\"op_demo.mpg\"]\n[wait time=100]\n[image storage=\"cg001_a.png\"]\n"
+		writeXP3(t, xp3, []xp3File{
+			{path: "data/scenario/01_movie.ks", data: []byte(ks)},
+			{path: "data/image/cg001_a.png", data: []byte("PNG-1")},
+			{path: "data/movie/op_demo.mpg", data: []byte("MPG-DATA")},
+		})
+		return xp3
+	}
+
+	// 预览要能算出「影片有几个、多大」，用户据此决定。
+	if plan, err := Preview(makeArchive(t)); err != nil {
+		t.Fatalf("Preview: %v", err)
+	} else if plan.Videos != 1 || plan.VideoBytes <= 0 {
+		t.Fatalf("预览应报出影片数与体积，实际 videos=%d bytes=%d", plan.Videos, plan.VideoBytes)
+	}
+
+	for _, skip := range []bool{true, false} {
+		xp3 := makeArchive(t)
+		dest := t.TempDir()
+		res, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll, SkipVideo: skip})
+		if err != nil {
+			t.Fatalf("ExtractWith(skip=%v): %v", skip, err)
+		}
+		movie := filepath.Join(dest, "raw", "data", "image", "op_demo.mpg")
+		_, statErr := os.Stat(movie)
+		if skip {
+			if statErr == nil {
+				t.Fatal("skip=true 时影片不应落盘")
+			}
+			if res.SkippedVideo == 0 {
+				t.Fatal("应统计出被跳过的影片数")
+			}
+		} else {
+			if statErr != nil {
+				t.Fatalf("skip=false 时影片应落盘：%v", statErr)
+			}
+			if res.SkippedVideo != 0 {
+				t.Fatalf("skip=false 时不该有跳过计数（%d）", res.SkippedVideo)
+			}
+		}
+	}
+}
+
+// TestCountVideos 「已含影片」按磁盘实况判断，不看记忆。
+func TestCountVideos(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "image"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"a.png", "op.mpg", "ed.wmv", "note.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, "image", n), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := CountVideos(dir); got != 2 {
+		t.Fatalf("应数出 2 个影片，实际 %d", got)
+	}
+	if got := CountVideos(filepath.Join(dir, "nope")); got != 0 {
+		t.Fatalf("目录不存在应为 0，实际 %d", got)
+	}
+}
+
+// TestExistingVideosManifest 清单里的影片要按「非空文件」计数，且不能越出产物目录。
+func TestExistingVideosManifest(t *testing.T) {
+	dest := t.TempDir()
+	for _, name := range []string{"op.mpg", "ed.wmv"} {
+		if err := os.WriteFile(filepath.Join(dest, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dest, "empty.mpg"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := Options{Decrypt: SchemeXor, Key: 0x5A}
+	if err := writeManifest(dest, nil,
+		[]string{"op.mpg", "ed.wmv", "empty.mpg", "../outside.mpg"}, 4, 2, opts); err != nil {
+		t.Fatal(err)
+	}
+	m := readManifest(dest)
+	if m == nil || m.Decrypt != string(SchemeXor) || m.Key != 0x5A {
+		t.Fatalf("清单应记录解密方案/密钥：%+v", m)
+	}
+	if got := ExistingVideos(dest); got != 2 {
+		t.Fatalf("空文件与越界路径都不该计数，实际 %d", got)
+	}
+}
+
+// TestUnpackIncremental 重复解包是增量的：已存在且大小一致的文件不重写。
+//
+// 动机：解包原来是「每次全量重写」，重复导入一个已解好的游戏会把几百 MB~几 GB
+// 再写一遍（纯浪费 IO）。现在按「归档记录的大小 == 目标文件大小」判定复用。
+func TestUnpackIncremental(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[image storage=\"a.png\"]\n[image storage=\"b.png\"]\n[wait time=100]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+		{path: "data/image/b.png", data: []byte("PNG-B")},
+	})
+	dest := t.TempDir()
+
+	r1, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第一次解包: %v", err)
+	}
+	if r1.Files == 0 || r1.Reused != 0 {
+		t.Fatalf("第一次应全写、无复用：files=%d reused=%d", r1.Files, r1.Reused)
+	}
+
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第二次解包: %v", err)
+	}
+	if r2.Files != 0 {
+		t.Fatalf("第二次不该重写任何文件：files=%d（复用 %d）", r2.Files, r2.Reused)
+	}
+	if r2.Reused != r1.Files {
+		t.Fatalf("第二次应全部复用：reused=%d，第一次写了 %d", r2.Reused, r1.Files)
+	}
+	// 全复用不能把清单里的产物统计清空：否则下次预览体积显示为 0。
+	if m := readManifest(dest); m == nil {
+		t.Fatal("第二次解包后清单丢了")
+	} else if m.Files != r1.Files || m.Bytes != r1.Bytes {
+		t.Fatalf("全复用后清单统计应保持 %d 个/%d 字节，实际 %d/%d",
+			r1.Files, r1.Bytes, m.Files, m.Bytes)
+	}
+
+	// 删掉一个文件 → 只补那一个
+	if err := os.Remove(filepath.Join(dest, "raw", "data", "image", "b.png")); err != nil {
+		t.Fatal(err)
+	}
+	r3, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatalf("第三次解包: %v", err)
+	}
+	if r3.Files != 1 {
+		t.Fatalf("应只补 1 个缺失文件，实际写了 %d 个", r3.Files)
+	}
+}
+
+// TestUnpackForce 强制重解：忽略增量，全部重写（补丁改了内容但大小没变时用）。
+func TestUnpackForce(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[image storage=\"a.png\"]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+	})
+	dest := t.TempDir()
+
+	r1, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll, Force: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Reused != 0 {
+		t.Fatalf("强制重解不该有复用，实际 %d", r2.Reused)
+	}
+	if r2.Files != r1.Files {
+		t.Fatalf("强制重解应重写全部：files=%d，首次 %d", r2.Files, r1.Files)
+	}
+}
+
+// TestUnpackArchiveChanged 归档变了（大小可能没变）就必须重解，不能靠产物大小蒙过去。
+//
+// 这是「只比大小」方案的漏洞：补丁改了图里的几个字节，大小一模一样，
+// 只比大小会误判成「没变」。改成看源归档指纹（大小 + 纳秒级修改时间）后能发现。
+func TestUnpackArchiveChanged(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	body := func(s string) []byte {
+		return []byte("[image storage=\"a.png\"]\n")
+	}
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: body("ks")},
+		{path: "data/image/a.png", data: []byte("AAAA")}, // 4 字节
+	})
+	dest := t.TempDir()
+	if _, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll}); err != nil {
+		t.Fatal(err)
+	}
+	asset := filepath.Join(dest, "raw", "data", "image", "a.png")
+	if got, _ := os.ReadFile(asset); string(got) != "AAAA" {
+		t.Fatalf("首次内容应为 AAAA，实际 %q", got)
+	}
+
+	// 同尺寸不同内容，并确保修改时间前进（纳秒级）
+	if err := os.Chtimes(xp3, time.Now(), time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: body("ks")},
+		{path: "data/image/a.png", data: []byte("BBBB")}, // 仍然 4 字节
+	})
+
+	r2, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Reused != 0 {
+		t.Fatalf("归档已变，不该复用任何文件（reused=%d）", r2.Reused)
+	}
+	if got, _ := os.ReadFile(asset); string(got) != "BBBB" {
+		t.Fatalf("归档变了应重解出 BBBB，实际 %q", got)
+	}
+}
+
+// TestExistingVideos 已有影片数走清单（只 stat 清单里的几个文件），不扫整个目录。
+func TestExistingVideos(t *testing.T) {
+	dir := t.TempDir()
+	xp3 := filepath.Join(dir, "data.xp3")
+	writeXP3(t, xp3, []xp3File{
+		{path: "data/scenario/01_a.ks", data: []byte("[movie storage=\"op.mpg\"]\n[image storage=\"a.png\"]\n")},
+		{path: "data/image/a.png", data: []byte("PNG-A")},
+		{path: "data/movie/op.mpg", data: []byte("MPG")},
+	})
+	dest := t.TempDir()
+	if _, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll}); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExistingVideos(dest); got != 1 {
+		t.Fatalf("应数出 1 个影片，实际 %d", got)
+	}
+	// 用户手动删掉 → 立刻反映为 0
+	vid := filepath.Join(dest, "raw", "data", "image", "op.mpg")
+	if err := os.Remove(vid); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExistingVideos(dest); got != 0 {
+		t.Fatalf("删掉影片后应为 0，实际 %d", got)
 	}
 }
