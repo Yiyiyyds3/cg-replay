@@ -14,8 +14,8 @@ import (
 
 // ScanUnity 按 cg-index.json 列出可回放的 CG。
 //
-// 只列现在**能播**的（frames / still）。spine 骨骼动画要等渲染器接入，
-// 先不列出来——列出来点开必失败，比不列更糟。
+// frames / still 走 Go 侧逐帧合成；spine 由前端 Spine WebGL 组件渲染，
+// 两者都能列出来。kind=unknown 仍排除，避免点开必然失败。
 func ScanUnity(root string) (*Library, error) {
 	idx, err := unitycg.LoadIndex(root)
 	if err != nil {
@@ -32,19 +32,19 @@ func ScanUnity(root string) (*Library, error) {
 	pending := 0
 	for _, cg := range idx.CGs {
 		if !unitycg.Playable(cg) {
-			pending++ // spine：等渲染器
+			pending++ // kind=unknown：导出器也没识别出可播素材
 			continue
 		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:     cg.ID,
 			Title:  cg.Title(),
 			Script: filepath.ToSlash(filepath.Join("cg", cg.ID)),
-			Label:  cg.Kind, // frames / still：打开时据此拼台本
+			Label:  cg.Kind, // frames / still / spine：打开时据此拼台本
 		})
 	}
 	if len(lib.Scenes) == 0 {
 		if pending > 0 {
-			return nil, fmt.Errorf("这 %d 部 CG 都是 Spine 骨骼动画，渲染器还没接入（暂无可以放的）", pending)
+			return nil, fmt.Errorf("这 %d 部 CG 素材不完整或类型无法识别（kind=unknown/缺 skeleton/贴图），没有可以放的", pending)
 		}
 		return nil, fmt.Errorf("索引里没有可回放的 CG")
 	}

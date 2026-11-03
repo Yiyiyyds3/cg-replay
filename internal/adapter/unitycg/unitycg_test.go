@@ -87,21 +87,57 @@ func TestBuildShowStill(t *testing.T) {
 	}
 }
 
-// TestBuildShowSpine 骨骼动画还没接渲染：要明确报错，不能返回空台本装没事。
+// TestBuildShowSpine 骨骼动画：player 只拿一条等待撑时间轴，画面交给前端。
 func TestBuildShowSpine(t *testing.T) {
 	cg := CG{ID: "HCG02", Kind: "spine"}
 	cg.Files.Text = []string{"HCG_02.json"}
 	cg.Spine = &SpineInfo{Animations: []AnimRef{{Name: "1(loop)", Loop: true, Dur: 6}}}
-	if _, err := BuildShow(cg); err == nil {
-		t.Fatal("spine 类型应当返回错误（渲染器未接入）")
+	ev, err := BuildShow(cg)
+	if err != nil {
+		t.Fatalf("BuildShow: %v", err)
+	}
+	if len(ev.Show) != 1 || ev.Show[0].Kind != ir.ShowWait {
+		t.Fatalf("spine 台本应只有一条 wait，实际 %+v", ev.Show)
+	}
+	if ev.Show[0].DurMs != 6000 || ev.EndMs != 6000 {
+		t.Fatalf("循环动画应播满 6s，实际 wait=%d end=%d", ev.Show[0].DurMs, ev.EndMs)
 	}
 }
 
-// TestPlayable 只有 frames/still 现在能放。
+// TestPickSpineAnimation 优先 idle，时长按动画自身/循环下限计算。
+func TestPickSpineAnimation(t *testing.T) {
+	cg := CG{Kind: "spine"}
+	cg.Spine = &SpineInfo{Animations: []AnimRef{
+		{Name: "start", Dur: 2},
+		{Name: "Idle_loop", Loop: true, Dur: 1.2},
+	}}
+	a, ok := cg.PickSpineAnimation()
+	if !ok || a.Name != "Idle_loop" {
+		t.Fatalf("应优先选 idle，实际 %+v ok=%v", a, ok)
+	}
+	if got := cg.SpineDurationMs(); got != 5000 {
+		t.Fatalf("循环动画时长下限应为 5000ms，实际 %d", got)
+	}
+	cg.Spine.Animations = nil
+	if got := cg.SpineDurationMs(); got != 3000 {
+		t.Fatalf("无动画统计应退回 3000ms，实际 %d", got)
+	}
+}
+
+// TestPlayable spine 由前端渲染；缺素材时仍不可播。
 func TestPlayable(t *testing.T) {
-	for k, want := range map[string]bool{"frames": true, "still": true, "spine": false} {
+	for k, want := range map[string]bool{"frames": true, "still": true, "unknown": false} {
 		if got := Playable(CG{Kind: k}); got != want {
 			t.Fatalf("%s: Playable=%v，应为 %v", k, got, want)
 		}
+	}
+	spine := CG{Kind: "spine"}
+	if Playable(spine) {
+		t.Fatal("缺 skeleton/贴图的 spine 不应可播")
+	}
+	spine.Files.Text = []string{"HCG_02.json", "HCG_02.atlas"}
+	spine.Files.PNG = []string{"HCG_02.png"}
+	if !Playable(spine) {
+		t.Fatal("素材齐全的 spine 应可播")
 	}
 }

@@ -570,6 +570,60 @@ export namespace main {
 	}
 	
 	
+	export class SpineTextureDTO {
+	    name: string;
+	    data_url: string;
+
+	    static createFrom(source: any = {}) {
+	        return new SpineTextureDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.data_url = source["data_url"];
+	    }
+	}
+	export class SpineAnimationDTO {
+	    name: string;
+	    loop: boolean;
+	    dur_ms: number;
+
+	    static createFrom(source: any = {}) {
+	        return new SpineAnimationDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.loop = source["loop"];
+	        this.dur_ms = source["dur_ms"];
+	    }
+	}
+	export class SpineDTO {
+	    skeleton: string;
+	    atlas: string;
+	    textures: SpineTextureDTO[];
+	    animations: SpineAnimationDTO[];
+	    animation: string;
+	    loop: boolean;
+	    warnings?: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new SpineDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skeleton = source["skeleton"];
+	        this.atlas = source["atlas"];
+	        this.textures = source["textures"];
+	        this.animations = source["animations"];
+	        this.animation = source["animation"];
+	        this.loop = source["loop"];
+	        this.warnings = source["warnings"];
+	    }
+	}
 	export class SessionMeta {
 	    kind: string;
 	    id: string;
@@ -580,6 +634,7 @@ export namespace main {
 	    op_count: number;
 	    text_count: number;
 	    duration_ms: number;
+	    spine?: SpineDTO;
 	
 	    static createFrom(source: any = {}) {
 	        return new SessionMeta(source);
@@ -596,6 +651,7 @@ export namespace main {
 	        this.op_count = source["op_count"];
 	        this.text_count = source["text_count"];
 	        this.duration_ms = source["duration_ms"];
+	        this.spine = source["spine"];
 	    }
 	}
 	export class SpeakerDTO {

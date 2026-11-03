@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@esotericsoftware/spine-webgl": "^4.2.120",
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

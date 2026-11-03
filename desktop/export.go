@@ -96,9 +96,13 @@ func (a *App) StartExport(format string) error {
 	}
 	s.mu.Lock()
 	ev, root, kind, id := s.ev, s.root, s.kind, s.id
+	isSpine := s.spine != nil
 	s.mu.Unlock()
 	if ev == nil || len(ev.Show) == 0 {
 		return fail(fmt.Errorf("当前事件没有可导出的台本"))
+	}
+	if isSpine {
+		return fail(fmt.Errorf("Spine 骨骼动画暂不支持服务端导出（画面由前端 WebGL 渲染）"))
 	}
 
 	want := strings.ToLower(strings.TrimSpace(format))

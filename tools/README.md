@@ -86,3 +86,7 @@ bundle 是 UnityFS（LZ4 + 序列化对象 + 未压缩像素流），webview 没
 8.8 万像素级贴图 68 张，自检通过。
 
 **它不做的**：不渲染、不播放、不改游戏、不碰存档。渲染是 spine runtime 的事。
+
+桌面回放器（`desktop/`）已内置 Spine WebGL 组件：`kind=spine` 的 CG 可以直接打开，
+Go 侧把 skeleton/atlas/贴图一次性下发，前端 canvas 按回放时间轴渲染。
+截图与 GIF/MP4 导出暂不支持 Spine 会话（Go 侧没有可编码的画面），按钮会隐藏并在快捷键路径明确报错。

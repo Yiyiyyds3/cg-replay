@@ -8,7 +8,7 @@
 //
 //	frames —— 一串 PNG，按编号顺序切帧（Unity AnimationClip 逐帧）
 //	still  —— 单张静态图
-//	spine  —— 骨骼动画，需要 spine runtime 渲染（尚未接入，明确报错而不是黑屏）
+//	spine  —— 骨骼动画：台本只负责时长，画面由前端 Spine WebGL 组件渲染
 package unitycg
 
 import (
@@ -129,8 +129,17 @@ func validSegment(s string) bool {
 	return true
 }
 
-// Playable 这部 CG 现在能不能放（spine 还没接渲染）。
-func Playable(cg CG) bool { return cg.Kind == "frames" || cg.Kind == "still" }
+// Playable 这部 CG 现在能不能放（spine 由前端 WebGL 组件渲染）。
+// spine 必须同时有 skeleton/atlas 文本和贴图，否则列出来点开只会报错。
+func Playable(cg CG) bool {
+	switch cg.Kind {
+	case "frames", "still":
+		return true
+	case "spine":
+		return len(cg.Files.Text) > 0 && len(cg.Files.PNG) > 0
+	}
+	return false
+}
 
 var numRe = regexp.MustCompile(`(\d+)`)
 
@@ -174,21 +183,22 @@ func BuildShow(cg CG) (*ir.Event, error) {
 	}
 	ev := &ir.Event{EventID: cg.ID, Kind: ir.KindScene, Title: cg.Title()}
 
+	if !validSegment(cg.ID) {
+		return nil, fmt.Errorf("CG id 非法：%q", cg.ID)
+	}
+	if cg.Kind == "spine" {
+		// Spine 的画面由前端 canvas 渲染；player 只需要一条等待撑住时间轴，
+		// 进度条/播放/暂停/seek 仍复用既有会话。
+		dur := cg.SpineDurationMs()
+		ev.Show = append(ev.Show, ir.ShowOp{TMs: 0, Kind: ir.ShowWait, DurMs: dur})
+		ev.EndMs = dur
+		return ev, nil
+	}
 	frames := cg.Frames
 	if len(frames) == 0 && cg.Kind == "still" {
 		frames = cg.Files.PNG
 	}
-	if !validSegment(cg.ID) {
-		return nil, fmt.Errorf("CG id 非法：%q", cg.ID)
-	}
 	if len(frames) == 0 {
-		if cg.Kind == "spine" {
-			reason := ""
-			if cg.Spine != nil && cg.Spine.Error != "" {
-				reason = "：" + cg.Spine.Error
-			}
-			return nil, fmt.Errorf("%s 是 Spine 骨骼动画（%d 段动画）%s；渲染器尚未接入", cg.ID, len(cg.SpineAnimations()), reason)
-		}
 		return nil, fmt.Errorf("%s 没有可播放的帧（kind=%s）", cg.ID, cg.Kind)
 	}
 	for _, f := range frames {
@@ -232,6 +242,42 @@ func (cg CG) SpineAnimations() []AnimRef {
 		return nil
 	}
 	return cg.Spine.Animations
+}
+
+// PickSpineAnimation 选默认播放的动画：优先名字里带 idle 的，否则第一段。
+func (cg CG) PickSpineAnimation() (AnimRef, bool) {
+	anims := cg.SpineAnimations()
+	if len(anims) == 0 {
+		return AnimRef{}, false
+	}
+	for _, a := range anims {
+		if strings.Contains(strings.ToLower(a.Name), "idle") {
+			return a, true
+		}
+	}
+	return anims[0], true
+}
+
+// SpineDurationMs 回放时长：非循环动画按自身时长；循环动画至少给 5 秒，
+// 让观众看完整段而不是刚起势就结束。索引缺动画统计时退回 3 秒。
+func (cg CG) SpineDurationMs() int64 {
+	const (
+		minMs  = int64(1000)
+		loopMs = int64(5000)
+		fallMs = int64(3000)
+	)
+	a, ok := cg.PickSpineAnimation()
+	if !ok || a.Dur <= 0 {
+		return fallMs
+	}
+	ms := int64(a.Dur * 1000)
+	if ms < minMs {
+		ms = minMs
+	}
+	if a.Loop && ms < loopMs {
+		ms = loopMs
+	}
+	return ms
 }
 
 // Ref 素材引用：相对游戏根的路径，桌面加载器会先按 root+rel 直接找。

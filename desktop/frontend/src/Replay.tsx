@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { api, onExportEvents, type FrameDTO, type SessionMeta } from "@/lib/api";
+import SpineStage from "@/components/SpineStage";
 
 const KIND_LABEL: Record<string, string> = {
   cg: "CG 鉴赏",
@@ -51,6 +52,7 @@ export default function Replay({
   const [expMsg, setExpMsg] = useState(""); // 导出结果（路径 + 摘要，非静默）
   const [fav, setFav] = useState(false); // 本事件收藏状态（星标）
   const [favBusy, setFavBusy] = useState(false);
+  const isSpine = !!meta.spine; // 骨骼动画：画面走 WebGL，Go 侧没有 JPEG/截图/导出
 
   // 进入回放：读收藏列表定位本事件星标（列表小，一次拉全）。
   useEffect(() => {
@@ -180,6 +182,11 @@ export default function Replay({
   }, [f?.muted, f?.now]);
 
   const screenshot = async () => {
+    if (isSpine) {
+      // 画面在 WebGL canvas 里，Go 侧没有可截的帧；明确告知而不是静默无反应。
+      setErr("Spine 骨骼动画暂不支持截图（画面由前端 WebGL 渲染）");
+      return;
+    }
     try {
       const p = await api.screenshot();
       console.info("[截图]", p);
@@ -225,7 +232,7 @@ export default function Replay({
   );
 
   const doExport = async (format: "gif" | "mp4") => {
-    if (exporting) return;
+    if (exporting || isSpine) return;
     setExporting(format);
     setExportPct(0);
     setExportFrame(0);
@@ -295,27 +302,31 @@ export default function Replay({
             <Badge variant="outline">文本 {meta.text_count} 段</Badge>
           </>
         )}
-        <Button variant="ghost" size="icon" onClick={screenshot} title="截图（F）">
-          <Camera className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={!!exporting}
-          onClick={() => doExport("gif")}
-          title="导出 GIF（10fps / 480×360 / 15s 上限）"
-        >
-          <FileImage className="h-5 w-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={!!exporting}
-          onClick={() => doExport("mp4")}
-          title="导出 MP4（25fps / 960×720 / 60s 上限；需本机 ffmpeg）"
-        >
-          <FileVideo className="h-5 w-5" />
-        </Button>
+        {!isSpine && (
+          <>
+            <Button variant="ghost" size="icon" onClick={screenshot} title="截图（F）">
+              <Camera className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!!exporting}
+              onClick={() => doExport("gif")}
+              title="导出 GIF（10fps / 480×360 / 15s 上限）"
+            >
+              <FileImage className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!!exporting}
+              onClick={() => doExport("mp4")}
+              title="导出 MP4（25fps / 960×720 / 60s 上限；需本机 ffmpeg）"
+            >
+              <FileVideo className="h-5 w-5" />
+            </Button>
+          </>
+        )}
         {exporting && (
           <>
             <Badge
@@ -373,6 +384,12 @@ export default function Replay({
           {err}
         </div>
       )}
+      {/* Spine 素材/统计警告：导出器有 problems 时不能静默 */}
+      {meta.spine?.warnings?.length ? (
+        <div className="border-b border-amber-900 bg-amber-950/80 px-4 py-1.5 text-xs text-amber-300">
+          Spine 提示：{meta.spine.warnings.join("；")}
+        </div>
+      ) : null}
       {/* 截图完成提示（路径可见，非静默） */}
       {shot && (
         <div className="absolute right-4 top-14 z-20 max-w-[80%] truncate rounded border border-border bg-card px-3 py-1.5 text-xs shadow">
@@ -394,12 +411,22 @@ export default function Replay({
             transform: `translate(${f?.quake_x ?? 0}px, ${f?.quake_y ?? 0}px)`,
           }}
         >
-          <img
-            ref={imgRef}
-            alt={meta.title}
-            className="max-h-full max-w-full object-contain"
-            draggable={false}
-          />
+          {meta.spine ? (
+            <SpineStage
+              spine={meta.spine}
+              now={f?.now ?? 0}
+              playing={!!f?.playing}
+              done={!!f?.done}
+              onError={setErr}
+            />
+          ) : (
+            <img
+              ref={imgRef}
+              alt={meta.title}
+              className="max-h-full max-w-full object-contain"
+              draggable={false}
+            />
+          )}
         </div>
         {/* 点击推进（对齐原作「点击继续」） */}
         <div

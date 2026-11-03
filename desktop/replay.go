@@ -67,6 +67,9 @@ type replaySession struct {
 	vs    map[string]*video.Stream // 每条影片一条流（惰性打开，按路径缓存）
 	audio *audio.System
 
+	// spine 非空：这是一部 Spine 骨骼动画，Go 侧不出 JPEG，画面由前端 canvas 渲染。
+	spine *SpineDTO
+
 	playing  bool
 	auto     bool
 	muted    bool
@@ -103,6 +106,8 @@ type SessionMeta struct {
 	OpCount    int    `json:"op_count"`
 	TextCount  int    `json:"text_count"`
 	DurationMs int64  `json:"duration_ms"`
+	// Spine 非空：前端用 WebGL canvas 渲染骨骼动画（Go 侧不编码 JPEG）。
+	Spine *SpineDTO `json:"spine,omitempty"`
 }
 
 // FrameDTO 一帧的前端所需全集。
@@ -269,6 +274,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		engineID = conv.EngineID
 	}
 	var ev *ir.Event
+	var unityCG *unitycg.CG
 	// 按**库扫出来的引擎**分派：registry 里的 Engine 可能为空，
 	// 约定文件（ucgr-convention.json）才是权威。
 	engine := strings.ToLower(strings.TrimSpace(lib.EngineID))
@@ -282,6 +288,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		if cerr != nil {
 			return SessionMeta{}, cerr
 		}
+		unityCG = &cg
 		ev, err = unitycg.BuildShow(cg)
 	case engine == "rmmz":
 		// RPG Maker：Script 是 data 目录下的 JSON，dataDir 从它反推。
@@ -309,6 +316,16 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		return SessionMeta{}, fmt.Errorf("%s 没有可回放的演出（台本 0 条）", title)
 	}
 
+	// Spine 的素材必须在开会话前读齐：缺 skeleton/atlas/贴图时明确报错，
+	// 不能开一个只有黑屏的会话。
+	var spine *SpineDTO
+	if unityCG != nil && unityCG.Kind == "spine" {
+		spine, err = loadSpineAssets(root, *unityCG)
+		if err != nil {
+			return SessionMeta{}, fmt.Errorf("加载 Spine 素材失败：%w", err)
+		}
+	}
+
 	s := &replaySession{
 		root:    root,
 		kind:    kind,
@@ -319,6 +336,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		auto:    a.confAuto(),
 		playing: true,
 		missing: map[string]string{},
+		spine:   spine,
 	}
 	s.opts.FontSize = 48
 	// 影片时长：台本里通常不写，靠 ffprobe 查；失败原因交给播放器写进诊断。
@@ -346,6 +364,10 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 			s.durMs = op.TMs
 		}
 	}
+	// Unity/Spine 的台本只有一条 wait（TMs=0），真实长度在 EndMs。
+	if ev.EndMs > s.durMs {
+		s.durMs = ev.EndMs
+	}
 	a.sess = s
 
 	// 最近播放时间：派生元数据，写失败不阻断回放。
@@ -368,6 +390,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		OpCount:    len(ev.Show),
 		TextCount:  len(ev.Texts),
 		DurationMs: s.durMs,
+		Spine:      s.spine,
 	}, nil
 }
 
@@ -463,6 +486,20 @@ func (s *replaySession) frameLocked() FrameDTO {
 		Texts:   boxDTOs(f),
 	}
 	dto.Cached = sig == s.lastSig
+	// Spine 会话没有 Go 侧画面：不编码 JPEG，前端 canvas 按 Now 自己出帧。
+	// 仍然更新快照，s.mu 忙时 GetFrame 能拿到最新的时间与播放状态。
+	if s.spine != nil {
+		dto.JPEG = ""
+		dto.Drawn = nil
+		s.lastSig = sig
+		s.lastJPEG = ""
+		s.lastDrawn = nil
+		s.snapMu.Lock()
+		s.snapLast = dto
+		s.snapOK = true
+		s.snapMu.Unlock()
+		return dto
+	}
 	if dto.Cached && s.lastJPEG != "" {
 		dto.JPEG = s.lastJPEG
 		dto.Drawn = append([]string(nil), s.lastDrawn...)
@@ -749,6 +786,9 @@ func (a *App) Screenshot() (string, error) {
 	s := a.sess
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.spine != nil {
+		return "", fmt.Errorf("Spine 骨骼动画暂不支持服务端截图（画面由前端 WebGL 渲染）")
+	}
 
 	rgba, _, err := player.RenderFrame(s.p, s.load, stageW, stageH)
 	if err != nil {
