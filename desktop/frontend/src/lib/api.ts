@@ -270,6 +270,28 @@ export interface ExportProgress {
 
 // ---------- M3 回放 DTO（与 desktop/replay.go 对应） ----------
 
+export interface SpineTextureDTO {
+  name: string;
+  data_url: string;
+}
+
+export interface SpineAnimationDTO {
+  name: string;
+  loop: boolean;
+  dur_ms: number;
+}
+
+/** Spine 会话素材（Go 侧一次性下发，前端 WebGL 渲染）。 */
+export interface SpineDTO {
+  skeleton: string;
+  atlas: string;
+  textures: SpineTextureDTO[];
+  animations: SpineAnimationDTO[];
+  animation: string; // 默认动画；空 = 取 skeleton 第一段
+  loop: boolean;
+  warnings?: string[];
+}
+
 export interface SessionMeta {
   kind: string;
   id: string;
@@ -280,6 +302,7 @@ export interface SessionMeta {
   op_count: number;
   text_count: number;
   duration_ms: number; // Show 台本时钟最大值（进度参考刻度），可能为 0（无 wait/wt 事件）
+  spine?: SpineDTO; // 非空 = Spine 骨骼动画，舞台由 WebGL canvas 渲染
 }
 
 export interface LayerDTO {
