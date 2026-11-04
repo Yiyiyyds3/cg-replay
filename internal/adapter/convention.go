@@ -125,16 +125,25 @@ func DefaultNScripter() Convention {
 	return Convention{EngineID: "nscript"}
 }
 
+// DefaultNeXAS 戏画 NeXAS 的默认约定。
+//
+// 剧本在 Script.pac（.bin 编译脚本）里，资源在 Bmp/Stand/System 等同目录
+// .pac 里，全部交给自动探测；没有画廊/CG 表。
+func DefaultNeXAS() Convention {
+	return Convention{EngineID: "nexas"}
+}
+
 // autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
 //
-// 这些引擎的剧本在解包树里的层级不固定（多卷 .pfs / 多个 dataXXXXX
-// 目录）或整作一份在根目录（nscript），约定里的 scenario_dir 留空是
+// 这些引擎的剧本在解包树里的层级不固定（多卷解包）或整作一份在根目录
+// （nscript）/打进 Script.pac（nexas），约定里的 scenario_dir 留空是
 // **正常形态**，不算配置缺失。
 var autoScenarioEngines = map[string]bool{
 	"artemis":    true,
 	"bgi":        true,
 	"catsystem2": true,
 	"nscript":    true,
+	"nexas":      true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -153,6 +162,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultCatSystem2(), true
 	case "nscript":
 		return DefaultNScripter(), true
+	case "nexas":
+		return DefaultNeXAS(), true
 	default:
 		return Convention{}, false
 	}
