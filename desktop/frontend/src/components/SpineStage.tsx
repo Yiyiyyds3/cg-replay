@@ -42,15 +42,19 @@ export default function SpineStage({
   now,
   playing,
   done,
+  skin,
   onError,
 }: {
   spine: SpineDTO;
   now: number;
   playing: boolean;
   done: boolean;
+  /** 当前皮肤（服装/状态）。空 = 用骨架自带的 default。 */
+  skin?: string;
   onError: (msg: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const skeletonRef = useRef<Skeleton | null>(null);
   const nowRef = useRef(now);
   const playingRef = useRef(playing);
   const doneRef = useRef(done);
@@ -91,6 +95,7 @@ export default function SpineStage({
         spine.skeleton,
       );
       const skeleton = new Skeleton(data);
+      skeletonRef.current = skeleton;
       const state = new AnimationState(new AnimationStateData(data));
       const physics = Physics.update; // 有物理约束时正常推进；没有也不报错
 
@@ -152,7 +157,7 @@ export default function SpineStage({
         state.apply(skeleton);
         skeleton.updateWorldTransform(physics);
         renderer?.begin();
-        renderer?.drawSkeleton(skeleton);
+        renderer?.drawSkeleton(skeleton, spine.pma ?? false);
         renderer?.end();
         raf = requestAnimationFrame(tick);
       };
@@ -173,6 +178,21 @@ export default function SpineStage({
       gl?.dispose();
     };
   }, [spine]);
+
+  // 换皮肤：不重建渲染器，只换当前皮肤并把插槽重置到 setup pose
+  // （否则上一套服装的 attachment 会残留在插槽上）。
+  useEffect(() => {
+    const skeleton = skeletonRef.current;
+    if (!skeleton || !skin) return;
+    try {
+      // 按名字换皮肤（setSkin 收的是 Skin 对象；setSkinByName 才吃字符串）
+      skeleton.setSkinByName(skin);
+      skeleton.setSlotsToSetupPose();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errRef.current(`切换皮肤「${skin}」失败：${msg}`);
+    }
+  }, [skin]);
 
   return (
     <canvas

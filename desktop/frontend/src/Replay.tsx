@@ -54,6 +54,14 @@ export default function Replay({
   const [favBusy, setFavBusy] = useState(false);
   const isSpine = !!meta.spine; // 骨骼动画：画面走 WebGL，Go 侧没有 JPEG/截图/导出
 
+  // 服装/状态（Spine 皮肤）：默认优先 default，其次第一套；切换事件时重置。
+  const skins = meta.spine?.skins ?? [];
+  const defaultSkin = skins.includes("default") ? "default" : (skins[0] ?? "");
+  const [skin, setSkin] = useState(defaultSkin);
+  useEffect(() => {
+    setSkin(defaultSkin);
+  }, [meta.id, defaultSkin]);
+
   // 进入回放：读收藏列表定位本事件星标（列表小，一次拉全）。
   useEffect(() => {
     let alive = true;
@@ -417,6 +425,7 @@ export default function Replay({
               now={f?.now ?? 0}
               playing={!!f?.playing}
               done={!!f?.done}
+              skin={skin || undefined}
               onError={setErr}
             />
           ) : (
@@ -434,6 +443,29 @@ export default function Replay({
           onClick={() => api.inputClick().catch((e) => setErr(e?.message ?? String(e)))}
         />
       </main>
+
+      {/* 服装/状态：CG 的差分几乎都靠 Spine 皮肤表达 */}
+      {skins.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto border-t border-border bg-background px-3 py-1.5">
+          <span className="shrink-0 text-[11px] text-muted-foreground">服装/状态</span>
+          {skins.map((name) => (
+            <button
+              key={name}
+              type="button"
+              title={name}
+              onClick={() => setSkin(name)}
+              className={
+                "shrink-0 rounded border px-2 py-0.5 text-[11px] transition-colors " +
+                (skin === name
+                  ? "border-primary text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground")
+              }
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 控制条 */}
       <footer className="flex items-center gap-3 border-t border-border bg-background px-4 py-2">

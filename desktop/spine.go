@@ -29,7 +29,13 @@ type SpineDTO struct {
 	Animations []SpineAnimationDTO `json:"animations"`
 	Animation  string              `json:"animation"` // 默认动画名（空=前端取第一段）
 	Loop       bool                `json:"loop"`
-	Warnings   []string            `json:"warnings,omitempty"`
+	// Skins 皮肤（服装/配件/状态）。CG 的差分几乎都靠皮肤表达，
+	// 前端据此列「换装」面板；第一个是骨架自带的 default。
+	Skins []string `json:"skins,omitempty"`
+	// PMA atlas 是否预乘 alpha（atlas 头里写着 pma:true 时，绘制要按预乘处理，
+	// 否则边缘会发黑/发亮）。空 atlas 时为 false。
+	PMA      bool     `json:"pma"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // SpineTextureDTO 一张 atlas 贴图（dataURL 避免 Wails 静态资源读不到游戏根目录）。
@@ -88,7 +94,12 @@ func loadSpineAssets(root string, cg unitycg.CG) (*SpineDTO, error) {
 		out.Warnings = append(out.Warnings, "索引缺少 Spine 统计，默认按第一段动画播放")
 	} else if cg.Spine.Error != "" {
 		out.Warnings = append(out.Warnings, "Spine 统计失败："+cg.Spine.Error)
+	} else {
+		out.Skins = append(out.Skins, cg.Spine.Skins...)
 	}
+	// atlas 头里的 pma:true 决定绘制时是否按预乘 alpha 处理。
+	// 传错不会报错，只会让边缘发黑/发亮——所以这里从原文里读，别猜。
+	out.PMA = atlasUsesPMA(string(atlasRaw))
 	for _, a := range cg.SpineAnimations() {
 		out.Animations = append(out.Animations, SpineAnimationDTO{
 			Name:  a.Name,
@@ -149,4 +160,18 @@ func readSpineFile(root, cgID, name string, maxSize int64) ([]byte, error) {
 		return nil, fmt.Errorf("%s 大小 %d MB，超过上限 %d MB", name, st.Size()>>20, maxSize>>20)
 	}
 	return os.ReadFile(p)
+}
+
+// atlasUsesPMA 读 atlas 头里的 `pma:true`。
+//
+// atlas 是逐页的分节文本（第一行是贴图名，后面若干 key:value），
+// 任一页写了 pma:true，就按预乘 alpha 绘制。
+func atlasUsesPMA(atlas string) bool {
+	for _, line := range strings.Split(atlas, "\n") {
+		l := strings.ToLower(strings.TrimSpace(line))
+		if l == "pma:true" || l == "pma: true" {
+			return true
+		}
+	}
+	return false
 }

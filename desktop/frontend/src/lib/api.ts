@@ -289,6 +289,10 @@ export interface SpineDTO {
   animations: SpineAnimationDTO[];
   animation: string; // 默认动画；空 = 取 skeleton 第一段
   loop: boolean;
+  /** 皮肤（服装/配件/状态）：换装面板据此列出 */
+  skins?: string[];
+  /** atlas 是否预乘 alpha（pma:true）：绘制时按预乘处理，否则边缘发黑 */
+  pma?: boolean;
   warnings?: string[];
 }
 
