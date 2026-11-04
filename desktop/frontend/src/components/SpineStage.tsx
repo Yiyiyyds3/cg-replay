@@ -43,6 +43,7 @@ export default function SpineStage({
   playing,
   done,
   skin,
+  onFirstFrame,
   onError,
 }: {
   spine: SpineDTO;
@@ -51,10 +52,13 @@ export default function SpineStage({
   done: boolean;
   /** 当前皮肤（服装/状态）。空 = 用骨架自带的 default。 */
   skin?: string;
+  /** 首帧画好后回调一次（canvas 转 dataURL），用于生成事件缩略图。 */
+  onFirstFrame?: (dataURL: string) => void;
   onError: (msg: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const skeletonRef = useRef<Skeleton | null>(null);
+  const onFirstFrameRef = useRef(onFirstFrame);
   const nowRef = useRef(now);
   const playingRef = useRef(playing);
   const doneRef = useRef(done);
@@ -63,6 +67,7 @@ export default function SpineStage({
   playingRef.current = playing;
   doneRef.current = done;
   errRef.current = onError;
+  onFirstFrameRef.current = onFirstFrame;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -159,6 +164,16 @@ export default function SpineStage({
         renderer?.begin();
         renderer?.drawSkeleton(skeleton, spine.pma ?? false);
         renderer?.end();
+        // 首帧回调整个会话只发一次：给缩略图生成用（canvas → dataURL）
+        if (onFirstFrameRef.current) {
+          const cb = onFirstFrameRef.current;
+          onFirstFrameRef.current = undefined;
+          try {
+            cb(canvas.toDataURL("image/png"));
+          } catch {
+            /* 截不出来就算了，卡片回落「无封面」 */
+          }
+        }
         raf = requestAnimationFrame(tick);
       };
       tick();

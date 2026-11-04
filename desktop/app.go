@@ -503,10 +503,13 @@ func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
 
 // coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
 func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
-	// 0) 游戏自带封面优先：导出器/用户放在根目录的 cover.png（一般是游戏主界面截图）。
-	//    这类 ACT 库没有「每部 CG 的标题画」，与其去猜首帧，不如统一用主界面。
-	if url, ok := readGameCover(g.Root); ok {
-		return url, nil
+	// 游戏级封面：根目录的 cover.png（主界面截图），侧栏靠它分清是哪个游戏。
+	// 只对 kind=game 生效——事件卡要用各自的首帧，不能全糊成一张图。
+	if kind == "game" {
+		if url, ok := readGameCover(g.Root); ok {
+			return url, nil
+		}
+		return "", fmt.Errorf("游戏没有 cover.png（把主界面截图放进游戏目录即可）")
 	}
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
 	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
@@ -534,6 +537,21 @@ func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 			default:
 				return "", fmt.Errorf("CG 事件 %s 没有页面图", id)
 			}
+		case "scene":
+			// unity 库的事件都是 scene：frames/still 直接用第一帧 PNG 当缩略图；
+			// spine 的首帧要 WebGL 渲染，由前端生成后存回来（SaveSpineThumb）。
+			cg, uerr := library.BuildUnityEvent(g.Root, id)
+			if uerr != nil {
+				return "", uerr
+			}
+			frames := cg.Frames
+			if len(frames) == 0 {
+				frames = cg.Files.PNG
+			}
+			if len(frames) == 0 {
+				return "", fmt.Errorf("%s 没有可用于封面的帧（spine 由前端生成）", id)
+			}
+			rel = unitycg.Ref(cg.ID, frames[0])
 		default:
 			return "", fmt.Errorf("暂不支持 %s 封面", kind)
 		}
@@ -619,6 +637,50 @@ func saveRatioCrop(src image.Image, path string, targetW, targetH int) error {
 	}
 	defer f.Close()
 	return png.Encode(f, out)
+}
+
+// SaveSpineThumb 前端把 Spine CG 的首帧（canvas 转 dataURL）存成缩略图。
+// 文件已存在时直接返回（幂等）：封面只生成一次，之后都读缓存。
+func (a *App) SaveSpineThumb(gameID, id, dataURL string) error {
+	g := a.gameByID(gameID)
+	if g == nil {
+		return fmt.Errorf("找不到游戏 %s", gameID)
+	}
+	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
+	path := filepath.Join(dir, safeName("scene")+"_"+safeName(id)+".png")
+	if _, err := os.Stat(path); err == nil {
+		return nil // 已有缓存，不覆盖
+	}
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(dataURL, prefix) {
+		return fmt.Errorf("缩略图不是 PNG dataURL")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(dataURL, prefix))
+	if err != nil {
+		return fmt.Errorf("缩略图解码失败：%w", err)
+	}
+	if len(raw) == 0 {
+		return fmt.Errorf("缩略图为空")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, raw, 0o644)
+}
+
+// gameByID 按注册表 id 找游戏。
+func (a *App) gameByID(id string) *registry.Game {
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return nil
+	}
+	for i := range reg.Games {
+		if reg.Games[i].ID == id {
+			return &reg.Games[i]
+		}
+	}
+	return nil
 }
 
 // readGameCover 读游戏根目录下的 cover.png（主界面截图）。

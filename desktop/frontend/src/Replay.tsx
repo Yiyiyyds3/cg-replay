@@ -427,6 +427,13 @@ export default function Replay({
               done={!!f?.done}
               skin={skin || undefined}
               onError={setErr}
+              onFirstFrame={(dataURL) => {
+                // 首帧当缩略图存回去：卡片墙的 spine 封面就靠它。
+                // 后端已存在时幂等跳过，失败不影响回放。
+                api
+                  .saveSpineThumb(meta.game_id, meta.id, dataURL)
+                  .catch(() => void 0);
+              }}
             />
           ) : (
             <img

@@ -234,6 +234,9 @@ export const api = {
     bridge().CatalogSpeakers(gameID) as Promise<SpeakerDTO[]>,
   getCoverForGame: (gameID: string, kind: string, id: string) =>
     bridge().GetCoverForGame(gameID, kind, id) as Promise<string>,
+  // Spine 首帧缩略图：前端 WebGL 渲染后存回（后端已存在则幂等跳过）
+  saveSpineThumb: (gameID: string, id: string, dataURL: string) =>
+    bridge().SaveSpineThumb(gameID, id, dataURL) as Promise<void>,
   // 兼容旧绑定；等价于 addGame
   setRoot: (root: string) => bridge().SetRoot(root) as Promise<LibraryDTO>,
   getLibrary: () => bridge().GetLibrary() as Promise<LibraryDTO>,

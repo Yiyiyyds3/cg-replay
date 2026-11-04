@@ -114,6 +114,10 @@ export function Rescan() {
   return window['go']['main']['App']['Rescan']();
 }
 
+export function SaveSpineThumb(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveSpineThumb'](arg1, arg2, arg3);
+}
+
 export function ScanDirectory(arg1) {
   return window['go']['main']['App']['ScanDirectory'](arg1);
 }

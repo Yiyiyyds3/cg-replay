@@ -59,6 +59,8 @@ export function ReportClientError(arg1:string):Promise<void>;
 
 export function Rescan():Promise<library.Library>;
 
+export function SaveSpineThumb(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function ScanDirectory(arg1:string):Promise<string>;
 
 export function Screenshot():Promise<string>;

@@ -1190,16 +1190,7 @@ function GameSidebar({
           title={`${g.title}\n${g.root}`}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-left"
         >
-          <span
-            className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
-              isActive
-                ? "border-primary/40 bg-primary/15 text-primary"
-                : "border-border bg-background/40",
-            )}
-          >
-            <Gamepad2 className="h-4 w-4" />
-          </span>
+          <GameThumb gameID={g.id} active={isActive} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium">{g.title}</span>
             <span className="block truncate text-[10px] text-muted-foreground">
@@ -2208,5 +2199,58 @@ function EventCard({
         )}
       </div>
     </button>
+  );
+}
+
+// GameThumb —— 侧栏的游戏缩略图：根目录的 cover.png（主界面截图）。
+// 用它分清「这是哪个游戏」；没有就回落手柄图标。
+// 结果缓存进程级：切游戏/重扫不会反复请求同一张。
+const gameThumbs = new Map<string, string>(); // gameID → dataURL（空串 = 确认没有）
+function GameThumb({ gameID, active }: { gameID: string; active: boolean }) {
+  const [url, setUrl] = useState<string | null>(gameThumbs.get(gameID) ?? null);
+  useEffect(() => {
+    const hit = gameThumbs.get(gameID);
+    if (hit !== undefined) {
+      setUrl(hit);
+      return;
+    }
+    let alive = true;
+    api
+      .getCoverForGame(gameID, "game", gameID)
+      .then((u) => {
+        gameThumbs.set(gameID, u);
+        if (alive) setUrl(u);
+      })
+      .catch(() => {
+        gameThumbs.set(gameID, "");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [gameID]);
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt=""
+        draggable={false}
+        className={cn(
+          "h-8 w-8 shrink-0 rounded-md border object-cover",
+          active ? "border-primary/40" : "border-border",
+        )}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
+        active
+          ? "border-primary/40 bg-primary/15 text-primary"
+          : "border-border bg-background/40",
+      )}
+    >
+      <Gamepad2 className="h-4 w-4" />
+    </span>
   );
 }
