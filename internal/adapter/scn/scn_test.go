@@ -3,6 +3,7 @@ package scn
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -303,6 +304,44 @@ func TestBuildShowCGReal(t *testing.T) {
 		return
 	}
 	t.Skip("没有可用图片序列的 CG 条目")
+}
+
+// TestDecodeCGListKeySwitch 键在文件中途切换的 CG 表也要能解出来。
+// 春色的 cglist.csv 在行中间从 0x13 切成 0x45（解包产物按块异或的产物），
+// 单键解码只能得到「前半对、后半乱」。
+func TestDecodeCGListKeySwitch(t *testing.T) {
+	// 表头用 CP932 字节（与真实文件一致），数据行是 ASCII。
+	plain := append([]byte{
+		0x23, 0x43, 0x47, 0x83, 0x82, 0x81, 0x5b, 0x83, 0x68, 0x88, 0xea, 0x97, 0x97, 0x2c, 0x0d, 0x0a,
+	}, []byte("thum_ev311a,\tev311a,ev311b,ev311c,ev311d\r\n"+
+		"thum_ev312a,\tev312a,ev312b\r\n")...)
+	raw := append([]byte{}, plain...)
+	// 前 40 字节用 0x13，其余用 0x45——切点落在 ev311 行的图片列表中间。
+	for i := range raw {
+		if i < 40 {
+			raw[i] ^= 0x13
+		} else {
+			raw[i] ^= 0x45
+		}
+	}
+	f := filepath.Join(t.TempDir(), "cglist.csv")
+	if err := os.WriteFile(f, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := ParseCGList(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("条目数 = %d，期望 2", len(entries))
+	}
+	want := []string{"ev311a", "ev311b", "ev311c", "ev311d"}
+	if got := entries[0].Images; !slices.Equal(got, want) {
+		t.Fatalf("ev311 图片 = %v，期望 %v", got, want)
+	}
+	if got := entries[1].Images; !slices.Equal(got, []string{"ev312a", "ev312b"}) {
+		t.Fatalf("ev312 图片 = %v", got)
+	}
 }
 
 // TestCleanBody 台词清洗：注音与内联命令都不能带到画面上。

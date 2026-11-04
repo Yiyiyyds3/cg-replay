@@ -143,7 +143,8 @@ func ScanSCN(root string, conv adapter.Convention) (*Library, error) {
 				}
 				pages := make([]string, 0, len(e.Images))
 				for _, img := range e.Images {
-					pages = append(pages, scn.ResolveImage(root, img))
+					page, _ := scn.ResolveImageComposite(root, img)
+					pages = append(pages, page)
 				}
 				title := e.Title
 				if title == "" || title == e.Thumb {

@@ -195,6 +195,24 @@ func ResolveImage(root, ref string) string {
 	return assetIndex(root, DefaultOptions()).Image(ref)
 }
 
+// ResolveImageComposite 解析 CG 表里的合成引用 `差分?底图`。
+//
+// 新章的 sd CG 行写作 `sd_z01a?sd_z01_base1`：差分叠在底图上。本播放器
+// 不做实时合成，优先取差分（CG 内容本体）；差分不在时退到底图。
+func ResolveImageComposite(root, ref string) (string, string) {
+	a, b, ok := strings.Cut(ref, "?")
+	if !ok {
+		return ResolveImage(root, ref), ""
+	}
+	if pa := ResolveImage(root, a); pa != "" && pa != a {
+		return pa, ""
+	}
+	if pb := ResolveImage(root, b); pb != "" && pb != b {
+		return pb, ""
+	}
+	return ResolveImage(root, a), ""
+}
+
 // ResolveAudio 同上，针对语音/BGM。
 func ResolveAudio(root, ref string) string {
 	return assetIndex(root, DefaultOptions()).Audio(ref)
