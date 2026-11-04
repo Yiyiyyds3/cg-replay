@@ -546,6 +546,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="只出索引，不写素材")
     ap.add_argument("--force", action="store_true", help="已存在的文件也重写")
     ap.add_argument(
+        "--cover",
+        default="",
+        help="封面图（一般放游戏主界面截图）复制成 <out>/cover.png；桌面端优先用它当封面",
+    )
+    ap.add_argument(
         "--allow-repo-output",
         action="store_true",
         help="允许把产物写进 git 仓库（默认拒绝，避免 100+ MB PNG 被顺手提交）",
@@ -734,6 +739,25 @@ def main() -> int:
             print("  ! 没有旧 cg-index.json：这次只写 --only 指定的 CG")
     cgs.sort(key=lambda c: str(c.get("id", "")))
 
+    # 封面：不猜、不渲染，只用调用方给的那张（游戏主界面截图）。
+    # 没给就保留导出目录里已有的 cover.png（可以先自己放一张再重跑）。
+    cover_path = out_path(args.out, "cover.png")
+    cover_info = None
+    if args.cover and not args.dry_run:
+        if not os.path.isfile(args.cover):
+            raise SystemExit(f"封面图不存在：{args.cover}")
+        with open(args.cover, "rb") as f:
+            data = f.read()
+        if len(data) > 32 << 20:
+            raise SystemExit(f"封面图太大（{len(data) >> 20} MB），请压到 32 MB 以内")
+        os.makedirs(args.out, exist_ok=True)
+        with open(cover_path, "wb") as f:
+            f.write(data)
+        cover_info = {"file": "cover.png", "bytes": len(data), "source": os.path.basename(args.cover)}
+        print(f"  封面：{os.path.basename(args.cover)} → cover.png（{len(data)//1024} KB）")
+    elif os.path.isfile(cover_path):
+        cover_info = {"file": "cover.png", "bytes": os.path.getsize(cover_path), "source": "existing"}
+
     index = {
         "schema": 1,
         "engine": "unity",
@@ -753,6 +777,7 @@ def main() -> int:
         "bytes": 0,  # 下面覆盖
         "cgs": cgs,
         "event_groups": groups,
+        "cover": cover_info,
     }
     index["bytes"] = sum(int(c.get("bytes") or 0) for c in cgs)
 

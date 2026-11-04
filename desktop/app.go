@@ -503,6 +503,11 @@ func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
 
 // coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
 func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
+	// 0) 游戏自带封面优先：导出器/用户放在根目录的 cover.png（一般是游戏主界面截图）。
+	//    这类 ACT 库没有「每部 CG 的标题画」，与其去猜首帧，不如统一用主界面。
+	if url, ok := readGameCover(g.Root); ok {
+		return url, nil
+	}
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
 	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -614,4 +619,19 @@ func saveRatioCrop(src image.Image, path string, targetW, targetH int) error {
 	}
 	defer f.Close()
 	return png.Encode(f, out)
+}
+
+// readGameCover 读游戏根目录下的 cover.png（主界面截图）。
+//
+// 约定：导出目录里放一张 cover.png，卡片墙就用它当封面，不再按事件去生成。
+// 没有就返回 false，交回原来的「按事件取首图」逻辑。
+func readGameCover(root string) (string, bool) {
+	if strings.TrimSpace(root) == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(root, "cover.png"))
+	if err != nil || len(data) == 0 {
+		return "", false
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), true
 }
