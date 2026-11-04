@@ -14,6 +14,7 @@ import (
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/adapter/nexas"
+	"ucgr/internal/adapter/nitro"
 	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/ir"
@@ -115,6 +116,14 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 				w, h = 1024, 768
 			}
 			ev, err := nexas.BuildPacScriptEvent(abs(e.Script), e.Label, w, h)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "nitro"):
+			// Nitro+：Label = .nss 条目名。舞台推不出来按鬼哭街重制版 1024×768。
+			w, h := stageOf(conv, lib)
+			if w <= 0 || h <= 0 {
+				w, h = 1024, 768
+			}
+			ev, err := nitro.BuildNssEventStage(abs(e.Script), e.Label, w, h)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)

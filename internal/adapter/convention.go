@@ -133,6 +133,14 @@ func DefaultNeXAS() Convention {
 	return Convention{EngineID: "nexas"}
 }
 
+// DefaultNitro Nitro+ / SDActi 的默认约定。
+//
+// 剧本打进 nss.npa（.nss 明文脚本，汉化版游戏优先读 nss-1.npa 覆盖包），
+// 资源在 cg/sound 等同目录 .npa 里，全部交给自动探测；没有画廊/CG 表。
+func DefaultNitro() Convention {
+	return Convention{EngineID: "nitro", StageW: 1024, StageH: 768}
+}
+
 // autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
 //
 // 这些引擎的剧本在解包树里的层级不固定（多卷解包）或整作一份在根目录
@@ -144,6 +152,7 @@ var autoScenarioEngines = map[string]bool{
 	"catsystem2": true,
 	"nscript":    true,
 	"nexas":      true,
+	"nitro":      true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -164,6 +173,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultNScripter(), true
 	case "nexas":
 		return DefaultNeXAS(), true
+	case "nitro":
+		return DefaultNitro(), true
 	default:
 		return Convention{}, false
 	}
