@@ -294,6 +294,8 @@ export interface SpineDTO {
   loop: boolean;
   /** 皮肤（服装/配件/状态）：换装面板据此列出 */
   skins?: string[];
+  /** 背景层：不属于 atlas 页的独立 PNG（游戏里垫在角色底下），先于骨架绘制 */
+  backgrounds?: SpineTextureDTO[];
   /** atlas 是否预乘 alpha（pma:true）：绘制时按预乘处理，否则边缘发黑 */
   pma?: boolean;
   warnings?: string[];

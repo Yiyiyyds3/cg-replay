@@ -32,6 +32,9 @@ type SpineDTO struct {
 	// Skins 皮肤（服装/配件/状态）。CG 的差分几乎都靠皮肤表达，
 	// 前端据此列「换装」面板；第一个是骨架自带的 default。
 	Skins []string `json:"skins,omitempty"`
+	// Backgrounds 背景层：CG 目录里不属于 atlas 页的独立 PNG（如 bench.png）。
+	// 游戏内是「背景 + Spine 角色」合成的，只画骨架会黑底——差距主要在这。
+	Backgrounds []SpineTextureDTO `json:"backgrounds,omitempty"`
 	// PMA atlas 是否预乘 alpha（atlas 头里写着 pma:true 时，绘制要按预乘处理，
 	// 否则边缘会发黑/发亮）。空 atlas 时为 false。
 	PMA      bool     `json:"pma"`
@@ -100,6 +103,8 @@ func loadSpineAssets(root string, cg unitycg.CG) (*SpineDTO, error) {
 	// atlas 头里的 pma:true 决定绘制时是否按预乘 alpha 处理。
 	// 传错不会报错，只会让边缘发黑/发亮——所以这里从原文里读，别猜。
 	out.PMA = atlasUsesPMA(string(atlasRaw))
+	// atlas 引用的页名集合：贴图是不是「页」以此为准，不按名字猜
+	pageSet := atlasPageNames(string(atlasRaw))
 	for _, a := range cg.SpineAnimations() {
 		out.Animations = append(out.Animations, SpineAnimationDTO{
 			Name:  a.Name,
@@ -123,10 +128,16 @@ func loadSpineAssets(root string, cg unitycg.CG) (*SpineDTO, error) {
 		if total > maxSpineTotal {
 			return nil, fmt.Errorf("CG %s 的 Spine 贴图总大小超过 %d MB", cg.ID, maxSpineTotal>>20)
 		}
-		out.Textures = append(out.Textures, SpineTextureDTO{
+		dto := SpineTextureDTO{
 			Name:    name,
 			DataURL: "data:image/png;base64," + base64.StdEncoding.EncodeToString(data),
-		})
+		}
+		if pageSet[strings.TrimSuffix(name, filepath.Ext(name))+".png"] || pageSet[name] {
+			out.Textures = append(out.Textures, dto)
+		} else {
+			// 不是 atlas 页 → 背景层（游戏里垫在角色底下）
+			out.Backgrounds = append(out.Backgrounds, dto)
+		}
 	}
 	if len(out.Textures) == 0 {
 		return nil, fmt.Errorf("CG %s 没有可用的 Spine 贴图（files.png=%v）", cg.ID, cg.Files.PNG)
@@ -174,4 +185,16 @@ func atlasUsesPMA(atlas string) bool {
 		}
 	}
 	return false
+}
+
+// atlasPageNames 从 atlas 原文里取引用的页名（每段以「X.png」行开头）。
+func atlasPageNames(atlas string) map[string]bool {
+	set := map[string]bool{}
+	for _, line := range strings.Split(atlas, "\n") {
+		l := strings.TrimSpace(line)
+		if strings.HasSuffix(l, ".png") && !strings.Contains(l, ":") {
+			set[l] = true
+		}
+	}
+	return set
 }

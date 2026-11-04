@@ -96,6 +96,19 @@ export default function SpineStage({
         page.setTexture(new GLTexture(gl, img, false));
       }
 
+      // 背景层：CG 目录里垫在角色底下的独立 PNG（如 bench.png）。
+      // 游戏内是「背景 + 角色」合成的，不画它就是黑底。
+      const bgTextures: GLTexture[] = [];
+      for (const bg of spine.backgrounds ?? []) {
+        try {
+          const img = await loadImage(bg.data_url);
+          if (disposed) return;
+          bgTextures.push(new GLTexture(gl, img, false));
+        } catch {
+          /* 单张背景失败不致命：回落黑底，warning 已由后端给 */
+        }
+      }
+
       const data = new SkeletonJson(new AtlasAttachmentLoader(atlas)).readSkeletonData(
         spine.skeleton,
       );
@@ -162,7 +175,20 @@ export default function SpineStage({
         state.apply(skeleton);
         skeleton.updateWorldTransform(physics);
         renderer?.begin();
-        renderer?.drawSkeleton(skeleton, spine.pma ?? false);
+        // 背景先铺满相机视口（与游戏内「背景填屏 + 角色居中」同构），再画角色
+        if (renderer) {
+          const cam = renderer.camera;
+          for (const tex of bgTextures) {
+            renderer.drawTexture(
+              tex,
+              cam.position.x - cam.viewportWidth / 2,
+              cam.position.y - cam.viewportHeight / 2,
+              cam.viewportWidth,
+              cam.viewportHeight,
+            );
+          }
+          renderer.drawSkeleton(skeleton, spine.pma ?? false);
+        }
         renderer?.end();
         // 首帧回调整个会话只发一次：给缩略图生成用（canvas → dataURL）
         if (onFirstFrameRef.current) {

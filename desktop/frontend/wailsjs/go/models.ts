@@ -612,6 +612,7 @@ export namespace main {
 	    animation: string;
 	    loop: boolean;
 	    skins?: string[];
+	    backgrounds?: SpineTextureDTO[];
 	    pma: boolean;
 	    warnings?: string[];
 	
@@ -628,6 +629,7 @@ export namespace main {
 	        this.animation = source["animation"];
 	        this.loop = source["loop"];
 	        this.skins = source["skins"];
+	        this.backgrounds = this.convertValues(source["backgrounds"], SpineTextureDTO);
 	        this.pma = source["pma"];
 	        this.warnings = source["warnings"];
 	    }

@@ -19,6 +19,7 @@ func TestLoadSpineAssets(t *testing.T) {
 		"HCG_02.json":  `{"skeleton":{"spine":"4.2"}}`,
 		"HCG_02.atlas": "HCG_02.png\nsize: 1024,1024\npma:true\n",
 		"HCG_02.png":   "fake-png",
+		"bench.png":    "fake-bg", // 背景：不在 atlas 页里（如 Breastfeeding01 的长凳）
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
 			t.Fatal(err)
@@ -26,7 +27,7 @@ func TestLoadSpineAssets(t *testing.T) {
 	}
 	cg := unitycg.CG{ID: "HCG02", Kind: "spine"}
 	cg.Files.Text = []string{"HCG_02.json", "HCG_02.atlas"}
-	cg.Files.PNG = []string{"HCG_02.png"}
+	cg.Files.PNG = []string{"HCG_02.png", "bench.png"}
 	cg.Spine = &unitycg.SpineInfo{
 		Skins: []string{"default", "clothes/nude"},
 		Animations: []unitycg.AnimRef{
@@ -43,6 +44,10 @@ func TestLoadSpineAssets(t *testing.T) {
 	}
 	if len(sp.Textures) != 1 || !strings.HasPrefix(sp.Textures[0].DataURL, "data:image/png;base64,") {
 		t.Fatalf("贴图应转成 dataURL：%+v", sp.Textures)
+	}
+	// 背景分拣：atlas 页进 Textures，非页 PNG 进 Backgrounds（垫在角色底下）
+	if len(sp.Backgrounds) != 1 || sp.Backgrounds[0].Name != "bench.png" {
+		t.Fatalf("背景层应识别出 bench.png：%+v", sp.Backgrounds)
 	}
 	if sp.Animation != "idle" || !sp.Loop {
 		t.Fatalf("默认动画不对：%+v", sp)

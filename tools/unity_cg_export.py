@@ -591,12 +591,51 @@ def main() -> int:
 
         env = UnityPy.load(bundle)
 
+        # 第一遍：TextAsset 内容自证。清单按 Art/CG/ 目录归属，但有些骨架/图集
+        # 不在那些目录下（实测：HCG01_ride、NPC_H_001/002/003），按名字匹配会漏成孤儿。
+        # 骨架(JSON)或图集(.atlas)自己就是一个 CG：以自身名字登记成新的归属键。
+        atlas_pages: dict[str, set[str]] = {}
+        for o in env.objects:
+            if o.type.name != "TextAsset":
+                continue
+            d = o.read()
+            name = getattr(d.m_Name, "string", str(d.m_Name))
+            stem = os.path.splitext(name)[0]
+            if stem in asset_to_cg:
+                continue
+            raw = d.m_Script
+            raw = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", "ignore")
+            is_atlas = name.lower().endswith(".atlas")
+            if raw[:1] != b"{" and not is_atlas:
+                continue  # 既不是骨架也不是图集（别的文本），不参与归属
+            asset_to_cg[stem].add(stem)
+            if is_atlas:
+                # 页清单：每个图集段以「X.png」行开头
+                import re as _re
+                atlas_pages[stem] = set(_re.findall(r"^(\S+\.png)\s*$", raw.decode("utf-8", "ignore"), _re.M))
+
         for o in env.objects:
             tname = o.type.name
             if tname == "Texture2D":
                 d = o.read()
                 name = safe_component(getattr(d.m_Name, "string", str(d.m_Name)), "texture")
                 targets = asset_to_cg.get(name, set())
+                if not targets:
+                    # 图集页归属：这张贴图是某个图集引用的页（如 HCG01_ride_2 → HCG01_ride）
+                    for stem, pages in atlas_pages.items():
+                        if (name + ".png") in pages:
+                            targets = asset_to_cg[stem]
+                            break
+                if not targets:
+                    # 最长前缀归属：贴图名以某个 CG 键开头就算（键越长越优先，
+                    # 保证 HCG01_ride_2 归 HCG01_ride 而不是 HCG01）
+                    best = max(
+                        (k for k in asset_to_cg if name.startswith(k)),
+                        key=len,
+                        default=None,
+                    )
+                    if best:
+                        targets = asset_to_cg[best]
                 if not targets:
                     orphan["png"] += 1
                     continue
@@ -791,6 +830,8 @@ def main() -> int:
         cg_dir = out_path(args.out, "cg", cid)
         if c.get("kind") == "spine" and not texts:
             check_problems.append(f"{cid}: 标为 spine 但没有骨架文件")
+        if c.get("kind") == "spine" and texts and not pngs:
+            check_problems.append(f"{cid}: spine 缺贴图（可能在本 bundle 之外），回放会缺页")
         if c.get("kind") == "frames" and len(pngs) < 2:
             check_problems.append(f"{cid}: 标为 frames 但只有 {len(pngs)} 张图")
         if args.dry_run:
