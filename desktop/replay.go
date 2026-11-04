@@ -27,21 +27,21 @@ import (
 
 	"ucgr/internal/adapter/artemis"
 	"ucgr/internal/adapter/bgi"
-	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
-	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 )
 
 const (
-	stageW      = 1600
-	stageH      = 1200
-	autoWaitMs  = 2500 // 与 cmd/cgreplay 一致
-	jpegQuality = 88
-	encMinGap   = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
+	// defaultStageW/H 台本未声明画布尺寸时的默认舞台（KiriKiri 本作 4:3）。
+	// 编译剧本（scn/9nine）会在 IR 里带 1280×720，按事件走。
+	defaultStageW = 1600
+	defaultStageH = 1200
+	autoWaitMs    = 2500 // 与 cmd/cgreplay 一致
+	jpegQuality   = 88
+	encMinGap     = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
 
 	durSnapshots = 240 // 时长估计取样点数
 )
@@ -53,6 +53,10 @@ type replaySession struct {
 	kind  string // cg / scene / chapter
 	id    string
 	title string
+
+	// sw/sh 本会话的渲染画布（= 事件声明的原生舞台；素材按原生坐标合成，
+	// 画布尺寸必须匹配，否则素材会挤在左上角）。
+	sw, sh int
 
 	ev   *ir.Event
 	opts player.Options
@@ -214,52 +218,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	if err != nil {
 		return SessionMeta{}, err
 	}
+	conv, err := gameConvention(g.Root, g.Engine)
+	if err != nil {
+		return SessionMeta{}, err
+	}
 
-	var script, label, title string
-	chapterPos := -1
-	var chEvent *library.ChapterEvent
-	switch kind {
-	case "cg":
-		e := lib.FindCG(id)
-		if e == nil {
-			return SessionMeta{}, fmt.Errorf("找不到 CG 事件 %s", id)
-		}
-		script, label, title = e.Script, e.Label, e.Title
-	case "chapter":
-		e := lib.FindChapter(id)
-		if e == nil {
-			return SessionMeta{}, fmt.Errorf("找不到演出段落 %s", id)
-		}
-		script, chapterPos, title = e.Script, e.LabelPos, e.Title
-		chEvent = e
-	case "scene":
-		e := lib.FindScene(id)
-		if e == nil {
-			return SessionMeta{}, fmt.Errorf("找不到场景 %s", id)
-		}
-		script, title = e.Script, e.Title
-	default:
-		return SessionMeta{}, fmt.Errorf("未知事件类型 %s", kind)
-	}
-	if script == "" {
-		return SessionMeta{}, fmt.Errorf("%s 没有脚本信息", title)
-	}
-	sp := filepath.Join(root, filepath.FromSlash(script))
-	var ev *ir.Event
-	switch {
-	case chapterPos >= 0 && chEvent != nil:
-		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
-		ev, err = library.BuildChapterEvent(root, chEvent)
-	case strings.EqualFold(g.Engine, "artemis"):
-		// Artemis：事件单位是剧本里的 block，Label 记 block 序号。
-		ev, err = buildArtemisShow(sp, label)
-	case strings.EqualFold(g.Engine, "bgi"):
-		// BGI：事件由适配器按换背景/换事件切出，Label 记事件序号；
-		// builder 已经产好 Show 台本，直接用。
-		ev, err = buildBGIShow(sp, label)
-	default:
-		ev, err = kirikiri.BuildShowSegment(sp, label)
-	}
+	// 构建台本：与台词索引共用同一入口（desktop/eventbuild.go），
+	// 保证「列表里列的」和「点开能播的」是同一条路径。
+	ev, title, err := buildEvent(root, engineOf(g.Engine), conv, lib, kind, id)
 	if err != nil {
 		return SessionMeta{}, fmt.Errorf("构建台本失败：%w", err)
 	}
@@ -267,11 +233,20 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		return SessionMeta{}, fmt.Errorf("%s 没有可回放的演出（台本 0 条）", title)
 	}
 
+	// 画布尺寸跟着约定走：9nine（scn）声明 1280×720，KiriKiri 未声明时
+	// 沿用默认 4:3 舞台。素材按原生坐标合成，尺寸必须与约定一致。
+	sw, sh := defaultStageW, defaultStageH
+	if conv.StageW > 0 && conv.StageH > 0 {
+		sw, sh = conv.StageW, conv.StageH
+	}
+
 	s := &replaySession{
 		root:    root,
 		kind:    kind,
 		id:      id,
 		title:   title,
+		sw:      sw,
+		sh:      sh,
 		ev:      ev,
 		opts:    player.DefaultOptions(),
 		auto:    a.confAuto(),
@@ -313,8 +288,8 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		ID:         id,
 		Title:      title,
 		GameID:     g.ID,
-		StageW:     stageW,
-		StageH:     stageH,
+		StageW:     sw,
+		StageH:     sh,
 		OpCount:    len(ev.Show),
 		TextCount:  len(ev.Texts),
 		DurationMs: s.durMs,
@@ -424,7 +399,7 @@ func (s *replaySession) frameLocked() FrameDTO {
 	}
 	s.lastSig = sig
 	s.lastEnc = time.Now()
-	j, err := renderJPEG(s.p, s.load, f.QuakeX, f.QuakeY)
+	j, err := renderJPEG(s.p, s.load, s.sw, s.sh)
 	if err != nil {
 		dto.JPEG = s.lastJPEG // 理论上到不了（stageLoader 已吞素材错）
 		return dto
@@ -508,8 +483,8 @@ func boxDTOs(f player.Frame) []BoxDTO {
 
 // renderJPEG RenderFrame → JPEG dataURL（quake 偏移已由 Compose/定位处理？——
 // RenderFrame 只管图层与框底，前端拿 QuakeX/Y 对 <img> 做位移）。
-func renderJPEG(p *player.Player, load player.Loader, _, _ int) (string, error) {
-	rgba, _, err := player.RenderFrame(p, load, stageW, stageH)
+func renderJPEG(p *player.Player, load player.Loader, w, h int) (string, error) {
+	rgba, _, err := player.RenderFrame(p, load, w, h)
 	if err != nil {
 		return "", err
 	}
@@ -657,7 +632,7 @@ func (a *App) Screenshot() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rgba, _, err := player.RenderFrame(s.p, s.load, stageW, stageH)
+	rgba, _, err := player.RenderFrame(s.p, s.load, s.sw, s.sh)
 	if err != nil {
 		return "", err
 	}

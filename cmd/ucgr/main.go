@@ -28,6 +28,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/scn"
 	"ucgr/internal/audio"
 	"ucgr/internal/decode"
 	"ucgr/internal/hash"
@@ -218,12 +219,16 @@ func cmdEvents(args []string) error {
 	if root == "" {
 		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json]")
 	}
-	lib, err := library.Scan(root)
+	engineID, conv, err := library.DetectConvention(root)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("事件库 %s（%s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
-		lib.Game, lib.Root, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
+	lib, err := library.ScanWith(root, conv)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("事件库 %s（%s，引擎 %s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
+		lib.Game, lib.Root, engineID, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
 	const showMax = 24
 	for i, c := range lib.CGs {
 		if i >= showMax {
@@ -251,6 +256,10 @@ func cmdEvents(args []string) error {
 			break
 		}
 		fmt.Printf("  段落 #%-3d %-10s %s\n", c.Index, c.Scene, c.Title)
+	}
+	// 跳过/降级的条目：解包产物本身有问题时如实报出来，不要静默少一堆事件。
+	for _, w := range lib.Warnings {
+		fmt.Printf("  ! %s\n", w)
 	}
 	if out != "" {
 		if err := lib.Save(out); err != nil {
@@ -929,7 +938,7 @@ func cmdPlay(args []string) error {
 			"      或: ucgr play --script <脚本.ks> --chapter <标签下标> [--assets 素材根]")
 	}
 	if assets == "" && scriptPath != "" {
-		assets = gameRootOf(scriptPath)
+		assets = library.GameRootOf(scriptPath)
 	}
 	if assets == "" {
 		return fmt.Errorf("play 需要 --assets <素材根>（解包目录或 S2 裁剪产物）")
@@ -939,6 +948,8 @@ func cmdPlay(args []string) error {
 		ev      *ir.Event
 		gameID  string
 		evLabel string
+		// canvasW/H 台本自带画布（scn 为 1280×720）；0 = 用默认 1600×1200。
+		canvasW, canvasH int
 	)
 	if scriptPath != "" {
 		// 按原作自己的分割单位播放：章节（*labelNN|显示名）、标签段（*cgNN）或整脚本。
@@ -946,9 +957,20 @@ func cmdPlay(args []string) error {
 			e   *ir.Event
 			err error
 		)
-		if hasChapter {
+		switch {
+		case strings.EqualFold(filepath.Ext(scriptPath), ".scn"):
+			// PSB 编译剧本：--chapter 当 scene 序号，缺省整份脚本。
+			root := library.GameRootOf(scriptPath)
+			opt := scn.DefaultOptions()
+			if hasChapter {
+				e, err = scn.BuildShowScene(root, scriptPath, chapterPos, opt)
+			} else {
+				e, err = scn.BuildShowFile(root, scriptPath, opt)
+			}
+			canvasW, canvasH = opt.StageW, opt.StageH
+		case hasChapter:
 			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
-		} else {
+		default:
 			e, err = kirikiri.BuildShowSegment(scriptPath, label)
 		}
 		if err != nil {
@@ -958,8 +980,13 @@ func cmdPlay(args []string) error {
 			return fmt.Errorf("脚本 %s 的标签段 %q 里没有可演的台本", filepath.Base(scriptPath), label)
 		}
 		ev = e
-		gameID = filepath.Base(gameRootOf(scriptPath))
+		gameID = filepath.Base(library.GameRootOf(scriptPath))
 		switch {
+		case strings.EqualFold(filepath.Ext(scriptPath), ".scn"):
+			evLabel = fmt.Sprintf("PSB 剧本 %s", filepath.Base(scriptPath))
+			if hasChapter {
+				evLabel = fmt.Sprintf("PSB 场景 %d（%s）", chapterPos, e.Title)
+			}
 		case hasChapter:
 			evLabel = fmt.Sprintf("章节 %s（%s）", e.Title, e.EventID)
 		case strings.TrimSpace(label) != "":
@@ -995,7 +1022,11 @@ func cmdPlay(args []string) error {
 	}
 	w, h := parseSize(sizeSpec)
 	if w <= 0 || h <= 0 {
-		w, h = 1600, 1200 // Config.tjs：scWidth/scHeight
+		if canvasW > 0 && canvasH > 0 {
+			w, h = canvasW, canvasH // scn：剧本自带舞台尺寸（9nine 1280×720）
+		} else {
+			w, h = 1600, 1200 // Config.tjs：scWidth/scHeight
+		}
 	}
 
 	load := player.Cached(playLoader(assets))

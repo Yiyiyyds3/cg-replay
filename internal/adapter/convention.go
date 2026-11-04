@@ -43,6 +43,19 @@ type Convention struct {
 	// SceneRe 场景脚本文件正则（如 `^\d{2}[A-Za-z_0-9]*\.ks$`）。
 	// 空 = 场景由 fallbackStoryScenes 兜底（按章节标记找）。
 	SceneRe string `json:"scene_re"`
+
+	// —— 以下为编译型剧本引擎（scn / PSB）专用，其它引擎留空即可 ——
+
+	// CGList CG 鉴赏表（相对 root 的 .csv，如 "raw/data/main/cglist.csv"）。
+	// 空 = 该游戏没有 CG 鉴赏表（不产出 CG 事件）。
+	CGList string `json:"cg_list"`
+	// StageW/StageH 原作舞台尺寸（像素）。0 = 用引擎默认（scn 为 1280×720）。
+	// 回放画布按它渲染——素材按原生坐标合成，画布尺寸不对会错位。
+	StageW int `json:"stage_w"`
+	StageH int `json:"stage_h"`
+	// ImageDirs/AudioDirs 素材目录（相对 root，可多个；留空用引擎默认目录）。
+	ImageDirs []string `json:"image_dirs"`
+	AudioDirs []string `json:"audio_dirs"`
 }
 
 // ConventionFileName 游戏根目录下的约定覆盖文件名。
@@ -64,12 +77,30 @@ func DefaultKiriKiri() Convention {
 	}
 }
 
+// DefaultSCN 编译剧本（PSB / M2 KiriKiri Evolution）的默认约定。
+//
+// 9nine 系列用 .scn（PSB 容器）：剧本在 raw/data/scn，CG 鉴赏表在
+// raw/data/main/cglist.csv，舞台 1280×720。整理版布局（原始归档解包/
+// _分类）用游戏根目录的 ucgr-convention.json 覆盖这三个路径即可。
+func DefaultSCN() Convention {
+	return Convention{
+		EngineID:    "scn",
+		ScenarioDir: filepath.Join("raw", "data", "scn"),
+		ScriptExt:   ".scn",
+		CGList:      filepath.Join("raw", "data", "main", "cglist.csv"),
+		StageW:      1280,
+		StageH:      720,
+	}
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
 	switch strings.ToLower(strings.TrimSpace(engineID)) {
 	case "kirikiri", "":
 		return DefaultKiriKiri(), true
+	case "scn":
+		return DefaultSCN(), true
 	default:
 		return Convention{}, false
 	}
@@ -127,6 +158,19 @@ func (c Convention) Validate() error {
 			return fmt.Errorf("%s 正则非法：%w", name, err)
 		}
 	}
+	for name, p := range map[string]string{"cg_list": c.CGList} {
+		if p != "" && filepath.IsAbs(p) {
+			return fmt.Errorf("%s 必须是相对游戏根目录的路径", name)
+		}
+	}
+	for _, p := range append(append([]string{}, c.ImageDirs...), c.AudioDirs...) {
+		if filepath.IsAbs(p) {
+			return fmt.Errorf("素材目录 %s 必须是相对游戏根目录的路径", p)
+		}
+	}
+	if c.StageW < 0 || c.StageH < 0 {
+		return fmt.Errorf("stage_w/stage_h 不能为负")
+	}
 	return nil
 }
 
@@ -153,6 +197,21 @@ func (c Convention) Merge(base Convention) Convention {
 	}
 	if c.SceneRe != "" {
 		out.SceneRe = c.SceneRe
+	}
+	if c.CGList != "" {
+		out.CGList = c.CGList
+	}
+	if c.StageW > 0 {
+		out.StageW = c.StageW
+	}
+	if c.StageH > 0 {
+		out.StageH = c.StageH
+	}
+	if len(c.ImageDirs) > 0 {
+		out.ImageDirs = append([]string(nil), c.ImageDirs...)
+	}
+	if len(c.AudioDirs) > 0 {
+		out.AudioDirs = append([]string(nil), c.AudioDirs...)
 	}
 	return out
 }

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/catalog"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
@@ -385,6 +384,11 @@ func (a *App) CatalogIndexText(gameID string) (CatalogIndexResultDTO, error) {
 	if err != nil {
 		return CatalogIndexResultDTO{}, err
 	}
+	conv, err := gameConvention(g.Root, g.Engine)
+	if err != nil {
+		return CatalogIndexResultDTO{}, err
+	}
+	engine := engineOf(g.Engine)
 	out := CatalogIndexResultDTO{GameID: g.ID}
 	writeLines := func(kind, id string, lines []catalog.TextLine) {
 		for i := range lines {
@@ -400,37 +404,27 @@ func (a *App) CatalogIndexText(gameID string) (CatalogIndexResultDTO, error) {
 		out.Events++
 		out.Lines += len(lines)
 	}
-
+	// 与 OpenEvent 同一构建入口：索引到的台词 = 回放时看到的台词。
+	index := func(kind, id string) {
+		ev, _, berr := buildEvent(g.Root, engine, conv, lib, kind, id)
+		if berr != nil {
+			out.Warnings = append(out.Warnings, fmt.Sprintf("%s %s 台本构建失败：%v", kind, id, berr))
+			return
+		}
+		writeLines(kind, id, catalog.TextLinesFromEvent(ev))
+	}
 	for _, cg := range lib.CGs {
-		// 画廊空槽（本作 cg091~cg096：pages 为空、label 无对应段）：
-		// 原作即无内容，OpenEvent 会明确报错；索引侧静默跳过，不当故障。
+		// 画廊空槽（原作即无内容）不索引，也不当故障。
 		if len(cg.Pages) == 0 {
 			continue
 		}
-		ev, berr := kirikiri.BuildShowSegment(
-			filepath.Join(g.Root, filepath.FromSlash(cg.Script)), cg.Label)
-		if berr != nil {
-			out.Warnings = append(out.Warnings, fmt.Sprintf("CG %s 台本构建失败：%v", cg.ID, berr))
-			continue
-		}
-		writeLines("cg", cg.ID, catalog.TextLinesFromEvent(ev))
+		index("cg", cg.ID)
 	}
 	for _, s := range lib.Scenes {
-		ev, berr := kirikiri.BuildShowSegment(
-			filepath.Join(g.Root, filepath.FromSlash(s.Script)), "")
-		if berr != nil {
-			out.Warnings = append(out.Warnings, fmt.Sprintf("场景 %s 台本构建失败：%v", s.ID, berr))
-			continue
-		}
-		writeLines("scene", s.ID, catalog.TextLinesFromEvent(ev))
+		index("scene", s.ID)
 	}
 	for _, ch := range lib.Chapters {
-		ev, berr := library.BuildChapterEvent(g.Root, &ch)
-		if berr != nil {
-			out.Warnings = append(out.Warnings, fmt.Sprintf("段落 %s 台本构建失败：%v", ch.ID, berr))
-			continue
-		}
-		writeLines("chapter", ch.ID, catalog.TextLinesFromEvent(ev))
+		index("chapter", ch.ID)
 	}
 	return out, nil
 }

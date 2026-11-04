@@ -67,6 +67,9 @@ type Library struct {
 	CGs         []CGEvent      `json:"cgs"`
 	Scenes      []SceneEvent   `json:"scenes"`
 	Chapters    []ChapterEvent `json:"chapters,omitempty"`
+	// Warnings 扫描期的非致命问题（个别剧本解析失败、CG 表缺失等）。
+	// 有它就说明「库是残缺的」，前端/CLI 应显式告知，不能静默当完整库。
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 var (
@@ -118,6 +121,9 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	}
 	if strings.EqualFold(conv.EngineID, "bgi") {
 		return ScanBGI(root, conv)
+	}
+	if strings.EqualFold(conv.EngineID, "scn") {
+		return ScanSCN(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
