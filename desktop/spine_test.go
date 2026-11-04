@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,43 @@ func TestLoadSpineAssets(t *testing.T) {
 	}
 	if !sp.PMA {
 		t.Fatal("atlas 写了 pma:true，DTO 应为 true")
+	}
+}
+
+// TestLoadSpineAssetsBinarySkel 二进制骨架走 base64 通道，且标记 Binary。
+func TestLoadSpineAssetsBinarySkel(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "cg", "bed_anna_1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skel := []byte{0x37, 0x00, 0x10, 0x02} // 任意非 JSON 字节
+	for name, data := range map[string][]byte{
+		"bed_anna_1.skel":  skel,
+		"bed_anna_1.atlas": []byte("bed_anna_1.png\nsize: 2048,1024\n"),
+		"bed_anna_1.png":   []byte("fake-png"),
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cg := unitycg.CG{ID: "bed_anna_1", Kind: "binary-skel"}
+	cg.Files.Text = []string{"bed_anna_1.skel", "bed_anna_1.atlas"}
+	cg.Files.PNG = []string{"bed_anna_1.png"}
+
+	sp, err := loadSpineAssets(root, cg)
+	if err != nil {
+		t.Fatalf("loadSpineAssets: %v", err)
+	}
+	if !sp.Binary {
+		t.Fatal("二进制骨架应标记 Binary=true")
+	}
+	dec, derr := base64.StdEncoding.DecodeString(sp.Skeleton)
+	if derr != nil || string(dec) != string(skel) {
+		t.Fatalf("Skeleton 应是 .skel 字节的 base64：%v %q", derr, sp.Skeleton)
+	}
+	if !unitycg.Playable(cg) {
+		t.Fatal("binary-skel（有文本+贴图）应可播")
 	}
 }
 

@@ -36,6 +36,7 @@ import csv
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import time
@@ -221,6 +222,47 @@ def find_game_layout(game: str) -> tuple[str, str]:
     return cat, scored[0][1]
 
 
+# Unity 引擎自带的场景/元数据容器：里面只有引擎对象，不装 CG，
+# 解析它们动辄几百 MB、几分钟，纯属浪费。按名排除。
+_ENGINE_ONLY = re.compile(r"(?i)^(globalgamemanagers|level\d+|unity_default)")
+
+
+def find_containers(game: str) -> list[str]:
+    """--auto：在游戏根目录里自动发现候选容器。
+
+    覆盖实测的四种布局（2026-11，第 2 批候选游戏）：
+      1. Addressables catalog.json + 命名 bundle（モンスターブラックマーケット）；
+      2. catalog.bin + 哈希命名 bundle（ElectronicStore / 克蕾娅）；
+      3. 第三方 AssetBundle 散装目录（ToxicMarriage 的 StreamingAssets/ab/）；
+      4. 资源内嵌 <游戏>_Data（resources.assets / sharedassetsN.assets / data.unity3d）。
+    .resource 是像素流不是容器；引擎场景容器（globalgamemanagers/levelN）不装 CG，跳过。
+    """
+    out: list[str] = []
+    for root, dirs, files in os.walk(game):
+        rel = os.path.relpath(root, game)
+        if rel != "." and rel.count(os.sep) >= 5:
+            dirs[:] = []
+            continue
+        if "Managed" in dirs:
+            dirs.remove("Managed")
+        if "Plugins" in dirs:
+            dirs.remove("Plugins")
+        for f in files:
+            low = f.lower()
+            if not low.endswith((".bundle", ".assets", ".unity3d")):
+                continue
+            if low.endswith(".resource") or _ENGINE_ONLY.match(f):
+                continue
+            out.append(os.path.join(root, f))
+    # CG 命名线索优先，再按体积降序（大容器更可能装美术资源）。
+    def rank(p: str) -> tuple:
+        low = os.path.basename(p).lower()
+        hint = sum(w in low for w in ("cg", "hcg", "spine", "event", "scene", "image", "himage"))
+        return (hint, os.path.getsize(p))
+    out.sort(key=rank, reverse=True)
+    return out
+
+
 def read_catalog(cat_path: str) -> tuple[dict[str, set[str]], list[str]]:
     """返回 (资产名 → CG 名集合, DialogueData 组名列表)。
 
@@ -268,7 +310,7 @@ def load_container(path: str, offset: str = "auto"):
     """
     off = 0
     with open(path, "rb") as f:
-        head = f.read(4096)
+        head = f.read(65536)  # 实测（2026-11，ToxicMarriage）有游戏把 UnityFS 放到 0x2683，4KB 窗口会漏
     if offset == "auto":
         i = head.find(b"UnityFS")
         if i > 0:
@@ -280,6 +322,49 @@ def load_container(path: str, offset: str = "auto"):
             f.seek(off)
             return UnityPy.load(f.read())
     return UnityPy.load(path)
+
+
+def _skel_header_ok(raw: bytes) -> bool:
+    """标准 Spine 4.x 二进制骨架的头部自检。
+
+    布局：int32 lowHash + int32 highHash + varint 版本串长 + 版本串 +
+    x/y/width/height 四个 float + nonessential bool。任何一段对不上
+    （版本不是 x.y.z、画布尺寸离谱）都视为非标准编码——实测（2026-11，
+    MonsterBlackMarket）有的游戏用自研运行时改写了骨架格式，明文只剩
+    零散字符串，标准 runtime 读不了，这种不该标成可播的 binary-skel。
+    """
+    try:
+        p = 8
+        n, p = _read_varint(raw, p)
+        if n <= 1:
+            return False
+        ver = raw[p : p + n - 1].decode("ascii", "replace")
+        p += n - 1
+        if not re.fullmatch(r"\d+\.\d+\.\d+", ver):
+            return False
+        floats = struct.unpack_from("<4f", raw, p)
+        p += 16
+        x, y, w, h = floats
+        if not (abs(x) <= 4096 and abs(y) <= 4096 and 0 < w <= 8192 and 0 < h <= 8192):
+            return False
+        if p < len(raw) and raw[p] not in (0, 1):
+            return False
+        return True
+    except (struct.error, IndexError):
+        return False
+
+
+def _read_varint(raw: bytes, pos: int) -> tuple[int, int]:
+    v = 0
+    shift = 0
+    while pos < len(raw):
+        c = raw[pos]
+        pos += 1
+        v |= (c & 0x7F) << shift
+        if not (c & 0x80):
+            return v, pos
+        shift += 7
+    raise IndexError("varint 越界")
 
 
 def _obj_name(d) -> str:
@@ -355,10 +440,17 @@ def export_embedded(paths: list[str], args, problems: list[str]) -> tuple[dict, 
         env = None  # 尽快释放容器索引
 
     skel_by_base: dict[str, bytes] = {}
+    # 二进制 Spine 骨架（.skel）：webview 渲染器只有 SkeletonJson，二进制播不了。
+    # 如实导出并标 binary-skel，让索引诚实反映「有素材、但需要 SkeletonBinary 才能播」。
+    binary_skels: dict[str, bytes] = {}
     for n, raw in texts.items():
+        low = n.lower()
         if raw[:1] == b"{" and b'"skeleton"' in raw[:400]:
-            base = n[:-5] if n.lower().endswith(".json") else n
+            base = n[:-5] if low.endswith(".json") else n
             skel_by_base.setdefault(base, raw)
+        elif low.endswith(".skel") or low.endswith(".skel.bytes"):
+            base = re.sub(r"\.skel(\.bytes)?$", "", n, flags=re.I)
+            binary_skels.setdefault(base, raw)
     atlas_by_base: dict[str, bytes] = {}
     for n, raw in texts.items():
         if n.lower().endswith(".atlas"):
@@ -459,6 +551,20 @@ def export_embedded(paths: list[str], args, problems: list[str]) -> tuple[dict, 
 
     prefixes = tuple(x.strip() for x in args.still_prefix.split(",") if x.strip())
     rx = re.compile(args.still_regex) if args.still_regex else None
+    frx = re.compile(args.frame_regex) if args.frame_regex else None
+    if frx:
+        for tn in textures:
+            if tn in used_tex:
+                continue
+            m = frx.search(tn)
+            if not m:
+                continue
+            cg = safe_component(m.group(1) if m.groups() else m.group(0), "cg")
+            if args.only and args.only != cg:
+                continue
+            if save_png(tn, cg):
+                used_tex.add(tn)
+                cg_files[cg]["png"].append(safe_component(tn, "texture") + ".png")
     for tn in textures:
         if tn in used_tex:
             continue
@@ -470,6 +576,50 @@ def export_embedded(paths: list[str], args, problems: list[str]) -> tuple[dict, 
         if save_png(tn, cg):
             used_tex.add(tn)
             cg_files[cg]["png"].append(safe_component(tn, "texture") + ".png")
+
+    # 二进制骨架 CG：图集 + 同名贴图 + 原始 .skel，一并落盘；kind 由索引层标 binary-skel。
+    # 只标「标准头自检通过」的：自研编码的骨架（如 MonsterBlackMarket）明文只剩
+    # 零散字符串，标准 runtime 读不了，标 unknown 让门禁如实拦下。
+    bad_skels: list[str] = []
+    for base in sorted(set(binary_skels) & set(atlas_by_base) - set(skel_by_base)):
+        if not _skel_header_ok(binary_skels[base]):
+            bad_skels.append(base)
+            continue
+    if bad_skels:
+        problems.append(
+            f"{len(bad_skels)} 个二进制骨架头部自检失败（疑似游戏自研编码，标准 runtime 读不了），"
+            f"不标 binary-skel，样例: {', '.join(bad_skels[:5])}"
+        )
+    for base in sorted(set(binary_skels) & set(atlas_by_base) - set(skel_by_base)):
+        if not _skel_header_ok(binary_skels[base]):
+            continue
+        cg = safe_component(base, "cg")
+        if args.only and args.only not in (cg, base):
+            continue
+        dest_dir = out_path(args.out, "cg", cg)
+        if not dry:
+            os.makedirs(dest_dir, exist_ok=True)
+            try:
+                with open(out_path(args.out, "cg", cg, safe_component(base, "spine") + ".skel"), "wb") as f:
+                    f.write(binary_skels[base])
+                with open(out_path(args.out, "cg", cg, safe_component(base, "spine") + ".atlas"), "wb") as f:
+                    f.write(atlas_by_base[base])
+            except Exception as e:
+                msg = f"{cg}/{base}: 二进制骨架导出失败：{e}"
+                problems.append(msg)
+                print(f"  ! {msg}")
+                continue
+        cg_files[cg]["text"].extend([safe_component(base, "spine") + ".skel",
+                                     safe_component(base, "spine") + ".atlas"])
+        text_bytes += len(binary_skels[base]) + len(atlas_by_base[base])
+        cg_files[cg]["skel_format"] = "binary"
+        cand = [t for t in textures if t == base or t.startswith(base + "_")]
+        for tn in cand:
+            if tn in used_tex:
+                continue
+            if save_png(tn, cg):
+                used_tex.add(tn)
+                cg_files[cg]["png"].append(safe_component(tn, "texture") + ".png")
 
     orphan["png"] = len(textures) - len(used_tex)
     orphan["text"] = len(texts) - sum(len(v["text"]) for v in cg_files.values())
@@ -534,7 +684,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="导出 Unity/Addressables 里的 Spine CG")
     ap.add_argument("--game", default="", help="游戏根目录（含 *_Data）；用 --assets 时可不填")
     ap.add_argument("--out", required=True, help="输出目录")
-    ap.add_argument("--bundle", default="cg_assets_all.bundle", help="CG 所在 bundle 文件名")
+    ap.add_argument("--bundle", default="cg_assets_all.bundle", help="CG 所在 bundle 文件名（Addressables 布局用）")
+    ap.add_argument("--auto", action="store_true",
+                    help="自动发现游戏目录里的全部容器（.bundle/.assets/.unity3d），"
+                         "覆盖 catalog.json / catalog.bin / 散装 ab / 资源内嵌四种布局")
     ap.add_argument("--assets", action="append", default=[],
                     help="直接指定容器（.assets/.bundle/无扩展名 bundle），可重复；给了就不走 catalog")
     ap.add_argument("--offset", default="auto", help="容器头偏移；auto=自动找 UnityFS（默认）")
@@ -542,6 +695,9 @@ def main() -> int:
     ap.add_argument("--spine-prefix", default="", help="只导出这些前缀的 Spine（逗号分隔）")
     ap.add_argument("--still-prefix", default="", help="把名字前缀匹配的孤立贴图当单图 CG（逗号分隔）")
     ap.add_argument("--still-regex", default="", help="把名字正则匹配的孤立贴图当单图 CG")
+    ap.add_argument("--frame-regex", default="",
+                    help="把名字正则匹配的孤立贴图按「第 1 组 = CG 名」归组成帧序列 CG"
+                         "（如 ^(cg_animation_\\d+)_ 匹配 cg_animation_07_01→cg_animation_07）")
     ap.add_argument("--only", default="", help="只导某个 CG（目录名）")
     ap.add_argument("--dry-run", action="store_true", help="只出索引，不写素材")
     ap.add_argument("--force", action="store_true", help="已存在的文件也重写")
@@ -571,7 +727,19 @@ def main() -> int:
     png_bytes = text_bytes = 0
     problems: list[str] = []
 
-    if args.assets:
+    if args.auto:
+        if not args.game:
+            raise SystemExit("--auto 需要 --game <游戏根目录>")
+        containers = find_containers(args.game)
+        if not containers:
+            raise SystemExit(f"--auto 没发现任何容器：{args.game}")
+        total = sum(os.path.getsize(p) for p in containers)
+        print(f"--auto：{len(containers)} 个容器 / {total/1048576:.0f} MB；前 8 个：")
+        for p in containers[:8]:
+            print(f"   {os.path.getsize(p)/1048576:7.1f} MB  {os.path.relpath(p, args.game)}")
+        cg_files, orphan, sources, png_bytes, text_bytes = export_embedded(containers, args, problems)
+        print(f"容器：{len(containers)} 个 · 候选 CG：{len(cg_files)} 部")
+    elif args.assets:
         cg_files, orphan, sources, png_bytes, text_bytes = export_embedded(args.assets, args, problems)
         if not args.game:
             args.game = os.path.basename(os.path.dirname(os.path.abspath(args.assets[0])))
@@ -730,6 +898,8 @@ def main() -> int:
         # 只有一堆 png 的是「逐帧序列 + Unity AnimationClip」（如 Witch01 的 bandit 帧）。
         if skeletons:
             kind = "spine"
+        elif files.get("skel_format") == "binary":
+            kind = "binary-skel"  # 二进制 Spine：素材齐但 webview 只有 SkeletonJson，暂不可播
         elif len(files["png"]) > 1:
             kind = "frames"      # 逐帧序列（Unity AnimationClip 驱动）
         elif len(files["png"]) == 1:

@@ -120,6 +120,14 @@ func Scan(root string) (*Library, error) {
 // 约定决定：剧本目录、画廊文件模式、画廊索引脚本、CG 标签正则、场景文件正则。
 // 解析器仍是引擎专属的（KiriKiri 的 AST），约定只管「文件在哪、叫什么」。
 func ScanWith(root string, conv adapter.Convention) (*Library, error) {
+	// 游戏根目录的 `ucgr-convention.json` 覆盖引擎默认约定：同引擎不同游戏的
+	// 目录/命名差异只改配置不改代码。写坏了要报错（静默忽略会让人以为配置生效了）。
+	// 桌面端已经自行合并过一次，这里重复合并是幂等的。
+	if file, ok, err := adapter.LoadConventionFile(root); err != nil {
+		return nil, err
+	} else if ok {
+		conv = file.Merge(conv)
+	}
 	lib, err := scanWith(root, conv)
 	// 统一回填引擎 id：打开事件时按它分派台本构建（跟目录的约定文件一致）。
 	if lib != nil && lib.EngineID == "" {

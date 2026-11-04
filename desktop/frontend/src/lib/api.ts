@@ -286,7 +286,10 @@ export interface SpineAnimationDTO {
 
 /** Spine 会话素材（Go 侧一次性下发，前端 WebGL 渲染）。 */
 export interface SpineDTO {
+  /** skeleton 原文；binary=true 时是 .skel 二进制的 base64 */
   skeleton: string;
+  /** true = skeleton 是二进制 .skel 的 base64，用 SkeletonBinary 加载 */
+  binary?: boolean;
   atlas: string;
   textures: SpineTextureDTO[];
   animations: SpineAnimationDTO[];

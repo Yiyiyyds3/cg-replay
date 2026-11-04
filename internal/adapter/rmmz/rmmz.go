@@ -184,6 +184,12 @@ type ScanResult struct {
 	Refs     []Ref
 	Warnings []string
 
+	// ShowPictureCommands = code 231（显示图片）出现次数。为 0 却扫到大量
+	// 脚本命令时，说明图片由插件驱动，静态事件命令提取不到 CG。
+	ShowPictureCommands int
+	// ScriptFunctions = code 355 脚本里的高频函数名（top 5），用于诊断插件驱动型游戏。
+	ScriptFunctions []string
+
 	sizes   map[string]picInfo
 	cleaner textCleaner
 }
@@ -352,6 +358,30 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 		cleaner:  textCleaner{i18n: LoadI18N(root, dataDir), locale: LoadLocale(root, dataDir)},
 	}
 
+	// 统计「显示图片」命令与脚本函数：有些游戏完全不用 code 231，
+	// 图片由插件函数（this.picsChange2() 之类）在运行时决定，静态命令里
+	// 根本没有图片名。这时 Segments 切不出任何演出段，需要给出可行动的诊断，
+	// 而不是笼统地报「没有识别到图片演出」。
+	showPictures := 0
+	scriptCounts := map[string]int{}
+	countCommands := func(cmds []Command) {
+		for _, c := range cmds {
+			switch c.Code {
+			case 231:
+				showPictures++
+			case 355:
+				if s := c.str(0); s != "" {
+					if i := strings.IndexByte(s, '('); i > 0 {
+						s = s[:i]
+					}
+					if s = strings.TrimSpace(s); s != "" && len(s) <= 48 {
+						scriptCounts[s]++
+					}
+				}
+			}
+		}
+	}
+
 	var mapFiles []string
 	for _, e := range ents {
 		name := e.Name()
@@ -390,6 +420,7 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 					pageSeen[sig] = pi
 				}
 				key := fmt.Sprintf("map:%s:%d:%d", name, ev.ID, pi)
+				countCommands(page.List)
 				res.addSegments(key, name, MapGroup(name, mf.DisplayName), ev.Name, page.List, root, imgDirs)
 			}
 		}
@@ -406,6 +437,7 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 					continue
 				}
 				key := fmt.Sprintf("common:%d", ce.ID)
+				countCommands(ce.List)
 				res.addSegments(key, "CommonEvents.json", "公共事件", ce.Name, ce.List, root, imgDirs)
 			}
 		}
@@ -423,12 +455,47 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 						continue
 					}
 					key := fmt.Sprintf("troop:%d:%d", tr.ID, pi)
+					countCommands(page.List)
 					res.addSegments(key, "Troops.json", "战斗事件", tr.Name, page.List, root, imgDirs)
 				}
 			}
 		}
 	}
+	res.ShowPictureCommands = showPictures
+	res.ScriptFunctions = topScripts(scriptCounts, 5)
+	if len(res.Refs) == 0 && len(res.ScriptFunctions) > 0 {
+		return nil, fmt.Errorf(
+			"图片由插件/脚本驱动：Show Picture 命令仅 %d 条、检测到脚本函数 %s；"+
+				"静态事件命令提取不到 CG，需插件级解析器（暂不纳入回放库）",
+			showPictures, strings.Join(res.ScriptFunctions, ", "))
+	}
 	return res, nil
+}
+
+// topScripts 按出现次数降序取前 n 个函数名（同次数按名字排序，保证输出稳定）。
+func topScripts(counts map[string]int, n int) []string {
+	type kv struct {
+		name string
+		n    int
+	}
+	var xs []kv
+	for k, v := range counts {
+		xs = append(xs, kv{k, v})
+	}
+	sort.Slice(xs, func(i, j int) bool {
+		if xs[i].n != xs[j].n {
+			return xs[i].n > xs[j].n
+		}
+		return xs[i].name < xs[j].name
+	})
+	out := []string{}
+	for i, x := range xs {
+		if i >= n {
+			break
+		}
+		out = append(out, x.name)
+	}
+	return out
 }
 
 // pageSignature 用于识别内容完全相同的事件页。

@@ -1,8 +1,8 @@
 // spine.go —— Spine 骨骼动画的素材装载（桌面壳专属）。
 //
-// Go 侧没有 Spine 渲染器：这里只把导出器产出的 skeleton JSON / atlas /
-// 贴图读出来，连同动画元信息塞进 SessionMeta（只传一次），画面由前端
-// Spine WebGL 组件按 FrameDTO.Now 同步渲染。
+// Go 侧没有 Spine 渲染器：这里只把导出器产出的 skeleton（JSON 或 .skel
+// 二进制）/ atlas / 贴图读出来，连同动画元信息塞进 SessionMeta（只传一次），
+// 画面由前端 Spine WebGL 组件按 FrameDTO.Now 同步渲染。
 package main
 
 import (
@@ -23,8 +23,11 @@ const (
 
 // SpineDTO 前端渲染 Spine 所需的全部素材（由 OpenEvent 一次性下发）。
 type SpineDTO struct {
-	Skeleton   string              `json:"skeleton"` // skeleton JSON 原文
-	Atlas      string              `json:"atlas"`    // atlas 原文
+	// Skeleton skeleton 原文。Binary=false 时是 JSON 文本；true 时是
+	// .skel 二进制的 base64（JSON 字段没法装原始字节）。
+	Skeleton   string              `json:"skeleton"`
+	Binary     bool                `json:"binary,omitempty"`
+	Atlas      string              `json:"atlas"` // atlas 原文
 	Textures   []SpineTextureDTO   `json:"textures"`
 	Animations []SpineAnimationDTO `json:"animations"`
 	Animation  string              `json:"animation"` // 默认动画名（空=前端取第一段）
@@ -60,12 +63,16 @@ func loadSpineAssets(root string, cg unitycg.CG) (*SpineDTO, error) {
 	if err != nil {
 		return nil, fmt.Errorf("解析游戏目录失败：%w", err)
 	}
-	var jsonName, atlasName string
+	var jsonName, skelName, atlasName string
 	for _, f := range cg.Files.Text {
 		switch strings.ToLower(filepath.Ext(f)) {
 		case ".json":
 			if jsonName == "" {
 				jsonName = f
+			}
+		case ".skel":
+			if skelName == "" {
+				skelName = f
 			}
 		case ".atlas":
 			if atlasName == "" {
@@ -73,26 +80,34 @@ func loadSpineAssets(root string, cg unitycg.CG) (*SpineDTO, error) {
 			}
 		}
 	}
-	if jsonName == "" {
-		return nil, fmt.Errorf("CG %s 缺少 skeleton JSON（files.text=%v）", cg.ID, cg.Files.Text)
+	if jsonName == "" && skelName == "" {
+		return nil, fmt.Errorf("CG %s 缺少 skeleton 文件（.json/.skel，files.text=%v）", cg.ID, cg.Files.Text)
 	}
 	if atlasName == "" {
 		return nil, fmt.Errorf("CG %s 缺少 atlas 文件（files.text=%v）", cg.ID, cg.Files.Text)
 	}
 
-	raw, err := readSpineFile(absRoot, cg.ID, jsonName, maxSpineText)
-	if err != nil {
-		return nil, fmt.Errorf("读 skeleton 失败：%w", err)
+	out := &SpineDTO{}
+	if skelName != "" {
+		// 二进制骨架：base64 塞进 JSON 字段，前端用 SkeletonBinary 加载。
+		raw, err := readSpineFile(absRoot, cg.ID, skelName, maxSpineText)
+		if err != nil {
+			return nil, fmt.Errorf("读 skeleton 失败：%w", err)
+		}
+		out.Binary = true
+		out.Skeleton = base64.StdEncoding.EncodeToString(raw)
+	} else {
+		raw, err := readSpineFile(absRoot, cg.ID, jsonName, maxSpineText)
+		if err != nil {
+			return nil, fmt.Errorf("读 skeleton 失败：%w", err)
+		}
+		out.Skeleton = string(raw)
 	}
 	atlasRaw, err := readSpineFile(absRoot, cg.ID, atlasName, maxSpineText)
 	if err != nil {
 		return nil, fmt.Errorf("读 atlas 失败：%w", err)
 	}
-
-	out := &SpineDTO{
-		Skeleton: string(raw),
-		Atlas:    string(atlasRaw),
-	}
+	out.Atlas = string(atlasRaw)
 	if cg.Spine == nil {
 		out.Warnings = append(out.Warnings, "索引缺少 Spine 统计，默认按第一段动画播放")
 	} else if cg.Spine.Error != "" {

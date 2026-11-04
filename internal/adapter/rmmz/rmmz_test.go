@@ -216,3 +216,77 @@ func TestLocatePictureJPFallback(t *testing.T) {
 		t.Fatalf("原名优先 = %q,%v，want img/pictures/CG/ChelseaH7_01.png,true", rel, ok)
 	}
 }
+
+// TestScanScriptDrivenDiagnostic 图片由插件函数（code 355）驱动、完全没有
+// Show Picture（code 231）的游戏，要给出可行动的诊断而不是笼统的「无图片演出」。
+func TestScanScriptDrivenDiagnostic(t *testing.T) {
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mf := `{"displayName":"测试地图","events":[{"id":1,"name":"事件","pages":[{"list":[` +
+		`{"code":355,"indent":0,"parameters":["this.picsChange2();"]},` +
+		`{"code":355,"indent":0,"parameters":["this.picsDel();"]},` +
+		`{"code":401,"indent":0,"parameters":["台词"]}` +
+		`]}]}]}`
+	if err := os.WriteFile(filepath.Join(dataDir, "Map001.json"), []byte(mf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Scan(root, "data")
+	if err == nil {
+		t.Fatal("插件驱动型游戏应返回明确诊断，不能静默当成空库")
+	}
+	for _, want := range []string{"插件/脚本驱动", "picsChange2"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("诊断信息缺少 %q：%v", want, err)
+		}
+	}
+}
+
+// TestScanShowPictureUnaffected 有 Show Picture 的游戏不受新诊断影响，
+// 且 ScanResult 会回填统计字段。
+func TestScanShowPictureUnaffected(t *testing.T) {
+	root := t.TempDir()
+	picDir := filepath.Join(root, "img", "pictures")
+	if err := os.MkdirAll(picDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, 300, 300))
+	for y := 0; y < 300; y++ {
+		for x := 0; x < 300; x++ {
+			img.SetRGBA(x, y, color.RGBA{200, 100, 50, 255})
+		}
+	}
+	f, err := os.Create(filepath.Join(picDir, "a.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+	dataDir := filepath.Join(root, "data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mf := `{"displayName":"测试地图","events":[{"id":1,"name":"事件","pages":[{"list":[` +
+		`{"code":231,"indent":0,"parameters":[1,"a",0,0,0,100,100,255,0]},` +
+		`{"code":401,"indent":0,"parameters":["台词"]},` +
+		`{"code":235,"indent":0,"parameters":[0]}` +
+		`]}]}]}`
+	if err := os.WriteFile(filepath.Join(dataDir, "Map001.json"), []byte(mf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Scan(root, "data")
+	if err != nil {
+		t.Fatalf("正常游戏不应报错: %v", err)
+	}
+	if res.ShowPictureCommands != 1 {
+		t.Fatalf("ShowPictureCommands = %d, want 1", res.ShowPictureCommands)
+	}
+	if len(res.Refs) != 1 {
+		t.Fatalf("Refs = %d, want 1", len(res.Refs))
+	}
+}

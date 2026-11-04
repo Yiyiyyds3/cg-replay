@@ -15,6 +15,7 @@ import {
   ResizeMode,
   SceneRenderer,
   Skeleton,
+  SkeletonBinary,
   SkeletonJson,
   TextureAtlas,
 } from "@esotericsoftware/spine-webgl";
@@ -35,6 +36,14 @@ function pageTextureURL(spine: SpineDTO, pageName: string): string | undefined {
   const base = pageName.replace(/\\/g, "/").split("/").pop() ?? pageName;
   return spine.textures.find((t) => t.name === base || t.name.toLowerCase() === base.toLowerCase())
     ?.data_url;
+}
+
+/** base64 → 字节（二进制 .skel 走 SkeletonBinary，不吃字符串）。 */
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 export default function SpineStage({
@@ -109,9 +118,10 @@ export default function SpineStage({
         }
       }
 
-      const data = new SkeletonJson(new AtlasAttachmentLoader(atlas)).readSkeletonData(
-        spine.skeleton,
-      );
+      const loader = new AtlasAttachmentLoader(atlas);
+      const data = spine.binary
+        ? new SkeletonBinary(loader).readSkeletonData(base64ToBytes(spine.skeleton))
+        : new SkeletonJson(loader).readSkeletonData(spine.skeleton);
       const skeleton = new Skeleton(data);
       skeletonRef.current = skeleton;
       const state = new AnimationState(new AnimationStateData(data));

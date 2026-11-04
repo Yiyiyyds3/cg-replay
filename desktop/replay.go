@@ -319,7 +319,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	// Spine 的素材必须在开会话前读齐：缺 skeleton/atlas/贴图时明确报错，
 	// 不能开一个只有黑屏的会话。
 	var spine *SpineDTO
-	if unityCG != nil && unityCG.Kind == "spine" {
+	if unityCG != nil && unitycg.IsSpine(unityCG.Kind) {
 		spine, err = loadSpineAssets(root, *unityCG)
 		if err != nil {
 			return SessionMeta{}, fmt.Errorf("加载 Spine 素材失败：%w", err)

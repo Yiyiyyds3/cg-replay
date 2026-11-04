@@ -131,13 +131,17 @@ func validSegment(s string) bool {
 	return true
 }
 
+// IsSpine 这部 CG 是骨骼动画：JSON 骨架（spine）或二进制骨架（binary-skel，
+// 导出器从 .skel 原样导出）。两者都由前端 WebGL 组件渲染，加载分支不同。
+func IsSpine(kind string) bool { return kind == "spine" || kind == "binary-skel" }
+
 // Playable 这部 CG 现在能不能放（spine 由前端 WebGL 组件渲染）。
 // spine 必须同时有 skeleton/atlas 文本和贴图，否则列出来点开只会报错。
 func Playable(cg CG) bool {
-	switch cg.Kind {
-	case "frames", "still":
+	switch {
+	case cg.Kind == "frames" || cg.Kind == "still":
 		return true
-	case "spine":
+	case IsSpine(cg.Kind):
 		return len(cg.Files.Text) > 0 && len(cg.Files.PNG) > 0
 	}
 	return false
@@ -189,7 +193,7 @@ func BuildShow(cg CG) (*ir.Event, error) {
 	if !validSegment(cg.ID) {
 		return nil, fmt.Errorf("CG id 非法：%q", cg.ID)
 	}
-	if cg.Kind == "spine" {
+	if IsSpine(cg.Kind) {
 		// Spine 的画面由前端 canvas 渲染；player 只需要一条等待撑住时间轴，
 		// 进度条/播放/暂停/seek 仍复用既有会话。
 		dur := cg.SpineDurationMs()

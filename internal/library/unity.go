@@ -30,9 +30,11 @@ func ScanUnity(root string) (*Library, error) {
 		Scenes:      []SceneEvent{},
 	}
 	pending := 0
+	kinds := map[string]int{}
 	for _, cg := range idx.CGs {
 		if !unitycg.Playable(cg) {
-			pending++ // kind=unknown：导出器也没识别出可播素材
+			pending++
+			kinds[cg.Kind]++ // 如实记下是什么类型：binary-skel / unknown / 缺文件的不完整 spine
 			continue
 		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
@@ -44,7 +46,12 @@ func ScanUnity(root string) (*Library, error) {
 	}
 	if len(lib.Scenes) == 0 {
 		if pending > 0 {
-			return nil, fmt.Errorf("这 %d 部 CG 素材不完整或类型无法识别（kind=unknown/缺 skeleton/贴图），没有可以放的", pending)
+			detail := ""
+			for k, n := range kinds {
+				detail += fmt.Sprintf(" %s=%d", k, n)
+			}
+			return nil, fmt.Errorf("这 %d 部 CG 都不可播（类型分布:%s）；"+
+				"unknown/不完整说明缺 skeleton、atlas 或贴图，请检查导出日志", pending, detail)
 		}
 		return nil, fmt.Errorf("索引里没有可回放的 CG")
 	}
