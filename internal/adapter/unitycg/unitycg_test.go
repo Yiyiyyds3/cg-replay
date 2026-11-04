@@ -141,3 +141,23 @@ func TestPlayable(t *testing.T) {
 		t.Fatal("素材齐全的 spine 应可播")
 	}
 }
+
+// TestBuildShowFPSOverride 索引里写 fps 就覆盖默认 12（用户可调快慢）。
+func TestBuildShowFPSOverride(t *testing.T) {
+	cg := CG{ID: "Witch01", Kind: "frames", FPS: 24}
+	cg.Frames = []string{"1.png", "2.png"}
+	ev, err := BuildShow(cg)
+	if err != nil {
+		t.Fatalf("BuildShow: %v", err)
+	}
+	// 每帧间隔 = 1000/24 ≈ 41ms：第二帧的 TMs 应为 41 而不是 83
+	var waits []int64
+	for _, op := range ev.Show {
+		if op.Kind == ir.ShowWait {
+			waits = append(waits, op.DurMs)
+		}
+	}
+	if len(waits) != 2 || waits[0] != 41 {
+		t.Fatalf("24fps 应为 41ms/帧，实际 %v", waits)
+	}
+}
