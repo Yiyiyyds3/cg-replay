@@ -517,8 +517,19 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		conv = adapter.DefaultKiriKiri()
 		conv.ScenarioDir = deps.ScriptDir
 	}
-	if err := adapter.SaveConventionFile(dest, conv); err != nil {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("写约定文件失败：%v", err))
+	// 已有约定文件 = 用户手工调过目录/命名，重新解包不能冲掉：保留用户写过的
+	// 字段，只把留空的补成引擎默认值。解析不了的文件一律不动并告警，避免把
+	// 用户配置悄悄改成默认（写坏时静默覆写最难排查）。
+	if existing, ok, err := adapter.LoadConventionFile(dest); err != nil {
+		res.Warnings = append(res.Warnings,
+			fmt.Sprintf("%s 读取/解析失败，已保留原文件不覆写：%v", adapter.ConventionFileName, err))
+	} else {
+		if ok {
+			conv = existing.Merge(conv)
+		}
+		if err := adapter.SaveConventionFile(dest, conv); err != nil {
+			res.Warnings = append(res.Warnings, fmt.Sprintf("写约定文件失败：%v", err))
+		}
 	}
 	return res, nil
 }

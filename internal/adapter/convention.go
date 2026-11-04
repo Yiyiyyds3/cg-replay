@@ -113,6 +113,9 @@ func LoadConventionFile(root string) (Convention, bool, error) {
 }
 
 // SaveConventionFile 写约定覆盖文件（给新游戏生成模板用）。
+//
+// 它会**整体覆写**目标文件；调用方若要保留用户已有字段，需先
+// LoadConventionFile 读出旧值，再用 Merge 补齐默认值后传入。
 func SaveConventionFile(root string, c Convention) error {
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ucgr/internal/adapter"
 )
 
 // ---------------------------------------------------------------
@@ -136,6 +138,89 @@ func TestUnpackArtemisPFS(t *testing.T) {
 	// 约定文件
 	if _, err := os.Stat(filepath.Join(dest, "ucgr-convention.json")); err != nil {
 		t.Fatalf("约定文件没写：%v", err)
+	}
+}
+
+// TestExtractPreservesUserConvention：重新解包保留用户手工改过的约定字段，
+// 只把留空的字段补成引擎默认值（不覆写）。
+func TestExtractPreservesUserConvention(t *testing.T) {
+	dir := t.TempDir()
+	writePFS(t, filepath.Join(dir, "data.pfs"), map[string][]byte{
+		"scenario/01_01.ast":  []byte(testAST),
+		"image/ev_cut_001_00": []byte("CG1"),
+		"image/chara_a":       []byte("SPRITE"),
+		"image/black":         []byte("BG"),
+		"image/fem_a_0001":    []byte("VO"),
+	})
+	dest := filepath.Join(t.TempDir(), "game")
+	if _, err := Extract(dir, dest, ScopeCG); err != nil {
+		t.Fatalf("首次 Extract: %v", err)
+	}
+
+	convPath := filepath.Join(dest, adapter.ConventionFileName)
+	user := []byte(`{"scene_re":"^.*\\.ast$","gallery_re":"^custom\\.ast$"}`)
+	if err := os.WriteFile(convPath, user, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Extract(dir, dest, ScopeCG); err != nil {
+		t.Fatalf("重新 Extract: %v", err)
+	}
+	got, ok, err := adapter.LoadConventionFile(dest)
+	if err != nil || !ok {
+		t.Fatalf("读回约定文件失败：ok=%v err=%v", ok, err)
+	}
+	if got.SceneRe != `^.*\.ast$` {
+		t.Errorf("用户 scene_re 被覆写：%q", got.SceneRe)
+	}
+	if got.GalleryRe != `^custom\.ast$` {
+		t.Errorf("用户 gallery_re 被覆写：%q", got.GalleryRe)
+	}
+	if got.EngineID != "artemis" || got.ScenarioDir != "scenario" || got.ScriptExt != ".ast" {
+		t.Errorf("留空字段未补引擎默认值：%+v", got)
+	}
+}
+
+// TestExtractKeepsBrokenConvention：写坏的约定文件不能被悄悄覆写成默认值，
+// 必须保留原样并给出可行动告警。
+func TestExtractKeepsBrokenConvention(t *testing.T) {
+	dir := t.TempDir()
+	writePFS(t, filepath.Join(dir, "data.pfs"), map[string][]byte{
+		"scenario/01_01.ast":  []byte(testAST),
+		"image/ev_cut_001_00": []byte("CG1"),
+		"image/chara_a":       []byte("SPRITE"),
+		"image/black":         []byte("BG"),
+		"image/fem_a_0001":    []byte("VO"),
+	})
+	dest := filepath.Join(t.TempDir(), "game")
+	if _, err := Extract(dir, dest, ScopeCG); err != nil {
+		t.Fatalf("首次 Extract: %v", err)
+	}
+
+	convPath := filepath.Join(dest, adapter.ConventionFileName)
+	broken := []byte(`{"scene_re":`)
+	if err := os.WriteFile(convPath, broken, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Extract(dir, dest, ScopeCG)
+	if err != nil {
+		t.Fatalf("重新 Extract: %v", err)
+	}
+	got, err := os.ReadFile(convPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(broken) {
+		t.Errorf("写坏的约定文件被覆写：%q", got)
+	}
+	warned := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, adapter.ConventionFileName) {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("缺少约定文件告警：%v", res.Warnings)
 	}
 }
 
