@@ -46,6 +46,11 @@ type Options struct {
 	MsgLines   int     // 每个消息层最多保留行数（默认 8）
 	SkipWaits  bool    // 跳过 [wait]/[wt]/点击点（快进预览用）
 	MsgDefault string  // 默认消息层 id（默认 message0）
+	// StageW/StageH 原生舞台尺寸：消息层没被 [position] 设置过时的默认几何
+	// 按「底部 210px 对话框」排（与 ir.MessageBoxOps 同一版式）。
+	// 0 = 沿用 1280×960 的旧默认（KiriKiri Config.tjs）。
+	StageW int
+	StageH int
 
 	// 文字样式（Config.tjs 实参；渲染层可再覆盖）
 	FontSize     float64  // 字号（默认 48）
@@ -555,9 +560,18 @@ func (p *Player) textBoxes() []TextBox {
 			st = p.back[id]
 		}
 		if st == nil {
-			// 消息层还没被 [position] 设置过：用 Config.tjs 的默认几何
-			box.X, box.Y, box.W, box.H = 32, 32, 1280-64, 960-64
-			box.MarginL, box.MarginT, box.MarginR, box.MarginB = 16, 16, 16, 16
+			// 消息层还没被 [position] 设置过：知道舞台尺寸就按底部对话框排
+			// （小说体脚本常用 @novel 这类宏，窗口几何从未显式给出）；
+			// 不知道就退回 Config.tjs 的默认几何。
+			if p.opt.StageW > 0 && p.opt.StageH > 0 {
+				box.X, box.Y = 0, float64(p.opt.StageH-210)
+				box.W, box.H = float64(p.opt.StageW), 210
+				box.MarginL, box.MarginT, box.MarginR, box.MarginB = 64, 30, 64, 16
+			} else {
+				box.X, box.Y = 32, 32
+				box.W, box.H = 1280-64, 960-64
+				box.MarginL, box.MarginT, box.MarginR, box.MarginB = 16, 16, 16, 16
+			}
 			box.HasGeom = true
 			box.FrameColor, box.FrameOpacity = p.opt.FrameColor, p.opt.FrameOpacity
 			out = append(out, box)

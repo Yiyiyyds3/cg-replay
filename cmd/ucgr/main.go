@@ -1107,6 +1107,7 @@ func cmdPlay(args []string) error {
 
 	load := player.Cached(playLoader(assets))
 	opt := player.DefaultOptions()
+	opt.StageW, opt.StageH = w, h // 消息层默认几何按舞台底部排
 	if speed > 0 {
 		opt.Speed = speed
 	}
@@ -1114,6 +1115,12 @@ func cmdPlay(args []string) error {
 		opt.CharMs = float64(charMs)
 	}
 	opt.SkipWaits = noWait
+	if atSpec != "" {
+		// 离线出图要「真实演到 t」：点击等待（自动阅读时长）与时间等待都要
+		// 生效。若沿用 --no-wait 的快进语义，整份脚本瞬间演完，--at 拿到的
+		// 永远是末帧——KiriKiri 剧本末尾常是收黑，画面就全黑了。
+		opt.SkipWaits = false
+	}
 
 	// 字体：本作自带思源宋体 SC（OTF/CFF，且被单字节 XOR 混淆）。
 	// RegisterFontFile 会还原混淆并私有注册到 GDI，返回可用的家族名。

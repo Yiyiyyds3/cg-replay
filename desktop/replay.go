@@ -297,6 +297,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		missing: map[string]string{},
 	}
 	s.opts.FontSize = 48
+	s.opts.StageW, s.opts.StageH = sw, sh // 消息层默认几何按舞台底部排
 	s.load = s.stageLoader(player.Cached(player.Loader(replay.GameLoader(root))))
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {

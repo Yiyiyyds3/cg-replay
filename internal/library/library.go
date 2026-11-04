@@ -252,12 +252,25 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	if len(names) == 0 {
 		names = fallbackStoryScenes(dir)
 	}
+	// 方言兜底：编号命名、cgrai 画廊、labelNN 章节标记都不匹配时
+	// （如 g01.ks + `*pageN|` 标签的作品），只要脚本能解析出台词就当一个场景。
+	generic := false
+	if len(names) == 0 {
+		names = genericStoryScenes(dir)
+		generic = len(names) > 0
+	}
 	sort.Strings(names)
 	for _, name := range names {
 		id := strings.TrimSuffix(name, filepath.Ext(name))
+		title := id
+		if generic {
+			if t := firstKAGText(filepath.Join(dir, name)); t != "" {
+				title = truncateRunes(t, 40)
+			}
+		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:     id,
-			Title:  id,
+			Title:  title,
 			Script: rel(filepath.Join(dir, name)),
 		})
 	}
@@ -373,6 +386,50 @@ func fallbackStoryScenes(dir string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// genericStoryScenes 通用 KAG 兜底：能解析出台词的 .ks 都算场景。
+//
+// 为什么需要：默认约定假设「编号命名 + cgrai 画廊 + labelNN 章节标记」，
+// 但其它 KiriKiri 作品常用 g01.ks 这类名字和 `*pageN|` 标签——三层筛选
+// 全部落空时把整目录误报成「被加密」。能解析出文本本身就是明文 KAG 的
+// 最硬证据，比名字模式可靠。
+func genericStoryScenes(dir string) []string {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range ents {
+		name := e.Name()
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(name), ".ks") {
+			continue
+		}
+		if galleryRe.MatchString(name) || strings.EqualFold(name, "cgrai00.ks") {
+			continue
+		}
+		ast, err := kirikiri.ParseScriptFile(filepath.Join(dir, name))
+		if err != nil || len(ast.Texts) == 0 {
+			continue
+		}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// firstKAGText 脚本的第一句台词（通用 KAG 兜底场景的标题来源）。
+func firstKAGText(path string) string {
+	ast, err := kirikiri.ParseScriptFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, tx := range ast.Texts {
+		if s := strings.TrimSpace(tx); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // Save 写库清单（JSON）。
