@@ -59,7 +59,8 @@ func gameConvention(root, engineID string) (adapter.Convention, error) {
 }
 
 // resolveGameConvention 判定引擎并给出约定：约定文件的 engine_id 优先，
-// 其次目录探测（library.DetectConvention），都没有时按 KiriKiri 处理。
+// 其次目录探测（library.DetectConvention）；目录里没有任何剧本时直接报
+// 「还没解包 / 可能是其它引擎」，不再一律按 KiriKiri 处理。
 func resolveGameConvention(root string) (string, adapter.Convention, error) {
 	return library.DetectConvention(root)
 }

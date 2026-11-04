@@ -93,6 +93,40 @@ func DefaultSCN() Convention {
 	}
 }
 
+// DefaultArtemis Artemis 的默认约定。
+//
+// .ast 剧本在解包树里的层级不固定（实测：`文本/<卷>.pfs/script`、
+// `原始归档解包/<卷>.pfs/script`），所以 ScenarioDir 留空 = 由扫描器
+// 自动探测；用户也可用 ucgr-convention.json 显式指定。
+func DefaultArtemis() Convention {
+	return Convention{EngineID: "artemis"}
+}
+
+// DefaultBGI BGI 的默认约定。
+//
+// .bs 剧本在 `文本_脚本/dataXXXXX/` 下分多个归档目录，同样交给自动探测。
+func DefaultBGI() Convention {
+	return Convention{EngineID: "bgi"}
+}
+
+// DefaultCatSystem2 CatSystem2 的默认约定。
+//
+// .cst 剧本在 `原始归档解包/scene/` 或 `_分类/文本/scene/` 下，
+// 层级随解包工具而异，交给自动探测。
+func DefaultCatSystem2() Convention {
+	return Convention{EngineID: "catsystem2"}
+}
+
+// autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
+//
+// 这些引擎的剧本在解包树里的层级不固定（多卷 .pfs / 多个 dataXXXXX
+// 目录），约定里的 scenario_dir 留空是**正常形态**，不算配置缺失。
+var autoScenarioEngines = map[string]bool{
+	"artemis":    true,
+	"bgi":        true,
+	"catsystem2": true,
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
@@ -101,6 +135,12 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultKiriKiri(), true
 	case "scn":
 		return DefaultSCN(), true
+	case "artemis":
+		return DefaultArtemis(), true
+	case "bgi":
+		return DefaultBGI(), true
+	case "catsystem2":
+		return DefaultCatSystem2(), true
 	default:
 		return Convention{}, false
 	}
@@ -141,7 +181,10 @@ func SaveConventionFile(root string, c Convention) error {
 // Validate 校验约定自洽（正则能编译、路径非绝对、目录非空）。
 func (c Convention) Validate() error {
 	if c.ScenarioDir == "" {
-		return fmt.Errorf("约定缺少 scenario_dir")
+		// 自动探测引擎（多卷解包）允许留空；其余引擎留空说明配置没写全。
+		if !autoScenarioEngines[strings.ToLower(strings.TrimSpace(c.EngineID))] {
+			return fmt.Errorf("约定缺少 scenario_dir")
+		}
 	}
 	if filepath.IsAbs(c.ScenarioDir) {
 		return fmt.Errorf("scenario_dir 必须是相对游戏根目录的路径")

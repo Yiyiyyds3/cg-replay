@@ -25,8 +25,10 @@ import (
 	"sync"
 	"time"
 
+	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/artemis"
 	"ucgr/internal/adapter/bgi"
+	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
@@ -174,7 +176,7 @@ func (s *replaySession) stageLoader(base player.Loader) player.Loader {
 }
 
 // buildArtemisShow 构建 Artemis 的 block 演出（事件 Label = block 序号）。
-func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
+func buildArtemisShow(scriptPath, block string, stageW, stageH int) (*ir.Event, error) {
 	idx, err := strconv.Atoi(strings.TrimSpace(block))
 	if err != nil {
 		return nil, fmt.Errorf("Artemis 事件缺 block 序号（%q）", block)
@@ -183,16 +185,54 @@ func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return artemis.BuildShowBlock(data, filepath.Base(scriptPath), idx)
+	return artemis.BuildShowBlockStage(data, filepath.Base(scriptPath), idx, stageW, stageH)
+}
+
+// buildArtemisScript 构建 Artemis 整份剧本的演出（所有 block 按块序拼接）。
+func buildArtemisScript(scriptPath string, stageW, stageH int) (*ir.Event, error) {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	return artemis.BuildShowScriptStage(data, filepath.Base(scriptPath), stageW, stageH)
 }
 
 // buildBGIShow 构建 BGI 的第 n 个事件演出（Label = 事件序号）。
-func buildBGIShow(scriptPath, ordinal string) (*ir.Event, error) {
+func buildBGIShow(scriptPath, ordinal string, stageW, stageH int) (*ir.Event, error) {
 	n, err := strconv.Atoi(strings.TrimSpace(ordinal))
 	if err != nil {
 		return nil, fmt.Errorf("BGI 事件缺序号（%q）", ordinal)
 	}
-	return bgi.BuildShowEventFile(scriptPath, n)
+	return bgi.BuildShowEventFileStage(scriptPath, n, stageW, stageH)
+}
+
+// buildCS2Show 构建 CatSystem2 的单个 .cst 演出（一个剧本 = 一个事件）。
+//
+// 走适配器的 ParseScript + BuildIR——与 CLI 的 astRefs/prune 同一条解析
+// 路径，避免壳层另写一份命令语义。stageW/H 为 0 时用适配器默认画布。
+func buildCS2Show(scriptPath string, stageW, stageH int) (*ir.Event, error) {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	a := &catsystem2.Adapter{}
+	ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: scriptPath})
+	if err != nil {
+		return nil, err
+	}
+	cfg := map[string]string{"script_name": scriptPath}
+	if stageW > 0 && stageH > 0 {
+		cfg["canvas_w"] = strconv.Itoa(stageW)
+		cfg["canvas_h"] = strconv.Itoa(stageH)
+	}
+	out, err := a.BuildIR(ast, &adapter.BuildCtx{GameID: "catsystem2", Config: cfg})
+	if err != nil {
+		return nil, err
+	}
+	if len(out.Events) == 0 {
+		return nil, fmt.Errorf("CatSystem2 剧本 %s 没有产出事件", filepath.Base(scriptPath))
+	}
+	return &out.Events[0], nil
 }
 
 // confAuto 读 conf 里的 auto（与旧 CLI 同字段）。
@@ -233,11 +273,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		return SessionMeta{}, fmt.Errorf("%s 没有可回放的演出（台本 0 条）", title)
 	}
 
-	// 画布尺寸跟着约定走：9nine（scn）声明 1280×720，KiriKiri 未声明时
-	// 沿用默认 4:3 舞台。素材按原生坐标合成，尺寸必须与约定一致。
+	// 画布尺寸：约定写了就用约定（9nine = 1280×720）；没写就用扫描时
+	// 从素材推断的原作尺寸（CatSystem2/Artemis/BGI 同引擎不同作品分辨率
+	// 不同）；都没有才退回默认 4:3 舞台。素材按原生坐标合成，必须一致。
 	sw, sh := defaultStageW, defaultStageH
 	if conv.StageW > 0 && conv.StageH > 0 {
 		sw, sh = conv.StageW, conv.StageH
+	} else if lib.StageW > 0 && lib.StageH > 0 {
+		sw, sh = lib.StageW, lib.StageH
 	}
 
 	s := &replaySession{

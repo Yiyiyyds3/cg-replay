@@ -27,13 +27,15 @@ var cgListCandidates = []string{
 	"raw/data/main/cglist.csv",
 	"原始归档解包/data_文本/main/cglist.csv",
 	"_分类/文本/data_main__cglist.csv",
+	"解包整理/data_脚本与数据/main/cglist.csv",
 }
 
-// scnScenarioCandidates 剧本目录的兜底探测顺序（同上三种布局）。
+// scnScenarioCandidates 剧本目录的兜底探测顺序（同上三种布局 + 整理布局）。
 var scnScenarioCandidates = []string{
 	"raw/data/scn",
 	"原始归档解包/data_脚本/scn",
 	"_分类/脚本",
+	"解包整理/data_脚本与数据/scn",
 }
 
 // ResolveScenarioDir 定位剧本目录：约定路径优先，其次按引擎的常见布局探测。
@@ -52,6 +54,13 @@ func ResolveScenarioDir(root string, conv adapter.Convention) (string, error) {
 		abs := filepath.Join(root, filepath.FromSlash(c))
 		if st, err := os.Stat(abs); err == nil && st.IsDir() {
 			return abs, nil
+		}
+	}
+	// 兜底：按扩展名自动探测。解包整理目录名五花八门（data_脚本与数据、
+	// 脚本_文本、scn_backup…），枚举不完，就按「哪层 .scn 最多」挑。
+	if strings.EqualFold(conv.EngineID, "scn") {
+		if dir := densestScriptDir(root, ".scn"); dir != "" {
+			return dir, nil
 		}
 	}
 	if conv.ScenarioDir != "" {
@@ -214,5 +223,6 @@ func findCGList(root, configured string) string {
 			return p
 		}
 	}
-	return ""
+	// 认不出的整理布局：按文件名找，取层数最浅的一个。
+	return findFileByName(root, "cglist.csv", 4)
 }

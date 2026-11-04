@@ -74,10 +74,24 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 			ev, err := scn.BuildShowScene(root, abs(e.Script), idx, scnOptions(conv))
 			return ev, e.Title, err
 		case strings.EqualFold(engine, "artemis"):
-			ev, err := buildArtemisShow(abs(e.Script), e.Label)
+			// Label 为空的条目是「整份剧本一个事件」（新口径）；
+			// 老库里的 block 级条目仍带序号，继续支持。
+			w, h := stageOf(conv, lib)
+			if strings.TrimSpace(e.Label) == "" {
+				ev, err := buildArtemisScript(abs(e.Script), w, h)
+				return ev, e.Title, err
+			}
+			ev, err := buildArtemisShow(abs(e.Script), e.Label, w, h)
 			return ev, e.Title, err
 		case strings.EqualFold(engine, "bgi"):
-			ev, err := buildBGIShow(abs(e.Script), e.Label)
+			w, h := stageOf(conv, lib)
+			ev, err := buildBGIShow(abs(e.Script), e.Label, w, h)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "catsystem2"):
+			// 舞台尺寸要传进 BuildIR：对话框位置按画布高度算，用错画布
+			// 会让框跑到画面外。优先扫描时从素材推断的尺寸。
+			w, h := stageOf(conv, lib)
+			ev, err := buildCS2Show(abs(e.Script), w, h)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)
@@ -86,6 +100,18 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 	default:
 		return nil, "", fmt.Errorf("未知事件类型 %s", kind)
 	}
+}
+
+// stageOf 取该游戏的舞台尺寸：约定优先，其次扫描时从素材推断的值。
+// 都拿不到返回 (0, 0)，由各适配器用自己的默认值。
+func stageOf(conv adapter.Convention, lib *library.Library) (int, int) {
+	if conv.StageW > 0 && conv.StageH > 0 {
+		return conv.StageW, conv.StageH
+	}
+	if lib != nil && lib.StageW > 0 && lib.StageH > 0 {
+		return lib.StageW, lib.StageH
+	}
+	return 0, 0
 }
 
 // engineOf 引擎 id 归一化（空 = KiriKiri 默认）。

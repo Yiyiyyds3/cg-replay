@@ -27,6 +27,7 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -49,6 +50,9 @@ const (
 
 // cstMagic .cst 文件魔数。
 var cstMagic = []byte("CatScene")
+
+// msgLayerName 消息层（与 scn / artemis 的台本同名，播放器按它画对话框）。
+const msgLayerName = "message0"
 
 // Adapter CatSystem2 适配器。
 type Adapter struct{}
@@ -619,6 +623,10 @@ func isAllDigits(s string) bool {
 
 func decodeBy(enc string, b []byte) string {
 	switch enc {
+	case "utf-8":
+		// pickEncoding 判成 UTF-8 时必须真的按 UTF-8 解——漏掉这一支会让
+		// 汉化组转码成 UTF-8 的 .cst 全部变成 CP932 乱码。
+		return string(b)
 	case "gb18030":
 		return decodeMB(b, 54936) // GB18030
 	default:
@@ -685,9 +693,21 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 	for _, it := range ast.Seq {
 		if it.Kind != "cmd" {
 			if it.Kind == "text" {
+				if strings.TrimSpace(it.Text) == "" {
+					continue
+				}
+				// 一句一屏：清上一句 → 写当前句 → 等点击。播放器只认 Show，
+				// 光有 Timeline 的 text 不会自动换屏。
+				ev.Show = append(ev.Show,
+					ir.ShowOp{TMs: clock, Kind: ir.ShowTextClear, Layer: msgLayerName},
+					ir.ShowOp{TMs: clock, Kind: ir.ShowTextRun, Layer: msgLayerName,
+						Text: &ir.ShowText{Text: it.Text}},
+					ir.ShowOp{TMs: clock, Kind: ir.ShowTextWait},
+				)
 				ev.Texts = append(ev.Texts, ir.TextLine{
 					LineID: fmt.Sprintf("L%03d", len(ev.Texts)+1), TMs: clock, Text: it.Text,
 				})
+				clock += 900 // 与 scn 的阅读节奏一致（推进由播放器按字数再补）
 			}
 			continue
 		}
@@ -732,6 +752,10 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 				ev.Timeline = append(ev.Timeline, ir.TimelineOp{
 					TMs: clock, Op: "image_show", Target: lid, Params: params,
 				})
+				ev.Show = append(ev.Show, ir.ShowOp{
+					TMs: clock, Kind: ir.ShowLayerShow, Layer: lid, Ref: ref,
+					Attr: showAttrs(params),
+				})
 				continue
 			}
 			delta, reason := applyLayerTransform(c, st)
@@ -742,6 +766,10 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 				}
 				ev.Timeline = append(ev.Timeline, ir.TimelineOp{
 					TMs: clock, Op: op, Target: lid, Params: delta,
+				})
+				ev.Show = append(ev.Show, ir.ShowOp{
+					TMs: clock, Kind: ir.ShowLayerAttr, Layer: lid,
+					Attr: showAttrs(delta), DurMs: durMsOf(delta),
 				})
 				continue
 			}
@@ -782,20 +810,37 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 				TMs: clock, Op: "image_show", Target: lid,
 				Params: map[string]interface{}{"ref": ref},
 			})
+			ev.Show = append(ev.Show, ir.ShowOp{
+				TMs: clock, Kind: ir.ShowLayerShow, Layer: lid, Ref: ref,
+			})
 		case "wait":
 			clock += 800
+			ev.Show = append(ev.Show, ir.ShowOp{
+				TMs: clock, Kind: ir.ShowWait, DurMs: 800,
+			})
 		case "pcm", "pcmch":
 			if len(c.Args) >= 1 {
 				if ar := add(c.Args[0]); ar != nil && len(ev.Texts) > 0 {
 					i := len(ev.Texts) - 1
 					ev.Texts[i].Voice = ar
 					ev.Voices = append(ev.Voices, ir.Voice{LineID: ev.Texts[i].LineID, Asset: *ar})
+					ev.Show = append(ev.Show, ir.ShowOp{
+						TMs: clock, Kind: ir.ShowVoicePlay, Ref: ar.OrigPath,
+					})
 				}
 			}
 		case "se", "bgm", "movie", "sysmovie":
 			for _, a := range c.Args {
 				if !isAllDigits(a) && !isCSCmdWord(a) {
-					add(a)
+					if ar := add(a); ar != nil {
+						kind := ir.ShowSEPlay
+						if tag == "bgm" {
+							kind = ir.ShowBGMPlay
+						}
+						ev.Show = append(ev.Show, ir.ShowOp{
+							TMs: clock, Kind: kind, Ref: ar.OrigPath,
+						})
+					}
 					break
 				}
 			}
@@ -816,14 +861,18 @@ func (a *Adapter) BuildIR(astObj adapter.ScriptAst, ctx *adapter.BuildCtx) (*ir.
 	if v, err := strconv.Atoi(ctx.Config["canvas_h"]); err == nil && v > 0 {
 		canvasH = v
 	}
+	// 底部对话框：播放器默认消息层是整屏（文字从顶上开始），
+	// 与本作「底部一条半透明框」的观感差太远。
+	if len(ev.Show) > 0 {
+		ev.Show = append(ir.MessageBoxOps(msgLayerName, canvasW, canvasH), ev.Show...)
+	}
 	out := &ir.IR{
 		IRVersion: ir.IRVersion, GameID: ctx.GameID, EngineID: "catsystem2",
 		Fidelity: ir.FidelityGeneric,
 		CanvasW:  canvasW, CanvasH: canvasH,
 		HasEmote: ev.HasEmote,
 		Meta:     ir.Meta{ScriptEncoding: ast.Encoding, GeneratedBy: "ucgr/catsystem2.BuildIR v2"},
-		Events:   []ir.Event{*ev},
-	}
+		Events:   []ir.Event{*ev}}
 	if n := ctx.Config["script_name"]; n != "" {
 		out.Events[0].EventID = strings.TrimSuffix(filepath.Base(n), filepath.Ext(n))
 	}
@@ -857,6 +906,7 @@ func (st *layerState) params() map[string]interface{} {
 	return p
 }
 
+// layerID 图层 id（命令名 + 槽位/ id 属性）。
 func layerID(tag string, c *Command) string {
 	lid := tag
 	if len(c.Args) > 0 && isAllDigits(c.Args[0]) {
@@ -866,6 +916,57 @@ func layerID(tag string, c *Command) string {
 		lid = tag + v
 	}
 	return lid
+}
+
+// showAttrs 把 Timeline 的数值参数转成台本属性（播放器按字符串读写）。
+//
+// opacity 在 Timeline 里是 0..1，播放器的层不透明度是 0..255——
+// 直接透传会让所有淡入图层几乎全透明。
+func showAttrs(params map[string]interface{}) map[string]string {
+	if len(params) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for k, v := range params {
+		switch k {
+		case "left", "top", "scale":
+			if f, ok := toFloat(v); ok {
+				out[k] = strconv.FormatFloat(f, 'f', -1, 64)
+			}
+		case "opacity":
+			if f, ok := toFloat(v); ok {
+				out[k] = strconv.Itoa(int(math.Round(f * 255)))
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func toFloat(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
+}
+
+// durMsOf 取变换里的时长（毫秒），没有返回 0。
+func durMsOf(delta map[string]interface{}) int64 {
+	if v, ok := delta["duration_ms"]; ok {
+		if f, ok := toFloat(v); ok {
+			return int64(f)
+		}
+	}
+	return 0
 }
 
 // applyLayerTransform 解析 CS2 的槽位属性命令，返回需要写进 layer_set 的

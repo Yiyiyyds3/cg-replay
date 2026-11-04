@@ -14,6 +14,9 @@ import (
 	"ucgr/internal/ir"
 )
 
+// bgiTextLayer BGI 的台词层名（builder 里所有 text 指令都落这一层）。
+const bgiTextLayer = "text"
+
 // BuildScriptEvents 解析 .bs 并返回它切出的事件列表（与 BuildIR 同源、同粒度）。
 func BuildScriptEvents(data []byte, name string) ([]ir.Event, error) {
 	a := &Adapter{}
@@ -42,11 +45,26 @@ func BuildShowEvent(data []byte, name string, n int) (*ir.Event, error) {
 	return &evs[n-1], nil
 }
 
-// BuildShowEventFile 读文件并构建第 n 个事件。
+// BuildShowEventFile 读文件并构建第 n 个事件（默认 1280×720 舞台）。
 func BuildShowEventFile(path string, n int) (*ir.Event, error) {
+	return BuildShowEventFileStage(path, n, 1280, 720)
+}
+
+// BuildShowEventFileStage 同 BuildShowEventFile，但按给定舞台尺寸摆对话框。
+//
+// BGI 的台词层名是 "text"（不是 message0），对话框几何要在同一层上，
+// 否则文字仍会从整屏左上角开始铺。
+func BuildShowEventFileStage(path string, n, stageW, stageH int) (*ir.Event, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return BuildShowEvent(data, filepath.Base(path), n)
+	ev, err := BuildShowEvent(data, filepath.Base(path), n)
+	if err != nil {
+		return nil, err
+	}
+	if len(ev.Show) > 0 {
+		ev.Show = append(ir.MessageBoxOps(bgiTextLayer, stageW, stageH), ev.Show...)
+	}
+	return ev, nil
 }

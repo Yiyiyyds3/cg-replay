@@ -336,10 +336,14 @@ func (b *builder) text(c *Command) {
 		b.chars = append(b.chars, speaker)
 	}
 	b.cur.Timeline = append(b.cur.Timeline, ir.TimelineOp{TMs: b.clock - b.evStart, Op: "text_show", Target: line.LineID})
-	b.cur.Show = append(b.cur.Show, ir.ShowOp{
-		TMs: b.clock, Kind: ir.ShowTextRun, Layer: "text",
-		Text: &ir.ShowText{Speaker: speaker, Text: text},
-	})
+	// 一句一屏：先清上一句再写当前句，最后等玩家点击。
+	// 不插 text_clear 的话，一个事件里的所有台词会同时堆在屏幕上。
+	b.cur.Show = append(b.cur.Show,
+		ir.ShowOp{TMs: b.clock, Kind: ir.ShowTextClear, Layer: "text"},
+		ir.ShowOp{TMs: b.clock, Kind: ir.ShowTextRun, Layer: "text",
+			Text: &ir.ShowText{Speaker: speaker, Text: text}},
+		ir.ShowOp{TMs: b.clock, Kind: ir.ShowTextWait},
+	)
 	b.clock += clockPerMsg
 }
 

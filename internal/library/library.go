@@ -70,6 +70,10 @@ type Library struct {
 	// Warnings 扫描期的非致命问题（个别剧本解析失败、CG 表缺失等）。
 	// 有它就说明「库是残缺的」，前端/CLI 应显式告知，不能静默当完整库。
 	Warnings []string `json:"warnings,omitempty"`
+	// StageW/StageH 扫描时从素材推断的原作舞台尺寸（0 = 未推断出，
+	// 由约定或壳层默认值兜底）。编译剧本（scn）不推断，用约定里的值。
+	StageW int `json:"stage_w,omitempty"`
+	StageH int `json:"stage_h,omitempty"`
 }
 
 var (
@@ -111,19 +115,23 @@ func Scan(root string) (*Library, error) {
 // 约定决定：剧本目录、画廊文件模式、画廊索引脚本、CG 标签正则、场景文件正则。
 // 解析器仍是引擎专属的（KiriKiri 的 AST），约定只管「文件在哪、叫什么」。
 func ScanWith(root string, conv adapter.Convention) (*Library, error) {
+	// 事件切分是引擎专属的：Artemis 的事件单位是剧本里的 block，
+	// BGI 是脚本内的事件边界，CatSystem2 是一个 .cst 文件，
+	// KiriKiri 是画廊槽位 + 场景 + 章节。约定里的 engine_id 决定走哪条。
+	// 注意：这三条分支的剧本目录可以由扫描器自动探测，所以**不能**
+	// 在分派前把空 ScenarioDir 合并成 KiriKiri 默认值。
+	switch strings.ToLower(strings.TrimSpace(conv.EngineID)) {
+	case "artemis":
+		return ScanArtemis(root, conv)
+	case "bgi":
+		return ScanBGI(root, conv)
+	case "catsystem2":
+		return ScanCatSystem2(root, conv)
+	case "scn":
+		return ScanSCN(root, conv)
+	}
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())
-	}
-	// 事件切分是引擎专属的：Artemis 的事件单位是剧本里的 block，
-	// KiriKiri 是画廊槽位 + 场景 + 章节。约定里的 engine_id 决定走哪条。
-	if strings.EqualFold(conv.EngineID, "artemis") {
-		return ScanArtemis(root, conv)
-	}
-	if strings.EqualFold(conv.EngineID, "bgi") {
-		return ScanBGI(root, conv)
-	}
-	if strings.EqualFold(conv.EngineID, "scn") {
-		return ScanSCN(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
@@ -132,7 +140,21 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 	dir := filepath.Join(root, filepath.FromSlash(conv.ScenarioDir))
 	ents, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+		// 约定里的目录不存在时按 .ks 分布自动探测——KiriKiri 的剧本目录
+		// 不总叫 scenario（实测有 raw/data_zh/scenario、_分类/文本/data/scenario）。
+		// 约定写了却读不到，说明这份约定和当前解包布局对不上，先试探测，
+		// 实在找不到再报错（报错信息要能区分「目录不存在」与「不是 KiriKiri」）。
+		alt := findKiriKiriScriptDir(root)
+		if alt == "" {
+			return nil, fmt.Errorf(
+				"读不到剧本目录 %s（%v）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎",
+				dir, err)
+		}
+		dir = alt
+		ents, err = os.ReadDir(dir)
+		if err != nil {
+			return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+		}
 	}
 	lib := &Library{
 		Root:        root,
@@ -311,6 +333,13 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 		}
 		prev.ContScript = s.Script
 		prev.ContLabelPos = info.firstLabelPos
+	}
+	// 空库要报错：脚本目录里有一堆 .ks 却一个事件都切不出来，
+	// 通常是脚本被加密/压缩（不是明文 KAG），不能当成「成功但空库」。
+	if len(lib.CGs)+len(lib.Scenes)+len(lib.Chapters) == 0 {
+		return nil, fmt.Errorf(
+			"没有识别到可回放事件（%s 下 %d 个 .ks 都不像明文 KAG 脚本——可能被加密/压缩）",
+			dir, len(ents))
 	}
 	return lib, nil
 }

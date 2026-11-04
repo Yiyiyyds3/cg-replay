@@ -5,13 +5,13 @@
 // 不会出现列了却播不出来。
 //
 // 事件 id 沿用适配器的 `<脚本名>#<序号>`；Label 记序号（回放据此重建）。
+// 剧本目录由 scriptFiles 自动探测（BGI 的 .bs 分在多个 dataXXXXX 目录下）。
 package library
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -21,10 +21,9 @@ import (
 
 // ScanBGI 扫 BGI 解包目录（.bs 编译脚本），产出事件库。
 func ScanBGI(root string, conv adapter.Convention) (*Library, error) {
-	dir := filepath.Join(root, filepath.FromSlash(conv.ScenarioDir))
-	ents, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+	files := scriptFiles(root, conv.ScenarioDir, ".bs", discoverMaxDepth)
+	if len(files) == 0 {
+		return nil, fmt.Errorf("没有找到 .bs 剧本（%s）", scriptDirHint(root, conv.ScenarioDir))
 	}
 	lib := &Library{
 		Root:        root,
@@ -34,31 +33,21 @@ func ScanBGI(root string, conv adapter.Convention) (*Library, error) {
 		Scenes:      []SceneEvent{},
 		Chapters:    []ChapterEvent{},
 	}
-	rel := func(p string) string {
-		if r, err := filepath.Rel(root, p); err == nil {
-			return filepath.ToSlash(r)
-		}
-		return filepath.ToSlash(p)
-	}
-	var names []string
-	for _, e := range ents {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".bs") {
-			continue
-		}
-		names = append(names, e.Name())
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		p := filepath.Join(dir, name)
+	failed := 0
+	stemOf := uniqueStems(root, files)
+	for _, p := range files {
+		name := filepath.Base(p)
 		data, err := os.ReadFile(p)
 		if err != nil {
+			failed++
 			continue
 		}
 		evs, err := bgi.BuildScriptEvents(data, name)
 		if err != nil {
-			continue // 单个脚本坏掉不拖垮整个库
+			failed++ // 单个脚本坏掉不拖垮整个库
+			continue
 		}
-		stem := strings.TrimSuffix(name, filepath.Ext(name))
+		stem := stemOf(p)
 		for i, ev := range evs {
 			id := ev.EventID
 			if id == "" {
@@ -71,13 +60,18 @@ func ScanBGI(root string, conv adapter.Convention) (*Library, error) {
 			lib.Scenes = append(lib.Scenes, SceneEvent{
 				ID:     id,
 				Title:  title,
-				Script: rel(p),
+				Script: relKey(root, p),
 				Label:  fmt.Sprint(i + 1),
 			})
 		}
 	}
-	if len(lib.Scenes) == 0 {
-		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .bs）", conv.ScenarioDir)
+	if failed > 0 {
+		lib.Warnings = append(lib.Warnings, fmt.Sprintf(
+			"%d/%d 个 .bs 解析失败已跳过（脚本可能损坏或不是 BGI 编译脚本）", failed, len(files)))
 	}
+	if len(lib.Scenes) == 0 {
+		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .bs）", scriptDirHint(root, conv.ScenarioDir))
+	}
+	lib.StageW, lib.StageH = detectStageSize(root)
 	return lib, nil
 }

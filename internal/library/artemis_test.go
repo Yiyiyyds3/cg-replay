@@ -29,8 +29,8 @@ ast = {
 }
 `
 
-// TestScanArtemisBlocks 扫 Artemis 目录 → 每个 block 一个场景事件。
-func TestScanArtemisBlocks(t *testing.T) {
+// TestScanArtemisScripts 扫 Artemis 目录 → 一份 .ast 一个场景事件。
+func TestScanArtemisScripts(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "scenario")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -48,27 +48,51 @@ func TestScanArtemisBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ScanWith: %v", err)
 	}
-	if len(lib.Scenes) != 2 {
-		t.Fatalf("场景事件数 = %d, want 2（每个 block 一个）：%+v", len(lib.Scenes), lib.Scenes)
+	if len(lib.Scenes) != 1 {
+		t.Fatalf("场景事件数 = %d, want 1（一份剧本一个事件）：%+v", len(lib.Scenes), lib.Scenes)
 	}
-	if lib.Scenes[0].ID != "01_01#1" || lib.Scenes[1].ID != "01_01#2" {
-		t.Fatalf("事件 id = %q, %q", lib.Scenes[0].ID, lib.Scenes[1].ID)
+	if lib.Scenes[0].ID != "01_01" {
+		t.Fatalf("事件 id = %q", lib.Scenes[0].ID)
 	}
-	// 第一个 block 有 savetitle → 标题取它。
+	// 标题取首个有 savetitle 的 block。
 	if lib.Scenes[0].Title != "银色、遥か" {
-		t.Errorf("第一个事件标题 = %q", lib.Scenes[0].Title)
+		t.Errorf("事件标题 = %q", lib.Scenes[0].Title)
 	}
-	// Label 记 block 序号（回放时据此重建演出）。
-	if lib.Scenes[0].Label != "1" || lib.Scenes[1].Label != "2" {
-		t.Errorf("事件 Label = %q, %q", lib.Scenes[0].Label, lib.Scenes[1].Label)
+	// 新口径的事件不带 block 序号（回放走整份剧本）。
+	if lib.Scenes[0].Label != "" {
+		t.Errorf("事件 Label = %q, want 空", lib.Scenes[0].Label)
 	}
 	// 脚本路径相对 root。
 	if lib.Scenes[0].Script != "scenario/01_01.ast" {
 		t.Errorf("脚本路径 = %q", lib.Scenes[0].Script)
 	}
 	// 找得到
-	if lib.FindScene("01_01#2") == nil {
-		t.Error("FindScene 应能找到 01_01#2")
+	if lib.FindScene("01_01") == nil {
+		t.Error("FindScene 应能找到 01_01")
+	}
+}
+
+// TestArtemisBuildShowScript 整份剧本拼成一个事件：两个 block 的演出都在。
+func TestArtemisBuildShowScript(t *testing.T) {
+	ev, err := artemis.BuildShowScript([]byte(artemisAST), "01_01.ast")
+	if err != nil {
+		t.Fatalf("BuildShowScript: %v", err)
+	}
+	if ev == nil || len(ev.Show) == 0 {
+		t.Fatal("整份剧本应有演出内容")
+	}
+	// 两个 block 各自的背景都会出现。
+	refs := map[string]bool{}
+	for _, op := range ev.Show {
+		if op.Ref != "" {
+			refs[op.Ref] = true
+		}
+	}
+	if !refs["black"] || !refs["ev_cut_001_00"] || !refs["ev_cut_002_00"] {
+		t.Fatalf("两个 block 的图都应出现，实际 refs=%v", refs)
+	}
+	if ev.EndMs <= 0 {
+		t.Error("整份剧本的结束时刻应大于 0")
 	}
 }
 

@@ -3,8 +3,10 @@ package replay
 import (
 	"fmt"
 	"image"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -24,9 +26,49 @@ var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3"}
 // GameLoader 在解包目录下按「storage 名」找图并解码。
 //
 // 演出台本里记的是脚本引用（storage 名，可能没有扩展名），所以这里先按原路径找，
-// 再按文件名在常见素材子目录里试扩展名。带缓存，重复引用只读一次磁盘。
+// 再按文件名在常见素材子目录里试扩展名；都找不到时退回**整棵树的文件名索引**
+// （Artemis / CatSystem2 / BGI 的整理版解包把图片按归档分到多层子目录，
+// 靠固定目录名猜不全）。索引只建一次并缓存。
 func GameLoader(root string) Loader {
 	cache := map[string]string{}
+	var index map[string]string
+	buildIndex := func() {
+		index = map[string]string{}
+		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				switch strings.ToLower(d.Name()) {
+				case "voice", "音频", "语音", "sound", "bgm", "se", "video", "视频",
+					"字体", "font", "_font_cache", ".git":
+					return fs.SkipDir
+				}
+				if rel, e := filepath.Rel(root, p); e == nil && rel != "." &&
+					strings.Count(rel, string(filepath.Separator)) >= 8 {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			switch strings.ToLower(filepath.Ext(p)) {
+			case ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3", ".bmp":
+			default:
+				return nil
+			}
+			stem := strings.ToLower(strings.TrimSuffix(filepath.Base(p), filepath.Ext(p)))
+			if _, ok := index[stem]; !ok {
+				index[stem] = p
+			}
+			// CatSystem2 的 HG3 展开名带 _<序号> 后缀（bg01_0000.png），
+			// 剧本里引用的是裸名（bg01）——同时登记去后缀的别名。
+			if base := diffSuffixRe.ReplaceAllString(stem, ""); base != "" && base != stem {
+				if _, ok := index[base]; !ok {
+					index[base] = p
+				}
+			}
+			return nil
+		})
+	}
 	return func(rel string) (image.Image, error) {
 		rel = strings.TrimSpace(rel)
 		if rel == "" {
@@ -56,10 +98,28 @@ func GameLoader(root string) Loader {
 				return decodeFile(c)
 			}
 		}
+		// 固定目录都不中：用文件名索引兜底。
+		if index == nil {
+			buildIndex()
+		}
+		key := strings.ToLower(stem)
+		if p, ok := index[key]; ok {
+			cache[rel] = p
+			return decodeFile(p)
+		}
+		if base := diffSuffixRe.ReplaceAllString(key, ""); base != "" {
+			if p, ok := index[base]; ok {
+				cache[rel] = p
+				return decodeFile(p)
+			}
+		}
 		cache[rel] = ""
 		return nil, fmt.Errorf("素材未找到: %s", rel)
 	}
 }
+
+// diffSuffixRe CatSystem2 HG3 展开名的序号后缀（bg01_0000 → bg01）。
+var diffSuffixRe = regexp.MustCompile(`_\d{2,4}$`)
 
 // decodeFile 读文件并按需解码（PNG / TLG5 / 明文或掩码 JPEG）。
 func decodeFile(path string) (image.Image, error) {
