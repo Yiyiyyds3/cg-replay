@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/artemis"
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
@@ -34,19 +35,20 @@ import (
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
-	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
 )
 
 const (
-	stageW      = 1600
-	stageH      = 1200
-	autoWaitMs  = 2500 // 与 cmd/cgreplay 一致
-	jpegQuality = 88
-	encMinGap   = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
-	videoFPS    = 20                    // 影片流的目标帧率（与渲染上限一致）
+	// defaultStageW/H 台本未声明画布尺寸时的默认舞台（KiriKiri 本作 4:3）。
+	// 编译剧本（scn/9nine）会在 IR 里带 1280×720，按事件走。
+	defaultStageW = 1600
+	defaultStageH = 1200
+	autoWaitMs    = 2500 // 与 cmd/cgreplay 一致
+	jpegQuality   = 88
+	encMinGap     = 50 * time.Millisecond // 播放中两次编码的最小间隔（≈20fps 封顶）
+	videoFPS      = 20                    // 影片流的目标帧率（与渲染上限一致）
 
 	durSnapshots = 240 // 时长估计取样点数
 )
@@ -58,6 +60,10 @@ type replaySession struct {
 	kind  string // cg / scene / chapter
 	id    string
 	title string
+
+	// sw/sh 本会话的渲染画布（= 事件声明的原生舞台；素材按原生坐标合成，
+	// 画布尺寸必须匹配，否则素材会挤在左上角）。
+	sw, sh int
 
 	ev   *ir.Event
 	opts player.Options
@@ -183,7 +189,7 @@ func (s *replaySession) stageLoader(base player.Loader) player.Loader {
 }
 
 // buildArtemisShow 构建 Artemis 的 block 演出（事件 Label = block 序号）。
-func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
+func buildArtemisShow(scriptPath, block string, stageW, stageH int) (*ir.Event, error) {
 	idx, err := strconv.Atoi(strings.TrimSpace(block))
 	if err != nil {
 		return nil, fmt.Errorf("Artemis 事件缺 block 序号（%q）", block)
@@ -192,25 +198,54 @@ func buildArtemisShow(scriptPath, block string) (*ir.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return artemis.BuildShowBlock(data, filepath.Base(scriptPath), idx)
+	return artemis.BuildShowBlockStage(data, filepath.Base(scriptPath), idx, stageW, stageH)
 }
 
-// buildBGIShow 构建 BGI 的第 n 个事件演出（Label = 事件序号）。
-func buildBGIShow(scriptPath, ordinal string) (*ir.Event, error) {
-	n, err := strconv.Atoi(strings.TrimSpace(ordinal))
-	if err != nil {
-		return nil, fmt.Errorf("BGI 事件缺序号（%q）", ordinal)
-	}
-	return bgi.BuildShowEventFile(scriptPath, n)
-}
-
-// buildCS2Show 构建 CatSystem2 的 .cst 演出（一份脚本一个事件）。
-func buildCS2Show(scriptPath string) (*ir.Event, error) {
+// buildArtemisScript 构建 Artemis 整份剧本的演出（所有 block 按块序拼接）。
+func buildArtemisScript(scriptPath string, stageW, stageH int) (*ir.Event, error) {
 	data, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return nil, err
 	}
-	return catsystem2.BuildShowScript(data, filepath.Base(scriptPath))
+	return artemis.BuildShowScriptStage(data, filepath.Base(scriptPath), stageW, stageH)
+}
+
+// buildBGIShow 构建 BGI 的第 n 个事件演出（Label = 事件序号）。
+func buildBGIShow(scriptPath, ordinal string, stageW, stageH int) (*ir.Event, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(ordinal))
+	if err != nil {
+		return nil, fmt.Errorf("BGI 事件缺序号（%q）", ordinal)
+	}
+	return bgi.BuildShowEventFileStage(scriptPath, n, stageW, stageH)
+}
+
+// buildCS2Show 构建 CatSystem2 的单个 .cst 演出（一个剧本 = 一个事件）。
+//
+// 走适配器的 ParseScript + BuildIR——与 CLI 的 astRefs/prune 同一条解析
+// 路径，避免壳层另写一份命令语义。stageW/H 为 0 时用适配器默认画布。
+func buildCS2Show(scriptPath string, stageW, stageH int) (*ir.Event, error) {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	a := &catsystem2.Adapter{}
+	ast, err := a.ParseScript(data, &adapter.ScriptCtx{EntryPath: scriptPath})
+	if err != nil {
+		return nil, err
+	}
+	cfg := map[string]string{"script_name": scriptPath}
+	if stageW > 0 && stageH > 0 {
+		cfg["canvas_w"] = strconv.Itoa(stageW)
+		cfg["canvas_h"] = strconv.Itoa(stageH)
+	}
+	out, err := a.BuildIR(ast, &adapter.BuildCtx{GameID: "catsystem2", Config: cfg})
+	if err != nil {
+		return nil, err
+	}
+	if len(out.Events) == 0 {
+		return nil, fmt.Errorf("CatSystem2 剧本 %s 没有产出事件", filepath.Base(scriptPath))
+	}
+	return &out.Events[0], nil
 }
 
 // confAuto 读 conf 里的 auto（与旧 CLI 同字段）。
@@ -233,6 +268,10 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	root := g.Root
 
 	lib, err := a.loadOrScanLib(g)
+	if err != nil {
+		return SessionMeta{}, err
+	}
+	conv, err := gameConvention(g.Root, g.Engine)
 	if err != nil {
 		return SessionMeta{}, err
 	}
@@ -273,6 +312,15 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	if conv, cerr := gameConvention(root, g.Engine); cerr == nil && conv.EngineID != "" {
 		engineID = conv.EngineID
 	}
+	// 画布尺寸：约定写了就用约定（9nine = 1280×720）；没写就用扫描时
+	// 从素材推断的原作尺寸（CatSystem2/Artemis/BGI 同引擎不同作品分辨率
+	// 不同）；都没有才退回默认 4:3 舞台。素材按原生坐标合成，必须一致。
+	sw, sh := defaultStageW, defaultStageH
+	if conv.StageW > 0 && conv.StageH > 0 {
+		sw, sh = conv.StageW, conv.StageH
+	} else if lib.StageW > 0 && lib.StageH > 0 {
+		sw, sh = lib.StageW, lib.StageH
+	}
 	var ev *ir.Event
 	var unityCG *unitycg.CG
 	// 按**库扫出来的引擎**分派：registry 里的 Engine 可能为空，
@@ -298,14 +346,14 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		ev, err = library.BuildChapterEvent(root, chEvent)
 	case strings.EqualFold(engineID, "artemis"):
 		// Artemis：事件单位是剧本里的 block，Label 记 block 序号。
-		ev, err = buildArtemisShow(sp, label)
+		ev, err = buildArtemisShow(sp, label, sw, sh)
 	case strings.EqualFold(engineID, "bgi"):
 		// BGI：事件由适配器按换背景/换事件切出，Label 记事件序号；
 		// builder 已经产好 Show 台本，直接用。
-		ev, err = buildBGIShow(sp, label)
+		ev, err = buildBGIShow(sp, label, sw, sh)
 	case strings.EqualFold(engineID, "catsystem2"):
 		// CS2：一份 .cst 一个事件（无 Label），构建时把 Timeline 转成 Show。
-		ev, err = buildCS2Show(sp)
+		ev, err = buildCS2Show(sp, sw, sh)
 	default:
 		ev, err = kirikiri.BuildShowSegment(sp, label)
 	}
@@ -331,6 +379,8 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		kind:    kind,
 		id:      id,
 		title:   title,
+		sw:      sw,
+		sh:      sh,
 		ev:      ev,
 		opts:    player.DefaultOptions(),
 		auto:    a.confAuto(),
@@ -347,6 +397,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		}
 		return video.Duration(p)
 	}
+	s.opts.StageW, s.opts.StageH = sw, sh // 消息层默认几何按舞台底部排
 	s.load = s.stageLoader(player.Cached(player.Loader(replay.GameLoader(root))))
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {
@@ -385,8 +436,8 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		ID:         id,
 		Title:      title,
 		GameID:     g.ID,
-		StageW:     stageW,
-		StageH:     stageH,
+		StageW:     sw,
+		StageH:     sh,
 		OpCount:    len(ev.Show),
 		TextCount:  len(ev.Texts),
 		DurationMs: s.durMs,
@@ -514,7 +565,7 @@ func (s *replaySession) frameLocked() FrameDTO {
 	}
 	s.lastSig = sig
 	s.lastEnc = time.Now()
-	j, drawn, err := renderJPEG(s.p, s.load, s.videoProvider())
+	j, drawn, err := renderJPEG(s.p, s.load, s.videoProvider(), s.sw, s.sh)
 	if err != nil {
 		dto.JPEG = s.lastJPEG // 理论上到不了（stageLoader 已吞素材错）
 		return dto
@@ -616,7 +667,7 @@ func (s *replaySession) videoProvider() player.VideoProvider {
 		st, ok := s.vs[path]
 		if !ok {
 			var err error
-			st, err = video.OpenStream(path, stageW, stageH, videoFPS)
+			st, err = video.OpenStream(path, s.sw, s.sh, videoFPS)
 			if err != nil {
 				return nil, err
 			}
@@ -637,8 +688,8 @@ func (s *replaySession) closeVideo() {
 // renderJPEG RenderFrame → JPEG dataURL（quake 偏移已由 Compose/定位处理？——
 // RenderFrame 只管图层与框底，前端拿 QuakeX/Y 对 <img> 做位移）。
 // drawn 原样返回：影片取帧失败等诊断不能在这里被丢掉。
-func renderJPEG(p *player.Player, load player.Loader, video player.VideoProvider) (string, []string, error) {
-	rgba, drawn, err := player.RenderFrameWithVideo(p, load, video, stageW, stageH)
+func renderJPEG(p *player.Player, load player.Loader, video player.VideoProvider, w, h int) (string, []string, error) {
+	rgba, drawn, err := player.RenderFrameWithVideo(p, load, video, w, h)
 	if err != nil {
 		return "", drawn, err
 	}
@@ -790,7 +841,7 @@ func (a *App) Screenshot() (string, error) {
 		return "", fmt.Errorf("Spine 骨骼动画暂不支持服务端截图（画面由前端 WebGL 渲染）")
 	}
 
-	rgba, _, err := player.RenderFrame(s.p, s.load, stageW, stageH)
+	rgba, _, err := player.RenderFrame(s.p, s.load, s.sw, s.sh)
 	if err != nil {
 		return "", err
 	}

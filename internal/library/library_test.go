@@ -75,3 +75,30 @@ func TestFindChapter(t *testing.T) {
 		t.Errorf("不该找到：%+v", ch)
 	}
 }
+
+// TestScanGenericKAG：方言兜底——g01.ks + `*pageN|` 标签、没有 labelNN 章节
+// 标记、没有 cgrai 画廊的作品，也能按「能解析出台词」扫出场景。
+func TestScanGenericKAG(t *testing.T) {
+	root := t.TempDir()
+	body := "@shide\r\n@black\r\n@wait time=2000\r\n" +
+		"@novel\r\n@bgm storage=bgm_13\r\n@ev storage=ev_other_09a\r\n@show\r\n" +
+		"*page1|\r\n　十月もなかばを過ぎたばかりだというのに、北寄りの風。[l]街は日没を待って徐々に色彩を失い。[wvl]\r\n" +
+		"\r\n*page2|\r\n　二段落目の本文。[np]\r\n"
+	writeScript(t, root, "g01.ks", body)
+
+	lib, err := Scan(root)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(lib.Scenes) != 1 {
+		t.Fatalf("场景数 = %d，期望 1：%+v", len(lib.Scenes), lib.Scenes)
+	}
+	s := lib.Scenes[0]
+	if s.ID != "g01" {
+		t.Errorf("场景 id = %q, want g01", s.ID)
+	}
+	// [l] 会把一行切成多个文本片段，标题取第一个片段。
+	if want := "十月もなかばを過ぎたばかりだというのに、北寄りの風。"; s.Title != want {
+		t.Errorf("标题 = %q, want 首句台词 %q", s.Title, want)
+	}
+}

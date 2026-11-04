@@ -3,8 +3,10 @@ package replay
 import (
 	"fmt"
 	"image"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"ucgr/internal/ir"
@@ -78,12 +80,56 @@ func AssetPath(root, rel string) (string, error) {
 // 演出台本里记的是脚本引用（storage 名，可能没有扩展名），所以这里先按原路径找，
 // 再按文件名在常见素材子目录里试扩展名。缓存的是**解码结果**，不是路径：
 // 重复引用只读一次磁盘。影片不走这里（否则会把几百 MB 的 .mpg 整个读进内存）。
+//
+// 固定目录猜不全时（Artemis / CatSystem2 / BGI 的整理版解包把图片按归档分到多层
+// 子目录），退回**整棵树的文件名索引**兜底；再找不到就试 NScripter 归档
+// （arc*.nsa / *.sar，海猫出题的图全在里面）。索引只建一次并缓存。
 func GameLoader(root string) Loader {
 	type entry struct {
 		img image.Image
 		err error
 	}
 	cache := map[string]entry{}
+	nsaCache := map[string]image.Image{} // NSA 解出的图（内存，无文件路径）
+	var index map[string]string
+	var nsas *nsaPool // NScripter 归档兜底（海猫出题的图全在 arc*.nsa）
+	buildIndex := func() {
+		index = map[string]string{}
+		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				switch strings.ToLower(d.Name()) {
+				case "voice", "音频", "语音", "sound", "bgm", "se", "video", "视频",
+					"字体", "font", "_font_cache", ".git":
+					return fs.SkipDir
+				}
+				if rel, e := filepath.Rel(root, p); e == nil && rel != "." &&
+					strings.Count(rel, string(filepath.Separator)) >= 8 {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			switch strings.ToLower(filepath.Ext(p)) {
+			case ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3", ".bmp":
+			default:
+				return nil
+			}
+			stem := strings.ToLower(strings.TrimSuffix(filepath.Base(p), filepath.Ext(p)))
+			if _, ok := index[stem]; !ok {
+				index[stem] = p
+			}
+			// CatSystem2 的 HG3 展开名带 _<序号> 后缀（bg01_0000.png），
+			// 剧本里引用的是裸名（bg01）——同时登记去后缀的别名。
+			if base := diffSuffixRe.ReplaceAllString(stem, ""); base != "" && base != stem {
+				if _, ok := index[base]; !ok {
+					index[base] = p
+				}
+			}
+			return nil
+		})
+	}
 	return func(rel string) (image.Image, error) {
 		rel = strings.TrimSpace(rel)
 		if rel == "" {
@@ -94,6 +140,9 @@ func GameLoader(root string) Loader {
 		}
 		if e, ok := cache[rel]; ok {
 			return e.img, e.err
+		}
+		if img, ok := nsaCache[rel]; ok {
+			return img, nil
 		}
 		put := func(img image.Image, err error) (image.Image, error) {
 			cache[rel] = entry{img: img, err: err}
@@ -118,9 +167,37 @@ func GameLoader(root string) Loader {
 				return put(decodeFile(c))
 			}
 		}
+		// 固定目录都不中：用文件名索引兜底。
+		if index == nil {
+			buildIndex()
+		}
+		key := strings.ToLower(stem)
+		if p, ok := index[key]; ok {
+			return put(decodeFile(p))
+		}
+		if base := diffSuffixRe.ReplaceAllString(key, ""); base != "" {
+			if p, ok := index[base]; ok {
+				return put(decodeFile(p))
+			}
+		}
+		// 文件系统里没有：试 NScripter 归档（arc*.nsa / *.sar）。
+		if nsas == nil {
+			nsas = newNsaPool(root)
+		}
+		if !nsas.empty() {
+			if data, ok := nsas.image(rel); ok {
+				if img, err := DecodeImage(data); err == nil {
+					nsaCache[rel] = img
+					return img, nil
+				}
+			}
+		}
 		return put(nil, fmt.Errorf("素材未找到: %s", rel))
 	}
 }
+
+// diffSuffixRe CatSystem2 HG3 展开名的序号后缀（bg01_0000 → bg01）。
+var diffSuffixRe = regexp.MustCompile(`_\d{2,4}$`)
 
 // decodeFile 读文件并按需解码（PNG / TLG5 / 明文或掩码 JPEG）。
 func decodeFile(path string) (image.Image, error) {

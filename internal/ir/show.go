@@ -102,3 +102,34 @@ func ValidateShow(ev *Event) []error {
 	}
 	return errs
 }
+
+// MessageBoxOps 返回「底部对话框」的层指令（各引擎把 Show 前置一份即可）。
+//
+// 播放器默认消息层是整屏的（文字从画面左上角开始铺），与多数 AVG
+// 「底部一条半透明框」差得远。stageW/H 不合法时退回 1280×720。
+func MessageBoxOps(layer string, stageW, stageH int) []ShowOp {
+	if layer == "" {
+		layer = "message0"
+	}
+	if stageW <= 0 || stageH <= 0 {
+		stageW, stageH = 1280, 720
+	}
+	top := stageH - 210
+	if top < 0 {
+		top = 0
+	}
+	return []ShowOp{
+		{TMs: 0, Kind: ShowLayerOpt, Layer: layer, Page: "fore",
+			Attr: map[string]string{"visible": "true"}},
+		{TMs: 0, Kind: ShowLayerAttr, Layer: layer, Page: "fore",
+			Attr: map[string]string{
+				"left": "0", "top": itoa(top),
+				"width": itoa(stageW), "height": "210",
+				"opacity": "160",
+				"margint": "30", "marginl": "64", "marginr": "64", "marginb": "16",
+			}},
+	}
+}
+
+// itoa 小工具：避免为一个整数格式化引入 strconv 之外的依赖。
+func itoa(v int) string { return fmt.Sprintf("%d", v) }

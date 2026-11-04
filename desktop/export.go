@@ -71,6 +71,18 @@ type exportPlan struct {
 	capFrames int
 }
 
+// scaledHeight 按舞台宽高比把输出宽度换算成高度（取偶数，编码器友好）。
+func scaledHeight(width, sw, sh int) int {
+	if sw <= 0 || sh <= 0 {
+		return width * 3 / 4
+	}
+	h := int(float64(width)*float64(sh)/float64(sw) + 0.5)
+	if h%2 == 1 {
+		h++
+	}
+	return h
+}
+
 // StartExport 异步启动导出任务（GIF / MP4），立即返回。
 //
 // 与旧同步版 ExportEvent 的差别：真正的渲染循环在 goroutine 里跑，
@@ -97,6 +109,7 @@ func (a *App) StartExport(format string) error {
 	s.mu.Lock()
 	ev, root, kind, id := s.ev, s.root, s.kind, s.id
 	isSpine := s.spine != nil
+	sw, sh := s.sw, s.sh
 	s.mu.Unlock()
 	if ev == nil || len(ev.Show) == 0 {
 		return fail(fmt.Errorf("当前事件没有可导出的台本"))
@@ -110,18 +123,20 @@ func (a *App) StartExport(format string) error {
 		want = "auto"
 	}
 	ffmpeg := findFFmpeg()
-	plan := exportPlan{format: "gif", fps: 10, width: 480, height: 360, capFrames: 150}
+	// 输出高度按舞台比例算（4:3 的 KiriKiri 与 16:9 的 9nine 都不变形）。
+	gifH, mp4H := scaledHeight(480, sw, sh), scaledHeight(960, sw, sh)
+	plan := exportPlan{format: "gif", fps: 10, width: 480, height: gifH, capFrames: 150}
 	switch want {
 	case "gif":
-		// 默认规格：10fps / 480×360 / 15s 上限（8 位调色板，体积可控）。
+		// 默认规格：10fps / 宽 480 / 15s 上限（8 位调色板，体积可控）。
 	case "mp4":
 		if ffmpeg == "" {
 			return fail(fmt.Errorf("未检测到 ffmpeg，无法导出 MP4；可改用 GIF，或把 ffmpeg 加入 PATH"))
 		}
-		plan = exportPlan{format: "mp4", fps: 25, width: 960, height: 720, capFrames: 1500}
+		plan = exportPlan{format: "mp4", fps: 25, width: 960, height: mp4H, capFrames: 1500}
 	case "auto":
 		if ffmpeg != "" {
-			plan = exportPlan{format: "mp4", fps: 25, width: 960, height: 720, capFrames: 1500}
+			plan = exportPlan{format: "mp4", fps: 25, width: 960, height: mp4H, capFrames: 1500}
 		}
 	default:
 		return fail(fmt.Errorf("未知导出格式 %q（支持 gif / mp4 / auto）", format))
@@ -136,7 +151,7 @@ func (a *App) StartExport(format string) error {
 			a.exportMu.Unlock() // 释放 StartExport TryLock 抢占的旗杆锁（任务结束）
 			cancel()            // 释放 context 资源
 		}()
-		res, err := a.runExport(ctx, plan, want, ffmpeg, ev, root, kind, id)
+		res, err := a.runExport(ctx, plan, want, ffmpeg, ev, root, kind, id, sw, sh)
 		switch {
 		case err == nil:
 			a.emitExportDone(res)
@@ -173,7 +188,7 @@ func (a *App) CancelExport() error {
 
 // runExport 导出主体（原 ExportEvent 的渲染循环）：逐帧检查 ctx 取消，
 // 完成/失败由调用方转成 export:done / export:failed 事件。
-func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg string, ev *ir.Event, root, kind, id string) (ExportResult, error) {
+func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg string, ev *ir.Event, root, kind, id string, sw, sh int) (ExportResult, error) {
 	opt := player.DefaultOptions()
 	opt.FontSize = 48
 	opt.Speed = 1
@@ -200,7 +215,7 @@ func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg strin
 	}
 	td := win32.NewTextDrawer(win32.DefaultTextStyle(face, opt.FontSize))
 	defer td.Free()
-	cv, err := win32.NewCanvas(stageW, stageH)
+	cv, err := win32.NewCanvas(sw, sh)
 	if err != nil {
 		return ExportResult{}, fmt.Errorf("创建导出画布失败：%w", err)
 	}
@@ -240,7 +255,7 @@ func (a *App) runExport(ctx context.Context, plan exportPlan, want, ffmpeg strin
 			cleanup()
 			return ExportResult{}, cerr // context.Canceled → 上层转「导出已取消」
 		}
-		rgba, _, rerr := player.RenderFrame(p, load, stageW, stageH)
+		rgba, _, rerr := player.RenderFrame(p, load, sw, sh)
 		if rerr != nil {
 			cleanup()
 			return ExportResult{}, fmt.Errorf("第 %d 帧合成失败：%w", i, rerr)

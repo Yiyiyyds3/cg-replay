@@ -1,29 +1,35 @@
-// catsystem2.go —— CatSystem2 事件库：一份 .cst 剧本 = 一个事件。
+// catsystem2.go —— CatSystem2 事件库：一个 .cst 剧本 = 一个可回放事件。
 //
-// 与 Artemis 的差别：CS2 的 `.cst` 是「一个场景一份脚本」，适配器的 BuildIR
-// 也只产一个事件（`EventID: "script"`），脚本里没有可靠的场景切换标记，
-// 所以事件库按**文件**切分，id 取文件名（去掉扩展名）。
+// CS2 的剧本天然按场景分文件（`原始归档解包/scene/ama01.cst`），
+// 所以事件单位直接用文件，不再像 KiriKiri 那样找画廊槽位/章节标记。
+//
+// 事件 id 用文件名（去 .cst）；多个 scene 目录下有同名文件时才退回相对路径。
+// 标题取剧本里的第一句对白——CS2 没有可用的「章节显示名」字段。
+// 解析与演出构建都复用适配器（BuildShowScript），保证「库里列的」
+// 与「点开能播的」是同一条路径；含影片指令的事件标 HasVideo。
 package library
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/ir"
 )
 
-// ScanCS2 扫 CatSystem2 解包目录（scene/*.cst），一份脚本一个场景事件。
-func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
-	dir := filepath.Join(root, filepath.FromSlash(conv.ScenarioDir))
-	ents, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+// cs2TitleMax 标题最多取多少字符（列表里一行放得下，不截断会撑爆界面）。
+const cs2TitleMax = 40
+
+// ScanCatSystem2 扫 CatSystem2 解包目录（.cst 剧本），产出事件库。
+func ScanCatSystem2(root string, conv adapter.Convention) (*Library, error) {
+	files := scriptFiles(root, conv.ScenarioDir, ".cst", discoverMaxDepth)
+	if len(files) == 0 {
+		return nil, fmt.Errorf("没有找到 .cst 剧本（%s）", scriptDirHint(root, conv.ScenarioDir))
 	}
 	lib := &Library{
 		Root:        root,
@@ -33,61 +39,58 @@ func ScanCS2(root string, conv adapter.Convention) (*Library, error) {
 		Scenes:      []SceneEvent{},
 		Chapters:    []ChapterEvent{},
 	}
-	rel := func(p string) string {
-		if r, err := filepath.Rel(root, p); err == nil {
-			return filepath.ToSlash(r)
-		}
-		return filepath.ToSlash(p)
-	}
-	var names []string
-	for _, e := range ents {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".cst") {
-			continue
-		}
-		names = append(names, e.Name())
-	}
-	sort.Strings(names)
-	skipped := 0
-	firstErr := ""
-	for _, name := range names {
-		p := filepath.Join(dir, name)
+	stemOf := uniqueStems(root, files)
+	failed := 0
+	for _, p := range files {
 		data, err := os.ReadFile(p)
 		if err != nil {
-			skipped++
-			if firstErr == "" {
-				firstErr = fmt.Sprintf("%s：%v", name, err)
-			}
+			failed++
 			continue
 		}
-		// 能解析**且**能构建出演出才算可回放（坏文件、空脚本都不列进库——
-		// 否则会出现「库里列着但点开播不出来」）。
-		ev, err := catsystem2.BuildShowScript(data, name)
+		// 能解析且能构建出演出才算可回放（坏文件、空脚本都不列进库——
+		// 否则会出现「库里列着但点开播不出来」）；同时拿到 ir.Event
+		// 用于 HasVideo 判定与标题提取。
+		ev, err := catsystem2.BuildShowScript(data, filepath.Base(p))
 		if err != nil || len(ev.Show) == 0 {
-			skipped++
-			if firstErr == "" {
-				if err != nil {
-					firstErr = fmt.Sprintf("%s：%v", name, err)
-				} else {
-					firstErr = fmt.Sprintf("%s：没有可回放的演出", name)
-				}
-			}
+			failed++ // 单个剧本坏掉不拖垮整个库
 			continue
 		}
-		stem := strings.TrimSuffix(name, filepath.Ext(name))
-		hasVideo := ir.HasVideo(ev)
+		stem := stemOf(p)
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:       stem,
-			Title:    stem,
-			Script:   rel(p),
-			HasVideo: hasVideo,
+			Title:    cs2Title(ev, stem),
+			Script:   relKey(root, p),
+			HasVideo: ir.HasVideo(ev),
 		})
 	}
-	if skipped > 0 {
-		lib.Warnings = append(lib.Warnings,
-			fmt.Sprintf("%d 份 .cst 无法回放，已跳过（首条：%s）", skipped, firstErr))
+	if failed > 0 {
+		lib.Warnings = append(lib.Warnings, fmt.Sprintf(
+			"%d/%d 个 .cst 解析失败已跳过（剧本可能损坏或不是 CatScene 容器）", failed, len(files)))
 	}
 	if len(lib.Scenes) == 0 {
-		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .cst；%s）", conv.ScenarioDir, firstErr)
+		return nil, fmt.Errorf("没有识别到可回放事件（%s 下没有可解析的 .cst）", scriptDirHint(root, conv.ScenarioDir))
 	}
+	lib.StageW, lib.StageH = detectStageSize(root)
 	return lib, nil
+}
+
+// cs2Title 取演出事件里的第一句对白当标题（没有就用文件名）。
+func cs2Title(ev *ir.Event, fallback string) string {
+	for _, t := range ev.Texts {
+		s := strings.TrimSpace(t.Text)
+		if s == "" {
+			continue
+		}
+		return truncateRunes(s, cs2TitleMax)
+	}
+	return fallback
+}
+
+// truncateRunes 按字符（不是字节）截断，避免把 CP932/UTF-8 多字节字符劈开。
+func truncateRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:n]) + "…"
 }

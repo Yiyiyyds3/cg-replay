@@ -77,8 +77,13 @@ type Library struct {
 	CGs         []CGEvent      `json:"cgs"`
 	Scenes      []SceneEvent   `json:"scenes"`
 	Chapters    []ChapterEvent `json:"chapters,omitempty"`
-	// Warnings 扫描时可以跳过但不应静默的问题（坏脚本、读取失败等）。
+	// Warnings 扫描期的非致命问题（个别剧本解析失败、CG 表缺失等）。
+	// 有它就说明「库是残缺的」，前端/CLI 应显式告知，不能静默当完整库。
 	Warnings []string `json:"warnings,omitempty"`
+	// StageW/StageH 扫描时从素材推断的原作舞台尺寸（0 = 未推断出，
+	// 由约定或壳层默认值兜底）。编译剧本（scn）不推断，用约定里的值。
+	StageW int `json:"stage_w,omitempty"`
+	StageH int `json:"stage_h,omitempty"`
 }
 
 var (
@@ -129,25 +134,30 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 }
 
 func scanWith(root string, conv adapter.Convention) (*Library, error) {
+	// 事件切分是引擎专属的：Artemis 的事件单位是整份剧本，
+	// BGI 是脚本内的事件边界，CatSystem2 是一个 .cst 文件，
+	// SCN 是编译剧本里的 scene，NScripter 是换背景切事件，
+	// KiriKiri 是画廊槽位 + 场景 + 章节。约定里的 engine_id 决定走哪条。
+	// 注意：这些分支的剧本目录可以由扫描器自动探测，所以**不能**
+	// 在分派前把空 ScenarioDir 合并成 KiriKiri 默认值。
+	switch strings.ToLower(strings.TrimSpace(conv.EngineID)) {
+	case "artemis":
+		return ScanArtemis(root, conv)
+	case "bgi":
+		return ScanBGI(root, conv)
+	case "catsystem2":
+		return ScanCatSystem2(root, conv)
+	case "scn":
+		return ScanSCN(root, conv)
+	case "nscript":
+		return ScanNScripter(root, conv)
+	case "unity":
+		return ScanUnity(root)
+	case "rmmz":
+		return ScanRMMZ(root, conv)
+	}
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())
-	}
-	// 事件切分是引擎专属的：Artemis 的事件单位是剧本里的 block，
-	// KiriKiri 是画廊槽位 + 场景 + 章节。约定里的 engine_id 决定走哪条。
-	if strings.EqualFold(conv.EngineID, "artemis") {
-		return ScanArtemis(root, conv)
-	}
-	if strings.EqualFold(conv.EngineID, "bgi") {
-		return ScanBGI(root, conv)
-	}
-	if strings.EqualFold(conv.EngineID, "catsystem2") {
-		return ScanCS2(root, conv)
-	}
-	if strings.EqualFold(conv.EngineID, "unity") {
-		return ScanUnity(root)
-	}
-	if strings.EqualFold(conv.EngineID, "rmmz") {
-		return ScanRMMZ(root, conv)
 	}
 	thumbRe := conventionRe(conv.CGLabelRe)
 	labelRe := conventionRe(conv.CGLabelRe)
@@ -156,7 +166,21 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 	dir := filepath.Join(root, filepath.FromSlash(conv.ScenarioDir))
 	ents, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+		// 约定里的目录不存在时按 .ks 分布自动探测——KiriKiri 的剧本目录
+		// 不总叫 scenario（实测有 raw/data_zh/scenario、_分类/文本/data/scenario）。
+		// 约定写了却读不到，说明这份约定和当前解包布局对不上，先试探测，
+		// 实在找不到再报错（报错信息要能区分「目录不存在」与「不是 KiriKiri」）。
+		alt := findKiriKiriScriptDir(root)
+		if alt == "" {
+			return nil, fmt.Errorf(
+				"读不到剧本目录 %s（%v）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎",
+				dir, err)
+		}
+		dir = alt
+		ents, err = os.ReadDir(dir)
+		if err != nil {
+			return nil, fmt.Errorf("读不到剧本目录 %s：%w", dir, err)
+		}
 	}
 	lib := &Library{
 		Root:        root,
@@ -254,9 +278,22 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 	if len(names) == 0 {
 		names = fallbackStoryScenes(dir)
 	}
+	// 方言兜底：编号命名、cgrai 画廊、labelNN 章节标记都不匹配时
+	// （如 g01.ks + `*pageN|` 标签的作品），只要脚本能解析出台词就当一个场景。
+	generic := false
+	if len(names) == 0 {
+		names = genericStoryScenes(dir)
+		generic = len(names) > 0
+	}
 	sort.Strings(names)
 	for _, name := range names {
 		id := strings.TrimSuffix(name, filepath.Ext(name))
+		title := id
+		if generic {
+			if t := firstKAGText(filepath.Join(dir, name)); t != "" {
+				title = truncateRunes(t, 40)
+			}
+		}
 		// 影片场景（OP/ED）：KiriKiri 的 .ks 是明文脚本，认一下自己的语法即可。
 		hasVideo := false
 		if data, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
@@ -264,7 +301,7 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:       id,
-			Title:    id,
+			Title:    title,
 			Script:   rel(filepath.Join(dir, name)),
 			HasVideo: hasVideo,
 		})
@@ -378,6 +415,13 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 		prev.ContScript = s.Script
 		prev.ContLabelPos = info.firstLabelPos
 	}
+	// 空库要报错：脚本目录里有一堆 .ks 却一个事件都切不出来，
+	// 通常是脚本被加密/压缩（不是明文 KAG），不能当成「成功但空库」。
+	if len(lib.CGs)+len(lib.Scenes)+len(lib.Chapters) == 0 {
+		return nil, fmt.Errorf(
+			"没有识别到可回放事件（%s 下 %d 个 .ks 都不像明文 KAG 脚本——可能被加密/压缩）",
+			dir, len(ents))
+	}
 	return lib, nil
 }
 
@@ -410,6 +454,50 @@ func fallbackStoryScenes(dir string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// genericStoryScenes 通用 KAG 兜底：能解析出台词的 .ks 都算场景。
+//
+// 为什么需要：默认约定假设「编号命名 + cgrai 画廊 + labelNN 章节标记」，
+// 但其它 KiriKiri 作品常用 g01.ks 这类名字和 `*pageN|` 标签——三层筛选
+// 全部落空时把整目录误报成「被加密」。能解析出文本本身就是明文 KAG 的
+// 最硬证据，比名字模式可靠。
+func genericStoryScenes(dir string) []string {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range ents {
+		name := e.Name()
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(name), ".ks") {
+			continue
+		}
+		if galleryRe.MatchString(name) || strings.EqualFold(name, "cgrai00.ks") {
+			continue
+		}
+		ast, err := kirikiri.ParseScriptFile(filepath.Join(dir, name))
+		if err != nil || len(ast.Texts) == 0 {
+			continue
+		}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// firstKAGText 脚本的第一句台词（通用 KAG 兜底场景的标题来源）。
+func firstKAGText(path string) string {
+	ast, err := kirikiri.ParseScriptFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, tx := range ast.Texts {
+		if s := strings.TrimSpace(tx); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // Save 写库清单（JSON）。

@@ -27,7 +27,12 @@ import (
 	"strings"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/adapter/artemis"
+	"ucgr/internal/adapter/bgi"
+	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/nscript"
+	"ucgr/internal/adapter/scn"
 	"ucgr/internal/audio"
 	"ucgr/internal/decode"
 	"ucgr/internal/hash"
@@ -39,11 +44,6 @@ import (
 	"ucgr/internal/prune"
 	"ucgr/internal/replay"
 	"ucgr/internal/scan"
-
-	// 空白导入触发各适配器 init() 注册（新增引擎在此加一行）
-	_ "ucgr/internal/adapter/artemis"
-	_ "ucgr/internal/adapter/bgi"
-	_ "ucgr/internal/adapter/catsystem2"
 )
 
 func main() {
@@ -218,12 +218,23 @@ func cmdEvents(args []string) error {
 	if root == "" {
 		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json]")
 	}
-	lib, err := library.Scan(root)
+	engineID, conv, err := library.DetectConvention(root)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("事件库 %s（%s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
-		lib.Game, lib.Root, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
+	lib, err := library.ScanWith(root, conv)
+	if err != nil {
+		return err
+	}
+	stage := "舞台未推断"
+	switch {
+	case conv.StageW > 0 && conv.StageH > 0:
+		stage = fmt.Sprintf("舞台 %d×%d（约定）", conv.StageW, conv.StageH)
+	case lib.StageW > 0 && lib.StageH > 0:
+		stage = fmt.Sprintf("舞台 %d×%d（素材推断）", lib.StageW, lib.StageH)
+	}
+	fmt.Printf("事件库 %s（%s，引擎 %s，%s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
+		lib.Game, lib.Root, engineID, stage, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
 	const showMax = 24
 	for i, c := range lib.CGs {
 		if i >= showMax {
@@ -251,6 +262,10 @@ func cmdEvents(args []string) error {
 			break
 		}
 		fmt.Printf("  段落 #%-3d %-10s %s\n", c.Index, c.Scene, c.Title)
+	}
+	// 跳过/降级的条目：解包产物本身有问题时如实报出来，不要静默少一堆事件。
+	for _, w := range lib.Warnings {
+		fmt.Printf("  ! %s\n", w)
 	}
 	if out != "" {
 		if err := lib.Save(out); err != nil {
@@ -602,9 +617,18 @@ func cmdIR(args []string) error {
 		return &ir.AssetRef{Hash: h, OrigPath: rel, Role: "其它"}, true
 	}
 	var unrecognized []ir.Unrecognized
+	cfg := map[string]string{"script_name": script}
+	// CatSystem2 的对话框位置按画布高度算；画布用素材推断值，
+	// 不然默认 1600×900 会把 1024×576 / 1920×1080 的作品排错。
+	if engineID == "catsystem2" {
+		if w, h := library.DetectStageSize(root); w > 0 && h > 0 {
+			cfg["canvas_w"] = strconv.Itoa(w)
+			cfg["canvas_h"] = strconv.Itoa(h)
+		}
+	}
 	out, err := a.BuildIR(ast, &adapter.BuildCtx{
 		GameID:             filepath.Base(root),
-		Config:             map[string]string{"script_name": script},
+		Config:             cfg,
 		RecordUnrecognized: func(u ir.Unrecognized) { unrecognized = append(unrecognized, u) },
 		Resolver:           resolver,
 	})
@@ -929,7 +953,7 @@ func cmdPlay(args []string) error {
 			"      或: ucgr play --script <脚本.ks> --chapter <标签下标> [--assets 素材根]")
 	}
 	if assets == "" && scriptPath != "" {
-		assets = gameRootOf(scriptPath)
+		assets = library.GameRootOf(scriptPath)
 	}
 	if assets == "" {
 		return fmt.Errorf("play 需要 --assets <素材根>（解包目录或 S2 裁剪产物）")
@@ -939,6 +963,11 @@ func cmdPlay(args []string) error {
 		ev      *ir.Event
 		gameID  string
 		evLabel string
+		// canvasW/H 台本自带画布（scn 为 1280×720）；0 = 用默认 1600×1200。
+		canvasW, canvasH int
+		// isModernScript CS2/Artemis/BGI 这批 16:9 时代的剧本，画布缺省
+		// 跟它们对齐（1600×900），别沿用 KiriKiri 4:3 的 1600×1200。
+		isModernScript bool
 	)
 	if scriptPath != "" {
 		// 按原作自己的分割单位播放：章节（*labelNN|显示名）、标签段（*cgNN）或整脚本。
@@ -946,9 +975,86 @@ func cmdPlay(args []string) error {
 			e   *ir.Event
 			err error
 		)
-		if hasChapter {
+		switch {
+		case strings.EqualFold(filepath.Ext(scriptPath), ".scn"):
+			// PSB 编译剧本：--chapter 当 scene 序号，缺省整份脚本。
+			root := library.GameRootOf(scriptPath)
+			opt := scn.DefaultOptions()
+			if hasChapter {
+				e, err = scn.BuildShowScene(root, scriptPath, chapterPos, opt)
+			} else {
+				e, err = scn.BuildShowFile(root, scriptPath, opt)
+			}
+			canvasW, canvasH = opt.StageW, opt.StageH
+		case strings.EqualFold(filepath.Ext(scriptPath), ".ast"):
+			// Artemis 明文剧本：整份剧本（所有 block 按块序拼接）一个事件。
+			isModernScript = true
+			var data []byte
+			data, err = os.ReadFile(scriptPath)
+			if err == nil {
+				root := library.GameRootOf(scriptPath)
+				w, h := library.DetectStageSize(root)
+				e, err = artemis.BuildShowScriptStage(data, filepath.Base(scriptPath), w, h)
+				canvasW, canvasH = w, h
+			}
+		case strings.EqualFold(filepath.Ext(scriptPath), ".cst"):
+			// CatSystem2 剧本：一个 .cst 一个事件。
+			isModernScript = true
+			var data []byte
+			data, err = os.ReadFile(scriptPath)
+			if err == nil {
+				a := &catsystem2.Adapter{}
+				var ast adapter.ScriptAst
+				ast, err = a.ParseScript(data, &adapter.ScriptCtx{EntryPath: scriptPath})
+				if err == nil {
+					root := library.GameRootOf(scriptPath)
+					w, h := library.DetectStageSize(root)
+					cfg := map[string]string{"script_name": scriptPath}
+					if w > 0 && h > 0 {
+						cfg["canvas_w"] = strconv.Itoa(w)
+						cfg["canvas_h"] = strconv.Itoa(h)
+					}
+					var doc *ir.IR
+					doc, err = a.BuildIR(ast, &adapter.BuildCtx{GameID: root, Config: cfg})
+					if err == nil {
+						if len(doc.Events) == 0 {
+							err = fmt.Errorf("剧本 %s 没有产出事件", filepath.Base(scriptPath))
+						} else {
+							e = &doc.Events[0]
+							canvasW, canvasH = w, h
+						}
+					}
+				}
+			}
+		case strings.EqualFold(filepath.Ext(scriptPath), ".bs"):
+			// BGI 编译脚本：--chapter 当事件序号（1 起），缺省第 1 个事件。
+			isModernScript = true
+			root := library.GameRootOf(scriptPath)
+			n := 1
+			if hasChapter && chapterPos > 0 {
+				n = chapterPos
+			}
+			w, h := library.DetectStageSize(root)
+			e, err = bgi.BuildShowEventFileStage(scriptPath, n, w, h)
+			canvasW, canvasH = w, h
+		case isNScripterScript(scriptPath):
+			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），
+			// 缺省第 1 个事件（对话起始处）。
+			root := library.GameRootOf(scriptPath)
+			n := 1
+			if hasChapter && chapterPos > 0 {
+				n = chapterPos
+			}
+			w, h := library.DetectStageSize(root)
+			if w <= 0 || h <= 0 {
+				// 图全在归档里推不出尺寸（海猫出题）时按 NScripter 标准舞台。
+				w, h = 640, 480
+			}
+			e, err = nscript.BuildShowEventFileStage(scriptPath, n, w, h)
+			canvasW, canvasH = w, h
+		case hasChapter:
 			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
-		} else {
+		default:
 			e, err = kirikiri.BuildShowSegment(scriptPath, label)
 		}
 		if err != nil {
@@ -958,8 +1064,19 @@ func cmdPlay(args []string) error {
 			return fmt.Errorf("脚本 %s 的标签段 %q 里没有可演的台本", filepath.Base(scriptPath), label)
 		}
 		ev = e
-		gameID = filepath.Base(gameRootOf(scriptPath))
+		gameID = filepath.Base(library.GameRootOf(scriptPath))
 		switch {
+		case strings.EqualFold(filepath.Ext(scriptPath), ".scn"):
+			evLabel = fmt.Sprintf("PSB 剧本 %s", filepath.Base(scriptPath))
+			if hasChapter {
+				evLabel = fmt.Sprintf("PSB 场景 %d（%s）", chapterPos, e.Title)
+			}
+		case strings.EqualFold(filepath.Ext(scriptPath), ".ast"):
+			evLabel = "Artemis 剧本 " + filepath.Base(scriptPath)
+		case strings.EqualFold(filepath.Ext(scriptPath), ".cst"):
+			evLabel = "CatSystem2 剧本 " + filepath.Base(scriptPath)
+		case strings.EqualFold(filepath.Ext(scriptPath), ".bs"):
+			evLabel = "BGI 剧本 " + filepath.Base(scriptPath)
 		case hasChapter:
 			evLabel = fmt.Sprintf("章节 %s（%s）", e.Title, e.EventID)
 		case strings.TrimSpace(label) != "":
@@ -995,11 +1112,23 @@ func cmdPlay(args []string) error {
 	}
 	w, h := parseSize(sizeSpec)
 	if w <= 0 || h <= 0 {
-		w, h = 1600, 1200 // Config.tjs：scWidth/scHeight
+		if canvasW > 0 && canvasH > 0 {
+			w, h = canvasW, canvasH // scn：剧本自带舞台尺寸（9nine 1280×720）
+		} else if isModernScript {
+			w, h = 1600, 900 // CS2/Artemis/BGI 作品多为 16:9；素材没解出来时先按 16:9
+		} else {
+			w, h = 1600, 1200 // Config.tjs：scWidth/scHeight
+		}
 	}
 
 	load := player.Cached(playLoader(assets))
 	opt := player.DefaultOptions()
+	opt.StageW, opt.StageH = w, h // 消息层默认几何按舞台底部排
+	if isNScripterScript(scriptPath) && w <= 800 {
+		// 640×480 的 NScripter 舞台用 48px 字会溢出对话框，按原作 setwindow
+		// 的字号级（26px 附近）缩小。
+		opt.FontSize, opt.LineSpacing = 26, 8
+	}
 	if speed > 0 {
 		opt.Speed = speed
 	}
@@ -1007,6 +1136,12 @@ func cmdPlay(args []string) error {
 		opt.CharMs = float64(charMs)
 	}
 	opt.SkipWaits = noWait
+	if atSpec != "" {
+		// 离线出图要「真实演到 t」：点击等待（自动阅读时长）与时间等待都要
+		// 生效。若沿用 --no-wait 的快进语义，整份脚本瞬间演完，--at 拿到的
+		// 永远是末帧——KiriKiri 剧本末尾常是收黑，画面就全黑了。
+		opt.SkipWaits = false
+	}
 
 	// 字体：本作自带思源宋体 SC（OTF/CFF，且被单字节 XOR 混淆）。
 	// RegisterFontFile 会还原混淆并私有注册到 GDI，返回可用的家族名。
@@ -1491,6 +1626,16 @@ func cmdEngines() {
 	for _, id := range adapter.IDs() {
 		fmt.Println(id)
 	}
+}
+
+// isNScripterScript 判断脚本路径是不是 NScripter 剧本
+// （nscript.dat / 0.txt / 00.txt，可能带扩展名大小写差异）。
+func isNScripterScript(p string) bool {
+	switch strings.ToLower(filepath.Base(p)) {
+	case "nscript.dat", "0.txt", "00.txt":
+		return true
+	}
+	return false
 }
 
 // engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。

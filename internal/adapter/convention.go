@@ -47,6 +47,19 @@ type Convention struct {
 	// raw/data/sysscn/ 之类的系统目录里，不在剧本目录，所以收不到。
 	// 这些目录里**只收含影片指令的脚本**（别的都是系统 UI 脚本，收进来是噪声）。
 	MovieDirs []string `json:"movie_dirs,omitempty"`
+
+	// —— 以下为编译型剧本引擎（scn / PSB）专用，其它引擎留空即可 ——
+
+	// CGList CG 鉴赏表（相对 root 的 .csv，如 "raw/data/main/cglist.csv"）。
+	// 空 = 该游戏没有 CG 鉴赏表（不产出 CG 事件）。
+	CGList string `json:"cg_list"`
+	// StageW/StageH 原作舞台尺寸（像素）。0 = 用引擎默认（scn 为 1280×720）。
+	// 回放画布按它渲染——素材按原生坐标合成，画布尺寸不对会错位。
+	StageW int `json:"stage_w"`
+	StageH int `json:"stage_h"`
+	// ImageDirs/AudioDirs 素材目录（相对 root，可多个；留空用引擎默认目录）。
+	ImageDirs []string `json:"image_dirs"`
+	AudioDirs []string `json:"audio_dirs"`
 }
 
 // ConventionFileName 游戏根目录下的约定覆盖文件名。
@@ -81,6 +94,66 @@ func DefaultRMMZ() Convention {
 	}
 }
 
+// DefaultSCN 编译剧本（PSB / M2 KiriKiri Evolution）的默认约定。
+//
+// 9nine 系列用 .scn（PSB 容器）：剧本在 raw/data/scn，CG 鉴赏表在
+// raw/data/main/cglist.csv，舞台 1280×720。整理版布局（原始归档解包/
+// _分类）用游戏根目录的 ucgr-convention.json 覆盖这三个路径即可。
+func DefaultSCN() Convention {
+	return Convention{
+		EngineID:    "scn",
+		ScenarioDir: filepath.Join("raw", "data", "scn"),
+		ScriptExt:   ".scn",
+		CGList:      filepath.Join("raw", "data", "main", "cglist.csv"),
+		StageW:      1280,
+		StageH:      720,
+	}
+}
+
+// DefaultArtemis Artemis 的默认约定。
+//
+// .ast 剧本在解包树里的层级不固定（实测：`文本/<卷>.pfs/script`、
+// `原始归档解包/<卷>.pfs/script`），所以 ScenarioDir 留空 = 由扫描器
+// 自动探测；用户也可用 ucgr-convention.json 显式指定。
+func DefaultArtemis() Convention {
+	return Convention{EngineID: "artemis"}
+}
+
+// DefaultBGI BGI 的默认约定。
+//
+// .bs 剧本在 `文本_脚本/dataXXXXX/` 下分多个归档目录，同样交给自动探测。
+func DefaultBGI() Convention {
+	return Convention{EngineID: "bgi"}
+}
+
+// DefaultCatSystem2 CatSystem2 的默认约定。
+//
+// .cst 剧本在 `原始归档解包/scene/` 或 `_分类/文本/scene/` 下，
+// 层级随解包工具而异，交给自动探测。
+func DefaultCatSystem2() Convention {
+	return Convention{EngineID: "catsystem2"}
+}
+
+// DefaultNScripter NScripter 的默认约定。
+//
+// 剧本是整作一份 nscript.dat（或 0.txt），在游戏根目录，交给自动探测；
+// 没有画廊/CG 表——事件由适配器按「换背景」切分。
+func DefaultNScripter() Convention {
+	return Convention{EngineID: "nscript"}
+}
+
+// autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
+//
+// 这些引擎的剧本在解包树里的层级不固定（多卷 .pfs / 多个 dataXXXXX
+// 目录）或整作一份在根目录（nscript），约定里的 scenario_dir 留空是
+// **正常形态**，不算配置缺失。
+var autoScenarioEngines = map[string]bool{
+	"artemis":    true,
+	"bgi":        true,
+	"catsystem2": true,
+	"nscript":    true,
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
@@ -89,6 +162,16 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultKiriKiri(), true
 	case "rmmz":
 		return DefaultRMMZ(), true
+	case "scn":
+		return DefaultSCN(), true
+	case "artemis":
+		return DefaultArtemis(), true
+	case "bgi":
+		return DefaultBGI(), true
+	case "catsystem2":
+		return DefaultCatSystem2(), true
+	case "nscript":
+		return DefaultNScripter(), true
 	default:
 		return Convention{}, false
 	}
@@ -129,7 +212,10 @@ func SaveConventionFile(root string, c Convention) error {
 // Validate 校验约定自洽（正则能编译、路径非绝对、目录非空）。
 func (c Convention) Validate() error {
 	if c.ScenarioDir == "" {
-		return fmt.Errorf("约定缺少 scenario_dir")
+		// 自动探测引擎（多卷解包）允许留空；其余引擎留空说明配置没写全。
+		if !autoScenarioEngines[strings.ToLower(strings.TrimSpace(c.EngineID))] {
+			return fmt.Errorf("约定缺少 scenario_dir")
+		}
 	}
 	if filepath.IsAbs(c.ScenarioDir) {
 		return fmt.Errorf("scenario_dir 必须是相对游戏根目录的路径")
@@ -145,6 +231,19 @@ func (c Convention) Validate() error {
 		if _, err := regexp.Compile(expr); err != nil {
 			return fmt.Errorf("%s 正则非法：%w", name, err)
 		}
+	}
+	for name, p := range map[string]string{"cg_list": c.CGList} {
+		if p != "" && filepath.IsAbs(p) {
+			return fmt.Errorf("%s 必须是相对游戏根目录的路径", name)
+		}
+	}
+	for _, p := range append(append([]string{}, c.ImageDirs...), c.AudioDirs...) {
+		if filepath.IsAbs(p) {
+			return fmt.Errorf("素材目录 %s 必须是相对游戏根目录的路径", p)
+		}
+	}
+	if c.StageW < 0 || c.StageH < 0 {
+		return fmt.Errorf("stage_w/stage_h 不能为负")
 	}
 	return nil
 }
@@ -175,6 +274,21 @@ func (c Convention) Merge(base Convention) Convention {
 	}
 	if len(c.MovieDirs) > 0 {
 		out.MovieDirs = c.MovieDirs
+	}
+	if c.CGList != "" {
+		out.CGList = c.CGList
+	}
+	if c.StageW > 0 {
+		out.StageW = c.StageW
+	}
+	if c.StageH > 0 {
+		out.StageH = c.StageH
+	}
+	if len(c.ImageDirs) > 0 {
+		out.ImageDirs = append([]string(nil), c.ImageDirs...)
+	}
+	if len(c.AudioDirs) > 0 {
+		out.AudioDirs = append([]string(nil), c.AudioDirs...)
 	}
 	return out
 }

@@ -29,12 +29,39 @@ import (
 
 // gameConvention 取一个游戏的扫描约定：
 //
-//	① 引擎默认约定（KiriKiri = 本作实测的 raw\data\scenario + cgrai*.ks + cgNN）；
+//	① 引擎默认约定（KiriKiri = 本作实测的 raw\data\scenario + cgrai*.ks + cgNN；
+//	   scn = 9nine 的 raw\data\scn + main\cglist.csv + 1280×720）；
 //	② 游戏根目录下的 `ucgr-convention.json` 覆盖（同引擎不同游戏的目录/命名差异
 //	   **只改配置不改代码** —— 这就是「引擎适配一劳永逸」落地的关键）。
 //
 // 约定文件写坏了要报错（用户明确写了配置却写坏，静默忽略会让人以为配置生效了）。
+// engineID 为空时按目录探测（老登记项 / 首次添加）。
 func gameConvention(root, engineID string) (adapter.Convention, error) {
+	if strings.TrimSpace(engineID) == "" {
+		// 先用 library.DetectConvention（scn/nscripter/catsystem2/artemis/bgi/kirikiri），
+		// 报错时退回本地 detectConvention（rmmz/unity）。
+		_, conv, err := resolveGameConvention(root)
+		if err == nil {
+			return conv, nil
+		}
+		conv = detectConvention(root)
+		file, exists, ferr := adapter.LoadConventionFile(root)
+		if ferr != nil {
+			return adapter.Convention{}, ferr
+		}
+		if exists {
+			conv = file.Merge(conv)
+		}
+		if strings.EqualFold(conv.EngineID, "rmmz") {
+			if dataDir, ok := rmmz.FindDataDir(root); ok {
+				conv.ScenarioDir = dataDir
+			}
+		}
+		if err := conv.Validate(); err != nil {
+			return conv, err
+		}
+		return conv, nil
+	}
 	file, exists, err := adapter.LoadConventionFile(root)
 	if err != nil {
 		return adapter.Convention{}, err
@@ -52,6 +79,7 @@ func gameConvention(root, engineID string) (adapter.Convention, error) {
 	if exists {
 		conv = file.Merge(conv)
 	}
+	conv.EngineID = strings.ToLower(strings.TrimSpace(engineID))
 	// RPG Maker 的 data 目录有三种摆法（www/data、data、内嵌/data），
 	// 登记表里只记了引擎，这里按实际结构校正，避免拿默认值去 stat 报错。
 	if strings.EqualFold(conv.EngineID, "rmmz") {
@@ -76,6 +104,13 @@ func detectConvention(root string) adapter.Convention {
 		return adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
 	}
 	return adapter.DefaultKiriKiri()
+}
+
+// resolveGameConvention 判定引擎并给出约定：约定文件的 engine_id 优先，
+// 其次目录探测（library.DetectConvention）；目录里没有任何剧本时直接报
+// 「还没解包 / 可能是其它引擎」，不再一律按 KiriKiri 处理。
+func resolveGameConvention(root string) (string, adapter.Convention, error) {
+	return library.DetectConvention(root)
 }
 
 // exeDir 返回 exe 所在目录（只读用途：如日志排查时告诉用户 exe 在哪）。
@@ -276,7 +311,8 @@ func (a *App) loadRegistry(c conf) (*registry.Registry, error) {
 	reg = registry.New()
 	if strings.TrimSpace(c.Root) != "" {
 		if clean, cerr := registry.CleanRoot(c.Root); cerr == nil {
-			if _, serr := os.Stat(library.ScenarioDir(clean)); serr == nil {
+			// 老版本只有 KiriKiri：这里只校验根目录还在（引擎交由后续探测判定）。
+			if _, serr := os.Stat(clean); serr == nil {
 				libPath := strings.TrimSpace(c.Library)
 				if libPath == "" {
 					libPath = registry.LibraryPath(dataDir(), registry.IDFor(clean))
@@ -343,12 +379,12 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	conv, cerr := gameConvention(clean, "")
+	engineID, conv, cerr := resolveGameConvention(clean)
 	if cerr != nil {
 		return nil, cerr
 	}
-	if _, err := os.Stat(filepath.Join(clean, filepath.FromSlash(conv.ScenarioDir))); err != nil {
-		return nil, fmt.Errorf("目录里没有 %s：%w", conv.ScenarioDir, err)
+	if _, err := library.ResolveScenarioDir(clean, conv); err != nil {
+		return nil, fmt.Errorf("%w（在其根目录放 %s 可指定自定义路径）", err, adapter.ConventionFileName)
 	}
 	lib, err := library.ScanWith(clean, conv)
 	if err != nil {
@@ -457,6 +493,7 @@ func (a *App) Rescan() (*library.Library, error) {
 	if cerr != nil {
 		return nil, cerr
 	}
+	g.Engine = conv.EngineID
 	lib, err := library.ScanWith(g.Root, conv)
 	if err != nil {
 		return nil, err
@@ -562,6 +599,10 @@ func (a *App) loadOrScanLib(g *registry.Game) (*library.Library, error) {
 	conv, cerr := gameConvention(g.Root, g.Engine)
 	if cerr != nil {
 		return nil, cerr
+	}
+	// 老登记项没有 engine 字段：探测结果回填，后续回放/索引才能走对适配器。
+	if strings.TrimSpace(g.Engine) == "" {
+		g.Engine = conv.EngineID
 	}
 	lib, err := library.ScanWith(g.Root, conv)
 	if err != nil {

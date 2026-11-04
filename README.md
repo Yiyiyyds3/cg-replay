@@ -86,6 +86,69 @@ wails build
 
 > 下载源码后的本机路径怎么填，见 [docs/10_本地环境配置.md](docs/10_本地环境配置.md)：仓库不含任何本机路径，脚本与测试需要的目录通过环境变量或 `<...>` 占位符指定。
 
+## 9nine 系列（PSB 剧本）适配
+
+9nine 五部（九次九日 / 天色 / 新章 / 春色 / 雪色）没有可读的 KAG 脚本：剧情编译在 PSB 容器（`.scn`）里，CG 鉴赏表另外放在 `main/cglist.csv`。适配口径：
+
+- 事件单位对齐原作自己：**场景事件** = 一个 `.scn` 里有台词的 scene，**CG 事件** = `cglist.csv` 的一行
+- 回放台本从 PSB 值树还原（图层显示/切换、转场、台词、BGM/SE/语音），舞台 1280×720
+- 三种解包布局（`raw/data/...`、`原始归档解包/...`、`_分类/...`）都能直接扫，不必手写 `ucgr-convention.json`
+
+```bash
+# 列出原作自己的事件表（CG + 场景）；--out 落盘给桌面壳用
+bin/ucgr.exe events <9nine解包目录> [--out lib.json]
+
+# 直接按某个 .scn 回放（--event/--size 等参数同 ir.json 回放）
+bin/ucgr.exe play --script <xxx.txt.scn> --assets <9nine解包目录>
+```
+
+已知边界：
+
+- **E-mote 立绘不复刻**（`.psb`/`.psz`/`.lpb`，硬约束 FR-19），只在事件里标记，画面用背景 + EV 图 + 对话框
+- 部分解包产物本身损坏：0x20 混淆变体（整份文件异或 0x20，头写作 `psb `）里有一批 `.scn` 的名字表/字符串表对不齐。解析器会**跳过单个坏节点**（同层子节点各带独立偏移，坏一个不连累兄弟），整份无法解析的剧本则跳文件；两种情况都写进事件库 `warnings`，不会静默少事件
+- `cglist.csv` 在春色/雪色/新章被单字节异或（键 0x13/0x45/0x10），读取时穷举 1..255 并用「像不像 CG 表」自校验
+
+## 多引擎批量适配（CatSystem2 / Artemis / BGI）
+
+在 9nine（PSB/scn）之后，同一套「约定 + 事件库 + IR 回放」管线又接入了三个明文/半明文剧本引擎，注册表现共 5 个：`kirikiri / scn / artemis / bgi / catsystem2`。
+
+- **事件粒度对齐原作**：CatSystem2 一个 `.cst` 一个场景事件（标题取首句对白）；Artemis 一份 `.ast` 一个事件；BGI 一份 `.bs` 按「换背景/换事件」切多个事件；scn 仍按 scene / cglist 行
+- **剧本目录自动探测**：约定里 `scenario_dir` 留空时按扩展名递归收集（`.ast`/`.bs`/`.cst`），KiriKiri 按「scenario/scn/script 目录名优先、`.ks` 密度兜底」选层；scn 追加「解包整理/data_脚本与数据/scn」等整理布局
+- **舞台尺寸自动推断**：取背景图（`bg*` 文件名或 `/bg/` 目录）尺寸众数；壁纸/特典/OST 目录不参与，推断不出就如实报「舞台未推断」
+- **回放台本**：三引擎都补齐了「一句一屏」（`text_clear + text + text_wait`）与底部对话框（`ir.MessageBoxOps`），素材加载带整树文件名索引兜底
+- **没解包的目录不再误报**：目录里没有可回放剧本但有原作打包签名（`.xp3`/`.pfs`/`.int`/`BGI.hvl`…）时，直接报「这层只有打包文件（…，属 X 引擎），还没解包」，而不是含糊的「可能不是 KiriKiri 引擎」
+
+```bash
+# 任一引擎的解包目录：扫出原作自己的事件表
+bin/ucgr.exe events <解包目录> [--out lib.json]
+
+# 直接按剧本回放（按扩展名/文件名分派 .scn/.ast/.cst/.bs/.ks/nscript.dat）
+bin/ucgr.exe play --script <xxx.cst> --assets <解包目录> [--shot 目录 --at ms]
+```
+
+实测抽样（本机解包目录）：
+
+| 游戏 | 引擎 | 舞台 | 事件 |
+|---|---|---|---|
+| 樱之刻 | artemis | 1920×1080 | 535 |
+| 甜蜜女友3 | artemis | 1920×1080 | 1300 |
+| 果实（灰色的果实） | catsystem2 | 1024×576 | 476 |
+| 甜蜜女友2 | catsystem2 | 1280×720 | 7860 |
+| 樱之诗 | bgi | 1280×751 | 5042 |
+| 秽翼的尤斯蒂娅 | bgi | 1280×720 | 401 |
+| 灰色的乐园FHD | catsystem2 | 未推断（素材未解出） | 228 |
+| 寒蝉鸣泣之时·解题篇 | nscript | 640×480 | 5636 |
+| 海猫鸣泣之时 出题篇 | nscript | 640×480 | 8270 |
+| 海猫鸣泣之时 散 | nscript | 640×480 | 10326 |
+
+**覆盖进度（2026-11-04）**：6 个引擎适配器覆盖 29 款 / 231.64 GB（74%）。
+NScripter 适配器要点：`nscript.dat` = XOR 0x84 的 CP932 明文（密文/明文关键字
+嗅探，寒蝉解的剧本解出来以空行开头）；NSA 归档大端索引，压缩 0=无 / 1=SPB /
+2=LZSS / 3=NBZ(bzip2)，SPB 解出 24bpp BMP（蛇形行序）；`bg sora` 这类裸名是
+不带 `$` 的 stralias（07th 惯例）；图片全在归档里的游戏（海猫出题）由
+GameLoader 的 NSA 兜底池取图。未适配 18 款 / 81.37 GB：Unity 3、GIGA BALDR 2、
+FAVORITE 2、其余单件 11。
+
 ## 已验证的实现基线（2026-10-17）
 
 Go 核心 CLI 与 Python 原型在真实数据上逐款对齐：

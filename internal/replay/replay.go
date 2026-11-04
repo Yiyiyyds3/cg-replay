@@ -259,9 +259,17 @@ func DirLoader(root string) Loader {
 	}
 }
 
-// DecodeImage 解 PNG（标准库）或 TLG5/JPEG/HG3（internal/decode，自动还原 XOR 掩码）。
-// 实现已下沉到 decode 包，避免适配层反向依赖 replay 造成 import 环。
-func DecodeImage(data []byte) (image.Image, error) { return decode.DecodeImage(data) }
+// DecodeImage 解 PNG（标准库）、BMP（24/32bpp + 8bpp 调色板，见 bmp.go）
+// 或 TLG5/JPEG/HG3（internal/decode，自动还原 XOR 掩码与 RPGMV 加密）。
+//
+// 实现已下沉到 decode 包（避免适配层反向依赖 replay 造成 import 环）；
+// BMP 是 replay 包本地补充——decode 包不感知 NScripter 的 BMP 诉求。
+func DecodeImage(data []byte) (image.Image, error) {
+	if len(data) > 2 && data[0] == 'B' && data[1] == 'M' {
+		return decodeBMP(data)
+	}
+	return decode.DecodeImage(data)
+}
 
 // Compose 按 z 升序把可见层叠到画布上。
 //
