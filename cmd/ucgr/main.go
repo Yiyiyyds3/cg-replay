@@ -31,6 +31,7 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/audio"
 	"ucgr/internal/decode"
@@ -1036,6 +1037,21 @@ func cmdPlay(args []string) error {
 			w, h := library.DetectStageSize(root)
 			e, err = bgi.BuildShowEventFileStage(scriptPath, n, w, h)
 			canvasW, canvasH = w, h
+		case isNScripterScript(scriptPath):
+			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），
+			// 缺省第 1 个事件（对话起始处）。
+			root := library.GameRootOf(scriptPath)
+			n := 1
+			if hasChapter && chapterPos > 0 {
+				n = chapterPos
+			}
+			w, h := library.DetectStageSize(root)
+			if w <= 0 || h <= 0 {
+				// 图全在归档里推不出尺寸（海猫出题）时按 NScripter 标准舞台。
+				w, h = 640, 480
+			}
+			e, err = nscript.BuildShowEventFileStage(scriptPath, n, w, h)
+			canvasW, canvasH = w, h
 		case hasChapter:
 			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
 		default:
@@ -1108,6 +1124,11 @@ func cmdPlay(args []string) error {
 	load := player.Cached(playLoader(assets))
 	opt := player.DefaultOptions()
 	opt.StageW, opt.StageH = w, h // 消息层默认几何按舞台底部排
+	if isNScripterScript(scriptPath) && w <= 800 {
+		// 640×480 的 NScripter 舞台用 48px 字会溢出对话框，按原作 setwindow
+		// 的字号级（26px 附近）缩小。
+		opt.FontSize, opt.LineSpacing = 26, 8
+	}
 	if speed > 0 {
 		opt.Speed = speed
 	}
@@ -1605,6 +1626,16 @@ func cmdEngines() {
 	for _, id := range adapter.IDs() {
 		fmt.Println(id)
 	}
+}
+
+// isNScripterScript 判断脚本路径是不是 NScripter 剧本
+// （nscript.dat / 0.txt / 00.txt，可能带扩展名大小写差异）。
+func isNScripterScript(p string) bool {
+	switch strings.ToLower(filepath.Base(p)) {
+	case "nscript.dat", "0.txt", "00.txt":
+		return true
+	}
+	return false
 }
 
 // engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。

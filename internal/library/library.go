@@ -129,6 +129,8 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 		return ScanCatSystem2(root, conv)
 	case "scn":
 		return ScanSCN(root, conv)
+	case "nscript":
+		return ScanNScripter(root, conv)
 	}
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())

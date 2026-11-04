@@ -13,6 +13,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/ir"
 	"ucgr/internal/library"
@@ -92,6 +93,19 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 			// 会让框跑到画面外。优先扫描时从素材推断的尺寸。
 			w, h := stageOf(conv, lib)
 			ev, err := buildCS2Show(abs(e.Script), w, h)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "nscript"):
+			// NScripter：Label = 事件序号（1 起）。舞台推断不出来时
+			// 按 NScripter 标准舞台 640×480。
+			w, h := stageOf(conv, lib)
+			if w <= 0 || h <= 0 {
+				w, h = 640, 480
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(e.Label))
+			if err != nil {
+				return nil, e.Title, fmt.Errorf("nscript 事件 %s 缺序号（%q）", id, e.Label)
+			}
+			ev, err := nscript.BuildShowEventFileStage(abs(e.Script), n, w, h)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)

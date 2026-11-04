@@ -26,7 +26,8 @@ var kirikiriScenarioDirs = []string{
 
 // DetectEngine 判定一个解包目录属于哪个引擎。
 //
-// 顺序：PSB .scn（scn）→ 含 .ks 的剧本目录（kirikiri）→ 通用竞聘（bgi/artemis…）。
+// 顺序：PSB .scn（scn）→ 含 .ks 的剧本目录（kirikiri）→ NScripter
+// （nscript.dat / 0.txt）→ 通用竞聘（bgi/artemis…）。
 // 都不匹配返回 ""（调用方应报错，不要瞎猜）。
 func DetectEngine(root string) string {
 	if a, ok := adapter.Get("scn"); ok {
@@ -37,6 +38,14 @@ func DetectEngine(root string) string {
 	for _, rel := range kirikiriScenarioDirs {
 		if hasAnyFile(filepath.Join(root, filepath.FromSlash(rel)), ".ks") {
 			return "kirikiri"
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "nscript.dat")); err == nil {
+		return "nscript"
+	}
+	for _, name := range []string{"0.txt", "00.txt"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+			return "nscript"
 		}
 	}
 	if id, err := adapter.IdentifyPath(root); err == nil {
@@ -79,6 +88,12 @@ func GameRootOf(script string) string {
 		// CatSystem2 整理版：<root>/scene/*.cst。
 		if d := filepath.Join(dir, "scene"); isDir(d) && hasAnyFile(d, ".cst") {
 			return dir
+		}
+		// NScripter：剧本整作一份在根目录（nscript.dat / 0.txt）。
+		for _, name := range []string{"nscript.dat", "0.txt", "00.txt"} {
+			if st, err := os.Stat(filepath.Join(dir, name)); err == nil && !st.IsDir() {
+				return dir
+			}
 		}
 		base := strings.ToLower(filepath.Base(dir))
 		if base == "data" || base == "raw" {
@@ -141,10 +156,10 @@ func DetectConvention(root string) (string, adapter.Convention, error) {
 				"这层只有打包文件（%s，属 %s 引擎），还没解包：先解包成可读剧本再扫（解包产物在别的目录时，直接对那个目录扫）",
 				evidence, packed)
 		}
-		// 既没有剧本也没有认得出的打包签名：多半是别的引擎（NScripter /
-		// RealLive / Siglus…）或没解包，别硬按 KiriKiri 去找。
+		// 既没有剧本也没有认得出的打包签名：多半是别的引擎
+		// （RealLive / Siglus…）或没解包，别硬按 KiriKiri 去找。
 		return "", adapter.Convention{}, fmt.Errorf(
-			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst），也没认出打包签名：可能是其它引擎，或还没解包")
+			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/nscript.dat），也没认出打包签名：可能是其它引擎，或还没解包")
 	}
 	if engineID == "" {
 		engineID = "kirikiri"
@@ -214,6 +229,12 @@ func anyScriptFile(root string) bool {
 			return nil
 		}
 		if replayableScriptExts[strings.ToLower(filepath.Ext(p))] {
+			found = true
+			return fs.SkipAll
+		}
+		// NScripter 的剧本是整作一份（无需解包即可回放），同样算数。
+		switch strings.ToLower(d.Name()) {
+		case "nscript.dat", "0.txt", "00.txt":
 			found = true
 			return fs.SkipAll
 		}

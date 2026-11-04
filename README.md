@@ -122,7 +122,7 @@ bin/ucgr.exe play --script <xxx.txt.scn> --assets <9nine解包目录>
 # 任一引擎的解包目录：扫出原作自己的事件表
 bin/ucgr.exe events <解包目录> [--out lib.json]
 
-# 直接按剧本回放（按扩展名分派 .scn/.ast/.cst/.bs/.ks）
+# 直接按剧本回放（按扩展名/文件名分派 .scn/.ast/.cst/.bs/.ks/nscript.dat）
 bin/ucgr.exe play --script <xxx.cst> --assets <解包目录> [--shot 目录 --at ms]
 ```
 
@@ -137,6 +137,17 @@ bin/ucgr.exe play --script <xxx.cst> --assets <解包目录> [--shot 目录 --at
 | 樱之诗 | bgi | 1280×751 | 5042 |
 | 秽翼的尤斯蒂娅 | bgi | 1280×720 | 401 |
 | 灰色的乐园FHD | catsystem2 | 未推断（素材未解出） | 228 |
+| 寒蝉鸣泣之时·解题篇 | nscript | 640×480 | 5636 |
+| 海猫鸣泣之时 出题篇 | nscript | 640×480 | 8270 |
+| 海猫鸣泣之时 散 | nscript | 640×480 | 10326 |
+
+**覆盖进度（2026-11-04）**：6 个引擎适配器覆盖 29 款 / 231.64 GB（74%）。
+NScripter 适配器要点：`nscript.dat` = XOR 0x84 的 CP932 明文（密文/明文关键字
+嗅探，寒蝉解的剧本解出来以空行开头）；NSA 归档大端索引，压缩 0=无 / 1=SPB /
+2=LZSS / 3=NBZ(bzip2)，SPB 解出 24bpp BMP（蛇形行序）；`bg sora` 这类裸名是
+不带 `$` 的 stralias（07th 惯例）；图片全在归档里的游戏（海猫出题）由
+GameLoader 的 NSA 兜底池取图。未适配 18 款 / 81.37 GB：Unity 3、GIGA BALDR 2、
+FAVORITE 2、其余单件 11。
 
 ## 已验证的实现基线（2026-10-17）
 

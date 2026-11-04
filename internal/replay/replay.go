@@ -261,8 +261,12 @@ func DirLoader(root string) Loader {
 	}
 }
 
-// DecodeImage 解 PNG（标准库）或 TLG5/JPEG（internal/decode，自动还原 XOR 掩码）。
+// DecodeImage 解 PNG（标准库）、BMP（24/32bpp + 8bpp 调色板，见 bmp.go）
+// 或 TLG5/JPEG（internal/decode，自动还原 XOR 掩码）。
 func DecodeImage(data []byte) (image.Image, error) {
+	if len(data) > 2 && data[0] == 'B' && data[1] == 'M' {
+		return decodeBMP(data)
+	}
 	if len(data) > 8 && bytes.Equal(data[1:4], []byte("PNG")) {
 		img, err := png.Decode(bytes.NewReader(data))
 		if err != nil {

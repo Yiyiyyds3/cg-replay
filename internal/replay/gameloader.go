@@ -31,7 +31,9 @@ var assetExts = []string{"", ".png", ".jpg", ".jpeg", ".webp", ".tlg", ".hg3"}
 // 靠固定目录名猜不全）。索引只建一次并缓存。
 func GameLoader(root string) Loader {
 	cache := map[string]string{}
+	nsaCache := map[string]image.Image{} // NSA 解出的图（内存，无文件路径）
 	var index map[string]string
+	var nsas *nsaPool // NScripter 归档兜底（海猫出题的图全在 arc*.nsa）
 	buildIndex := func() {
 		index = map[string]string{}
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -80,6 +82,9 @@ func GameLoader(root string) Loader {
 			}
 			return decodeFile(p)
 		}
+		if img, ok := nsaCache[rel]; ok {
+			return img, nil
+		}
 		slashRel := filepath.FromSlash(rel)
 		base := filepath.Base(slashRel)
 		stem := strings.TrimSuffix(base, filepath.Ext(base))
@@ -111,6 +116,18 @@ func GameLoader(root string) Loader {
 			if p, ok := index[base]; ok {
 				cache[rel] = p
 				return decodeFile(p)
+			}
+		}
+		// 文件系统里没有：试 NScripter 归档（arc*.nsa / *.sar）。
+		if nsas == nil {
+			nsas = newNsaPool(root)
+		}
+		if !nsas.empty() {
+			if data, ok := nsas.image(rel); ok {
+				if img, err := DecodeImage(data); err == nil {
+					nsaCache[rel] = img
+					return img, nil
+				}
 			}
 		}
 		cache[rel] = ""

@@ -117,14 +117,24 @@ func DefaultCatSystem2() Convention {
 	return Convention{EngineID: "catsystem2"}
 }
 
+// DefaultNScripter NScripter 的默认约定。
+//
+// 剧本是整作一份 nscript.dat（或 0.txt），在游戏根目录，交给自动探测；
+// 没有画廊/CG 表——事件由适配器按「换背景」切分。
+func DefaultNScripter() Convention {
+	return Convention{EngineID: "nscript"}
+}
+
 // autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
 //
 // 这些引擎的剧本在解包树里的层级不固定（多卷 .pfs / 多个 dataXXXXX
-// 目录），约定里的 scenario_dir 留空是**正常形态**，不算配置缺失。
+// 目录）或整作一份在根目录（nscript），约定里的 scenario_dir 留空是
+// **正常形态**，不算配置缺失。
 var autoScenarioEngines = map[string]bool{
 	"artemis":    true,
 	"bgi":        true,
 	"catsystem2": true,
+	"nscript":    true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -141,6 +151,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultBGI(), true
 	case "catsystem2":
 		return DefaultCatSystem2(), true
+	case "nscript":
+		return DefaultNScripter(), true
 	default:
 		return Convention{}, false
 	}
