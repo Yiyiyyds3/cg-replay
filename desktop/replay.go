@@ -295,8 +295,13 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		// RPG Maker：Script 是 data 目录下的 JSON，dataDir 从它反推。
 		ev, err = rmmz.BuildShow(root, filepath.ToSlash(filepath.Dir(script)), id)
 	case engine == "renpy":
-		// Ren'Py：Script 是 game 目录下的 .rpy，gameDir 从它反推。
-		ev, err = renpy.BuildShow(root, filepath.ToSlash(filepath.Dir(script)), id)
+		// Ren'Py：脚本可能嵌在 game 的子目录里，gameDir 用探测的
+		// （不能从 Script 反推 Dir，嵌套路径会推出 game/characters/events）。
+		gameDir, ok := renpy.FindGameDir(root)
+		if !ok {
+			return SessionMeta{}, fmt.Errorf("找不到 Ren'Py 的 game 目录")
+		}
+		ev, err = renpy.BuildShow(root, gameDir, id)
 	case chapterPos >= 0 && chEvent != nil:
 		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)

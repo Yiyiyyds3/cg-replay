@@ -42,13 +42,14 @@ type Script struct {
 }
 
 var (
-	reLabel  = regexp.MustCompile(`^label\s+([A-Za-z_][\w.]*)\s*(\([^)]*\))?\s*:`)
-	reImage  = regexp.MustCompile(`^image\s+(.+?)\s*=\s*"(.*)"\s*$`)
-	reScene  = regexp.MustCompile(`^(scene|show|hide)\s+(.+)$`)
-	reSay    = regexp.MustCompile(`^(?:([A-Za-z_][\w ]*?)\s+)?"((?:[^"\\]|\\.)*)"\s*$`)
-	reWith   = regexp.MustCompile(`^with\s+(.+)$`)
-	rePause  = regexp.MustCompile(`^pause\b`)
-	reDefine = regexp.MustCompile(`^(?:define|default)\s+\w+`) // 变量定义，跳过
+	reLabel   = regexp.MustCompile(`^label\s+([A-Za-z_][\w.]*)\s*(\([^)]*\))?\s*:`)
+	reImage   = regexp.MustCompile(`^image\s+(.+?)\s*=\s*"(.*)"\s*$`)
+	reScene   = regexp.MustCompile(`^(scene|show|hide)\s+(.+)$`)
+	reSay     = regexp.MustCompile(`^(?:([A-Za-z_][\w ]*?)\s+)?"((?:[^"\\]|\\.)*)"\s*$`)
+	reWith    = regexp.MustCompile(`^with\s+(.+)$`)
+	rePause   = regexp.MustCompile(`^pause\b`)
+	reTextTag = regexp.MustCompile(`\{[^}]*\}`)
+	reDefine  = regexp.MustCompile(`^(?:define|default)\s+\w+`) // 变量定义，跳过
 )
 
 // ParseScriptFile 读一个 .rpy 文件并提取语句。
@@ -172,8 +173,15 @@ func firstToken(s string) string {
 	return s
 }
 
-// unescapeRenPy 还原台词里的转义（\" \\ \n）。
+// unescapeRenPy 还原台词里的转义（\" \\ \n）并剥掉 Ren'Py 文本标签
+// （{color=#…}{/color}{nw} 等——回放器不排版富文本）。`{{` 是字面大括
+// 号的转义，先占位再还原。
 func unescapeRenPy(s string) string {
+	s = strings.ReplaceAll(s, "{{", "\x00")
+	if strings.Contains(s, "}") {
+		s = reTextTag.ReplaceAllString(s, "")
+	}
+	s = strings.ReplaceAll(s, "\x00", "{")
 	if !strings.Contains(s, "\\") {
 		return s
 	}

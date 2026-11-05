@@ -328,6 +328,27 @@ func parsePickle(data []byte) (any, error) {
 				return nil, err
 			}
 			p.push(string(b))
+		case 0x55: // UNICODE（'U'，raw-unicode-escape 字符串）
+			// python2 标准是 4 字节 LE 长度；本批实测的打包器写的是
+			// 1 字节长度（兑现/千千阙歌 的 scripts.rpa：`55 00 71 03 87`
+			// = 空 prefix + BINPUT + TUPLE3，与结构完全自洽）。先窥
+			// 4 字节判别两种形态。
+			if i+4 > len(data) {
+				return nil, fail("UNICODE 数据截断")
+			}
+			var n int
+			if data[i] == 0 && data[i+1] == 0 && data[i+2] == 0 {
+				n = int(le32(data[i : i+4]))
+				i += 4
+			} else {
+				n = int(data[i])
+				i++
+			}
+			b, err := readN(n)
+			if err != nil {
+				return nil, err
+			}
+			p.push(string(b))
 		case 0x43, 0x42: // SHORT_BINBYTES / BINBYTES
 			var n int
 			switch op {
@@ -433,6 +454,9 @@ func parsePickle(data []byte) (any, error) {
 			} else {
 				p.memoize()
 			}
+		case 0x71: // BINPUT（'q'）：栈顶存入指定 memo 槽（不弹栈）
+			p.memoizeAt(int(data[i]))
+			i++
 		case 0x72: // LONG_BINPUT：栈顶存入指定 memo 槽（不弹栈）
 			b, err := readN(4)
 			if err != nil {

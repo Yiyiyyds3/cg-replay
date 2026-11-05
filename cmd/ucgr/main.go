@@ -961,16 +961,16 @@ func cmdPlay(args []string) error {
 		)
 		switch {
 		case strings.EqualFold(engineOverride, "renpy"):
-			// Ren'Py：--script 指向 game 目录下的 .rpy，gameDir 从它反推，
-			// --label 是事件单位（一个含图片演出的 label）。
+			// Ren'Py：--label 是事件单位（一个含图片演出的 label）。
+			// gameDir 用探测的——脚本可能嵌在子目录，不能从 --script 反推。
 			if strings.TrimSpace(label) == "" {
 				return fmt.Errorf("renpy 播放需要 --label <label>（ucgr events 可列出）")
 			}
-			rel, rerr := filepath.Rel(assets, scriptPath)
-			if rerr != nil {
-				return fmt.Errorf("脚本 %s 不在素材根 %s 下：%w", scriptPath, assets, rerr)
+			gameDir, ok := renpy.FindGameDir(assets)
+			if !ok {
+				return fmt.Errorf("在 %s 下找不到 Ren'Py 的 game 目录", assets)
 			}
-			e, err = renpy.BuildShow(assets, filepath.ToSlash(filepath.Dir(rel)), label)
+			e, err = renpy.BuildShow(assets, gameDir, label)
 		case hasChapter:
 			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
 		default:
@@ -1311,12 +1311,12 @@ func replayDump(doc *ir.IR) {
 	}
 }
 
-// cmdDecode 按需解码资产（当前支持 KiriKiri TLG5）为 PNG，
-// 让回放在没有原播放器时也能「看」静态合成图（P1-3 解码层的最小集）。
+// cmdUnpack 解包归档（CatSystem2 KIF / Ren'Py RPA-3.0）。
 // 用法：ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]
 //
-// 目前支持 CatSystem2 的 KIF 归档（.int/.kif）。不给 --out 时只列条目；给了就解包写盘。
+// KIF：不给 --out 时只列条目；给了就解包写盘。
 // 索引与数据解密都不需要游戏主程序口令，只有**名字的大小写**需要口令才能精确还原。
+// RPA-3.0：按文件头魔数识别，--key 通常不需要（密钥在归档头里）。
 func cmdUnpack(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("用法: ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]")
@@ -1349,6 +1349,11 @@ func cmdUnpack(args []string) error {
 		default:
 			return fmt.Errorf("未知参数: %s", args[i])
 		}
+	}
+
+	// RPA-3.0（Ren'Py）按魔数分派；KIF 索引没有固定魔数，走老路。
+	if ok, err := isRPA(in); err == nil && ok {
+		return cmdUnpackRPA(in, outDir, limit)
 	}
 
 	arc, err := kif.Open(in)
@@ -1391,6 +1396,98 @@ func cmdUnpack(args []string) error {
 	}
 	fmt.Printf("已解包 %d 个文件 / %s → %s\n", len(arc.Entries), fmtBytes(total), outDir)
 	return nil
+}
+
+// isRPA 按文件头魔数判断是不是 RPA-3.0 归档。
+func isRPA(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	head := make([]byte, 8)
+	n, err := f.Read(head)
+	if n < 8 {
+		return false, err
+	}
+	return string(head) == "RPA-3.0 ", nil
+}
+
+// cmdUnpackRPA 全量解包 Ren'Py RPA-3.0 归档。
+//
+// 与 KIF 一样：不给 --out 只列条目，给了就写盘。剧本救场流程：
+//
+//	ucgr unpack game/scripts.rpa --out game
+//
+// 解出的 .rpy 直接并入 game/，Ren'Py 适配器即可扫描（不用改任何代码）。
+func cmdUnpackRPA(in, outDir string, limit int) error {
+	a, err := renpy.OpenRPA(in)
+	if err != nil {
+		return err
+	}
+	names := make([]string, 0, len(a.Files))
+	for n := range a.Files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	fmt.Printf("归档: %s（RPA-3.0，条目 %d）\n", in, len(names))
+
+	if outDir == "" {
+		for i, n := range names {
+			if limit > 0 && i >= limit {
+				fmt.Printf("  …（其余 %d 条省略，--limit 0 取消限制）\n", len(names)-limit)
+				break
+			}
+			fmt.Printf("  %-56s %10d\n", n, a.Files[n].Size)
+		}
+		return nil
+	}
+
+	var total int64
+	written, skipped := 0, 0
+	for _, n := range names {
+		if limit > 0 && written >= limit {
+			fmt.Printf("  …（--limit %d，其余 %d 条未解）\n", limit, len(names)-written)
+			break
+		}
+		// 路径穿越防护：归档名是游戏侧数据，写盘前守住 outDir。
+		if !safeArchiveName(n) {
+			skipped++
+			continue
+		}
+		data, err := a.ReadFile(n)
+		if err != nil {
+			return fmt.Errorf("读取 %s 失败: %w", n, err)
+		}
+		dest := filepath.Join(outDir, filepath.FromSlash(n))
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dest, data, 0o644); err != nil {
+			return err
+		}
+		written++
+		total += int64(len(data))
+	}
+	fmt.Printf("已解包 %d 个文件 / %s → %s（跳过 %d 个可疑路径）\n",
+		written, fmtBytes(total), outDir, skipped)
+	return nil
+}
+
+// safeArchiveName 归档内路径是否可以安全写盘（拒绝绝对路径/盘符/..）。
+func safeArchiveName(n string) bool {
+	if n == "" || strings.ContainsRune(n, '\\') || strings.ContainsRune(n, ':') {
+		return false
+	}
+	if strings.HasPrefix(n, "/") {
+		return false
+	}
+	for _, part := range strings.Split(n, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 // kindSummary 把名字可信度统计压成一行（固定顺序，便于跨实现比对）。
