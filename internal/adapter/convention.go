@@ -81,6 +81,18 @@ func DefaultRMMZ() Convention {
 	}
 }
 
+// DefaultRenPy Ren'Py 的默认约定。
+//
+// game 目录由 renpy.FindGameDir 实际探测（整合包常套壳、大小写不定），
+// 这里的 game/ 只是让 ScanWith 有个非空默认值。
+func DefaultRenPy() Convention {
+	return Convention{
+		EngineID:    "renpy",
+		ScenarioDir: "game",
+		ScriptExt:   ".rpy",
+	}
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
@@ -89,6 +101,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultKiriKiri(), true
 	case "rmmz":
 		return DefaultRMMZ(), true
+	case "renpy":
+		return DefaultRenPy(), true
 	default:
 		return Convention{}, false
 	}

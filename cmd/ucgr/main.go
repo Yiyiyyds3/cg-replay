@@ -28,6 +28,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/audio"
 	"ucgr/internal/decode"
 	"ucgr/internal/hash"
@@ -218,7 +219,19 @@ func cmdEvents(args []string) error {
 	if root == "" {
 		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json]")
 	}
-	lib, err := library.Scan(root)
+	// --engine <id>（全局参数）指定引擎时按其默认约定扫（如 renpy 的
+	// game 目录探测）；否则按 KiriKiri 默认约定（本作基线）。
+	var lib *library.Library
+	var err error
+	if strings.TrimSpace(engineOverride) != "" {
+		conv, ok := adapter.ConventionByEngine(engineOverride)
+		if !ok {
+			conv = adapter.Convention{EngineID: engineOverride}
+		}
+		lib, err = library.ScanWith(root, conv)
+	} else {
+		lib, err = library.Scan(root)
+	}
 	if err != nil {
 		return err
 	}
@@ -946,9 +959,21 @@ func cmdPlay(args []string) error {
 			e   *ir.Event
 			err error
 		)
-		if hasChapter {
+		switch {
+		case strings.EqualFold(engineOverride, "renpy"):
+			// Ren'Py：--script 指向 game 目录下的 .rpy，gameDir 从它反推，
+			// --label 是事件单位（一个含图片演出的 label）。
+			if strings.TrimSpace(label) == "" {
+				return fmt.Errorf("renpy 播放需要 --label <label>（ucgr events 可列出）")
+			}
+			rel, rerr := filepath.Rel(assets, scriptPath)
+			if rerr != nil {
+				return fmt.Errorf("脚本 %s 不在素材根 %s 下：%w", scriptPath, assets, rerr)
+			}
+			e, err = renpy.BuildShow(assets, filepath.ToSlash(filepath.Dir(rel)), label)
+		case hasChapter:
 			e, err = kirikiri.BuildShowChapterFile(scriptPath, chapterPos)
-		} else {
+		default:
 			e, err = kirikiri.BuildShowSegment(scriptPath, label)
 		}
 		if err != nil {

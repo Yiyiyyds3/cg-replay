@@ -20,6 +20,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/rmmz"
+	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/catalog"
 	"ucgr/internal/library"
@@ -59,6 +60,12 @@ func gameConvention(root, engineID string) (adapter.Convention, error) {
 			conv.ScenarioDir = dataDir
 		}
 	}
+	// Ren'Py 的 game 目录同理（标准 root/game，整合包常套壳、大小写不定）。
+	if strings.EqualFold(conv.EngineID, "renpy") {
+		if gameDir, ok := renpy.FindGameDir(root); ok {
+			conv.ScenarioDir = gameDir
+		}
+	}
 	if err := conv.Validate(); err != nil {
 		return conv, err
 	}
@@ -74,6 +81,11 @@ func detectConvention(root string) adapter.Convention {
 	}
 	if st, err := os.Stat(filepath.Join(root, unitycg.IndexFile)); err == nil && !st.IsDir() {
 		return adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
+	}
+	if gameDir, ok := renpy.FindGameDir(root); ok {
+		conv := adapter.DefaultRenPy()
+		conv.ScenarioDir = gameDir
+		return conv
 	}
 	return adapter.DefaultKiriKiri()
 }
