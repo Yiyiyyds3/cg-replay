@@ -43,8 +43,23 @@ import (
 )
 
 // inflateExact 把 zlib 流解压到恰好 want 字节（多退少补报错）。
-// QNT 像素平面 / DCF chunk map 都要求精确长度；AJP mask 同样复用。
+// QNT 像素平面要求精确长度（libsys4 zlib_decompress_exact 同款）。
 func inflateExact(src []byte, want int) ([]byte, error) {
+	out, err := inflateAtLeast(src, want)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) != want {
+		return nil, fmt.Errorf("解压长度 %d != 目标 %d", len(out), want)
+	}
+	return out, nil
+}
+
+// inflateAtLeast 把 zlib 流解压到**至少** want 字节，多余部分忽略。
+// QNT 的 alpha 平面用这个：libsys4 的 extract_alpha 走非精确解压
+// （ALDExplorer 只补宽不补高，流尾可能带多余字节），要求精确会在
+// 其它 System 4 游戏上误报溢出。
+func inflateAtLeast(src []byte, want int) ([]byte, error) {
 	if want < 0 {
 		return nil, fmt.Errorf("非法解压目标长度 %d", want)
 	}
@@ -57,10 +72,7 @@ func inflateExact(src []byte, want int) ([]byte, error) {
 	if _, err := io.ReadFull(zr, out); err != nil {
 		return nil, fmt.Errorf("解压不足（要 %d 字节）：%w", want, err)
 	}
-	var extra [1]byte
-	if n, _ := zr.Read(extra[:]); n != 0 {
-		return nil, fmt.Errorf("解压溢出（超出目标 %d 字节）", want)
-	}
+	_, _ = io.Copy(io.Discard, zr) // 忽略尾部多余字节
 	return out, nil
 }
 
@@ -193,7 +205,7 @@ func qntPixel(pic, comp []byte, w, h int) error {
 
 // qntAlpha 解出 w*h 的 alpha 平面（行优先 + 奇宽补位，预测还原）。
 func qntAlpha(alpha, comp []byte, w, h int) error {
-	raw, err := inflateExact(comp, ((w+1)&^1)*h)
+	raw, err := inflateAtLeast(comp, ((w+1)&^1)*h)
 	if err != nil {
 		return fmt.Errorf("QNT alpha 解压失败：%w", err)
 	}

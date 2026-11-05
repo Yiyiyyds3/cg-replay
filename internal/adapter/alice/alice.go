@@ -80,7 +80,10 @@ func (a *Adapter) ParseArchive(path string) ([]adapter.ArchiveEntry, error) {
 			out = append(out, adapter.ArchiveEntry{
 				Path:        base + "/" + e.Name,
 				Size:        int64(e.Size),
-				Offset:      e.Off,
+				// AFA 的 off 相对数据区（dataStart）；ArchiveEntry.Offset
+				// 的契约是「归档文件内绝对偏移」（ReadArchiveEntry 直接
+				// Seek 它），必须加上 dataStart。
+				Offset:      af.DataStart + e.Off,
 				Compression: adapter.CompNone,
 				Encrypted:   false,
 			})

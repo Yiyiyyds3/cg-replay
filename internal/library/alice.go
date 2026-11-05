@@ -39,11 +39,13 @@ func ScanAlice(root string, conv adapter.Convention) (*Library, error) {
 		Chapters:    []ChapterEvent{},
 	}
 	rel := relKey(root, ainPath)
+	seen := map[string]bool{}
 	for _, fnIdx := range scenes {
 		name := ain.Funcs[fnIdx].Name
-		if strings.TrimSpace(name) == "" {
-			continue
+		if strings.TrimSpace(name) == "" || seen[name] {
+			continue // 重名函数会让 SceneEvent.ID 撞车，首个为准
 		}
+		seen[name] = true
 		lib.Scenes = append(lib.Scenes, SceneEvent{
 			ID:     name,
 			Title:  name,

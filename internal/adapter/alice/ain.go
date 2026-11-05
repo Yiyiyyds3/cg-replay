@@ -92,13 +92,13 @@ func ParseAIN(data []byte) (*AIN, error) {
 		case "STRT":
 			a.skipStructs(r)
 		case "MSG0":
-			n := int(r.u32())
+			n := r.count(tag)
 			a.Messages = make([]string, n)
 			for i := 0; i < n; i++ {
 				a.Messages[i] = r.zstr()
 			}
 		case "MSG1":
-			n := int(r.u32())
+			n := r.count(tag)
 			r.i32() // uk
 			a.Messages = make([]string, n)
 			for i := 0; i < n; i++ {
@@ -109,26 +109,32 @@ func ParseAIN(data []byte) (*AIN, error) {
 		case "SWI0":
 			a.skipSwitches(r)
 		case "STR0":
-			n := int(r.u32())
+			n := r.count(tag)
 			a.Strings = make([]string, n)
 			for i := 0; i < n; i++ {
 				a.Strings[i] = r.zstr()
 			}
 		case "SLBL":
-			n := int(r.u32())
+			n := r.count(tag)
 			for i := 0; i < n; i++ {
 				r.zstr()
 				r.i32()
 			}
 		case "FNAM":
-			n := int(r.u32())
+			n := r.count(tag)
 			for i := 0; i < n; i++ {
 				r.zstr()
 			}
 		default:
 			// 未知 tag（v13+ 的新区段等）：无法推断长度，就地停止。
 			// 已解析的区段照常可用。
+			if r.err != nil {
+				return nil, r.err
+			}
 			return a, nil
+		}
+		if r.err != nil {
+			return nil, r.err
 		}
 	}
 	return a, nil
@@ -179,7 +185,7 @@ var ainRefTypes = map[int32]bool{
 }
 
 func (a *AIN) parseFuncs(r *reader) {
-	n := int(r.u32())
+	n := r.count("FUNC")
 	a.Funcs = make([]AFunc, 0, n)
 	for i := 0; i < n; i++ {
 		addr := r.i32()
@@ -197,7 +203,7 @@ func (a *AIN) parseFuncs(r *reader) {
 }
 
 func (a *AIN) skipGlobals(r *reader) {
-	n := int(r.u32())
+	n := r.count("GLOB")
 	for i := 0; i < n; i++ {
 		r.zstr() // name
 		r.zstr() // name2 (v12+)
@@ -207,7 +213,7 @@ func (a *AIN) skipGlobals(r *reader) {
 }
 
 func (a *AIN) skipInitvals(r *reader) {
-	n := int(r.u32())
+	n := r.count("GSET")
 	for i := 0; i < n; i++ {
 		r.i32() // global_index
 		dt := r.i32()
@@ -220,7 +226,7 @@ func (a *AIN) skipInitvals(r *reader) {
 }
 
 func (a *AIN) skipStructs(r *reader) {
-	n := int(r.u32())
+	n := r.count("STRT")
 	for i := 0; i < n; i++ {
 		r.zstr() // name
 		nif := int(r.i32())
@@ -239,7 +245,7 @@ func (a *AIN) skipStructs(r *reader) {
 }
 
 func (a *AIN) parseLibs(r *reader) {
-	n := int(r.u32())
+	n := r.count("HLL0")
 	a.Libs = make([]ALib, 0, n)
 	for i := 0; i < n; i++ {
 		name := r.zstr()
@@ -259,7 +265,7 @@ func (a *AIN) parseLibs(r *reader) {
 }
 
 func (a *AIN) skipSwitches(r *reader) {
-	n := int(r.u32())
+	n := r.count("SWI0")
 	for i := 0; i < n; i++ {
 		r.i32() // case_type
 		r.i32() // default_address
@@ -312,19 +318,57 @@ func skipTypeRet(r *reader) int32 {
 	return data
 }
 
-// reader 小端顺序读取器。
+// reader 小端顺序读取器。越界不 panic：首个错误记入 err（sticky），
+// 后续读取返回零值，ParseAIN 收尾统一上报——损坏文件得到明确错误
+// 而不是进程崩溃。
 type reader struct {
 	buf []byte
 	i   int
+	err error
+}
+
+// fail 记录首个错误（后续错误忽略，保持 sticky 语义）。
+func (r *reader) fail(format string, args ...any) {
+	if r.err == nil {
+		r.err = fmt.Errorf(format, args...)
+	}
+}
+
+// count 读区段条目数并做上界检查：条目至少占 1 字节，所以 n 超过
+// 剩余总长必是损坏数据（防 make 巨量分配拖垮进程）。
+func (r *reader) count(what string) int {
+	n := int(r.u32())
+	if r.err != nil {
+		return 0
+	}
+	if n < 0 || n > len(r.buf) {
+		r.fail("alice: %s 条目数 %d 可疑（区段共 %d 字节）", what, n, len(r.buf))
+		return 0
+	}
+	return n
 }
 
 func (r *reader) u32() uint32 {
+	if r.err != nil {
+		return 0
+	}
+	if r.i+4 > len(r.buf) {
+		r.fail("alice: 区段数据越界（偏移 %d / %d 字节）", r.i, len(r.buf))
+		return 0
+	}
 	v := binary.LittleEndian.Uint32(r.buf[r.i:])
 	r.i += 4
 	return v
 }
 
 func (r *reader) i32() int32 {
+	if r.err != nil {
+		return 0
+	}
+	if r.i+4 > len(r.buf) {
+		r.fail("alice: 区段数据越界（偏移 %d / %d 字节）", r.i, len(r.buf))
+		return 0
+	}
 	v := int32(binary.LittleEndian.Uint32(r.buf[r.i:]))
 	r.i += 4
 	return v
@@ -332,6 +376,13 @@ func (r *reader) i32() int32 {
 
 // zstr 读 \0 结尾串（GBK → UTF-8）。
 func (r *reader) zstr() string {
+	if r.err != nil {
+		return ""
+	}
+	if r.i >= len(r.buf) {
+		r.fail("alice: 字符串越界（偏移 %d / %d 字节）", r.i, len(r.buf))
+		return ""
+	}
 	end := bytes.IndexByte(r.buf[r.i:], 0)
 	if end < 0 {
 		s := decodeGBK(r.buf[r.i:])
@@ -346,8 +397,11 @@ func (r *reader) zstr() string {
 // msg1 读 MSG1 加密串（u32 len + len 字节，b[i] -= i+0x60）。
 func (r *reader) msg1() string {
 	n := int(r.u32())
+	if r.err != nil {
+		return ""
+	}
 	if n < 0 || r.i+n > len(r.buf) {
-		r.i = len(r.buf)
+		r.fail("alice: MSG1 串长 %d 越界（偏移 %d / %d 字节）", n, r.i, len(r.buf))
 		return ""
 	}
 	b := make([]byte, n)

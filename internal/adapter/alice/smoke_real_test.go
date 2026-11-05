@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"ucgr/internal/adapter"
 )
 
 // 真实语料 smoke 测试：兰斯10（AliceSoft System 4，AI2/AIN + AFA）。
@@ -196,5 +197,53 @@ func TestRealAFALookupStem(t *testing.T) {
 	}
 	if af == nil {
 		t.Fatal("裸名匹配不到立绘条目")
+	}
+}
+
+// TestRealAliceParseArchiveOffset：ParseArchive 的 Offset 契约是「归档文件内
+// 绝对偏移」（adapter.ReadArchiveEntry 直接 Seek 它）——AFA 的 off 相对
+// dataStart，回归保护：按 Offset 读回的条目必须以合法图像魔数开头。
+func TestRealAliceParseArchiveOffset(t *testing.T) {
+	dir := rance10Dir(t)
+	ents, err := (&Adapter{}).ParseArchive(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ents) == 0 {
+		t.Fatal("ParseArchive 列出 0 条目")
+	}
+	afaPath := filepath.Join(dir, "Rance10CG.afa")
+	f, err := os.Open(afaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := 0
+	for _, e := range ents {
+		if !strings.HasPrefix(e.Path, "Rance10CG/") {
+			continue
+		}
+		if e.Offset <= 0 || e.Offset+e.Size > st.Size() {
+			t.Fatalf("条目 %s 越界：offset=%d size=%d 文件=%d", e.Path, e.Offset, e.Size, st.Size())
+		}
+		data, err := adapter.ReadArchiveEntry(f, e)
+		if err != nil {
+			t.Fatalf("读条目 %s 失败：%v", e.Path, err)
+		}
+		magic := string(data[:min(4, len(data))])
+		if magic != "AJP\x00" && magic != "QNT\x00" && magic != "dcf " {
+			t.Fatalf("条目 %s @offset=%d 魔数 %q 不是图像（Offset 语义可能错位）", e.Path, e.Offset, magic)
+		}
+		checked++
+		if checked >= 20 {
+			break
+		}
+	}
+	if checked == 0 {
+		t.Fatal("没取到 Rance10CG 条目")
 	}
 }

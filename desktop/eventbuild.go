@@ -127,13 +127,13 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 			ev, err := nitro.BuildNssEventStage(abs(e.Script), e.Label, w, h)
 			return ev, e.Title, err
 		case strings.EqualFold(engine, "alice"):
-			// AliceSoft System 4：Label = 场景函数名。舞台推不出来按
-			// 兰斯10 原生 1920×1080。
+			// AliceSoft System 4：Label = 场景函数名。事件自带对话框几何；
+			// 播放画布按素材推断，推不出来按兰斯10 原生 1920×1080。
 			w, h := stageOf(conv, lib)
 			if w <= 0 || h <= 0 {
 				w, h = 1920, 1080
 			}
-			ev, err := alice.BuildAINEventStage(abs(e.Script), e.Label, w, h)
+			ev, err := alice.BuildAINEventStage(abs(e.Script), e.Label)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)

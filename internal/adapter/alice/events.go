@@ -81,7 +81,10 @@ func (a *AIN) SceneEventOf(fnIdx int) (*ir.Event, error) {
 			textOrd++
 			lineID := textLineID(fnIdx, textOrd)
 			if first {
-				ev.Show = append(ev.Show, ir.MessageBoxOps("msg", 1024, 768)...)
+				// 对话框几何必须挂在文本层（"text"）上：player 的 textBox
+				// 按「文本所在层」取几何，层名不一致就等于没设。
+				// 舞台用兰斯10 原生 1920×1080（素材全该尺寸，见 docs/04 §11.4）。
+				ev.Show = append(ev.Show, ir.MessageBoxOps("text", 1920, 1080)...)
 				first = false
 			}
 			ev.Texts = append(ev.Texts, ir.TextLine{

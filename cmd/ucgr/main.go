@@ -1102,7 +1102,7 @@ func cmdPlay(args []string) error {
 				// 图全在 afa 里推不出尺寸时按兰斯10 原生舞台（1920×1080）。
 				w, h = 1920, 1080
 			}
-			e, err = alice.BuildAINEventStage(scriptPath, label, w, h)
+			e, err = alice.BuildAINEventStage(scriptPath, label)
 			canvasW, canvasH = w, h
 		case isNScripterScript(scriptPath):
 			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），

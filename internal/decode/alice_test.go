@@ -485,3 +485,18 @@ func hasVariance(px []byte) bool {
 	return false
 }
 
+
+// TestQNTAlphaTrailingBytes：alpha 流尾多余字节必须容忍（libsys4 对
+// alpha 用非精确解压；ALDExplorer 只补宽不补高，流尾可能带垃圾）。
+func TestQNTAlphaTrailingBytes(t *testing.T) {
+	src := randBGRA(4, 2, 42)
+	enc := qntEncode(t, 4, 2, src, false)
+	enc = append(enc, 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03) // 流尾垃圾
+	img, err := decodeQNT(enc)
+	if err != nil {
+		t.Fatalf("带尾部垃圾的 alpha 解码失败：%v", err)
+	}
+	if !bytes.Equal(src, img.Pixels) {
+		t.Fatal("像素与无垃圾版本不一致")
+	}
+}

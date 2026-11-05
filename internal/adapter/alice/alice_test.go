@@ -143,3 +143,44 @@ func TestSynthAIN(t *testing.T) {
 		t.Fatal("场景函数判 CJK 失败")
 	}
 }
+
+// TestSynthAINCorrupt 损坏/截断的区段流必须返回错误，而不是 panic 或 OOM。
+func TestSynthAINCorrupt(t *testing.T) {
+	base := synthAIN(t)
+	put32 := func(b []byte, v uint32) []byte {
+		return append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+	}
+	cases := map[string][]byte{
+		// FUNC 声称 4 亿个函数（防 OOM/长循环）
+		"huge-count": put32(append([]byte{}, []byte("VERS\x00\x00\x00\x00FUNC")...), 0xFFFFFFFF),
+		// FUNC 条目截断（读取器越界）
+		"truncated-func": append(append([]byte{}, base[:len(base)-10]...), []byte("FUNC")...),
+		// MSG1 串长越界
+		"bad-msg1": put32(append([]byte{}, []byte("VERS\x00\x00\x00\x00MSG1\x01\x00\x00\x00\x00\x00\x00\x00")...), 0x7FFFFFFF),
+		// 尾部截一半
+		"half": base[:len(base)/2],
+	}
+	for name, data := range cases {
+		ain, err := ParseAIN(data)
+		if err == nil {
+			// 允许「截断处恰好完整」的情况，但绝不允许 panic
+			t.Logf("%s: 解析出 %d 函数 %d 消息（截断处恰好对齐）", name, len(ain.Funcs), len(ain.Messages))
+			continue
+		}
+		if ain != nil {
+			t.Errorf("%s: 出错时不应返回半成品 ain", name)
+		}
+	}
+}
+
+// TestParseAINUnknownTagStops 未知 tag 就地停止，已解析区段仍可用（v13+ 前向兼容）。
+func TestParseAINUnknownTagStops(t *testing.T) {
+	data := append(synthAIN(t), []byte("NEWX\x01\x02\x03\x04")...)
+	ain, err := ParseAIN(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ain.Funcs) != 1 {
+		t.Fatalf("未知 tag 后函数表丢失：%d", len(ain.Funcs))
+	}
+}

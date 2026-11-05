@@ -40,8 +40,9 @@ func DecodeGBKString(b string) string {
 
 // BuildAINEventStage 读 .ain 文件，按函数名构建场景事件。
 // funcName 为空时取第一个场景函数（供「缺省播第一个」）。
-// 舞台尺寸由回放器按素材推断（兰斯10 素材全 1920×1080）。
-func BuildAINEventStage(ainPath, funcName string, stageW, stageH int) (*ir.Event, error) {
+// 舞台几何由事件自带（MessageBoxOps 按 1920×1080）或播放器按素材推断，
+// 这里不再收舞台参数（收了也用不上，徒增误配面）。
+func BuildAINEventStage(ainPath, funcName string) (*ir.Event, error) {
 	data, err := os.ReadFile(ainPath)
 	if err != nil {
 		return nil, err
