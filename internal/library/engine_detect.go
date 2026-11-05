@@ -48,6 +48,14 @@ func DetectEngine(root string) string {
 			return "nscript"
 		}
 	}
+	// NeXAS：Script.pac（或任何含 .bin 条目的 .pac）。
+	if findScriptPac(root) != "" {
+		return "nexas"
+	}
+	// Nitro+：nss.npa（或任何含 .nss 条目的 .npa）。
+	if findScriptNpa(root) != "" {
+		return "nitro"
+	}
 	if id, err := adapter.IdentifyPath(root); err == nil {
 		return id
 	}
@@ -94,6 +102,14 @@ func GameRootOf(script string) string {
 			if st, err := os.Stat(filepath.Join(dir, name)); err == nil && !st.IsDir() {
 				return dir
 			}
+		}
+		// NeXAS：剧本打进 Script.pac。
+		if findScriptPac(dir) != "" {
+			return dir
+		}
+		// Nitro+：剧本打进 nss.npa。
+		if findScriptNpa(dir) != "" {
+			return dir
 		}
 		base := strings.ToLower(filepath.Base(dir))
 		if base == "data" || base == "raw" {
@@ -159,7 +175,7 @@ func DetectConvention(root string) (string, adapter.Convention, error) {
 		// 既没有剧本也没有认得出的打包签名：多半是别的引擎
 		// （RealLive / Siglus…）或没解包，别硬按 KiriKiri 去找。
 		return "", adapter.Convention{}, fmt.Errorf(
-			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/nscript.dat），也没认出打包签名：可能是其它引擎，或还没解包")
+			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/nscript.dat/Script.pac/nss.npa），也没认出打包签名：可能是其它引擎，或还没解包")
 	}
 	if engineID == "" {
 		engineID = "kirikiri"
@@ -200,6 +216,15 @@ var packedSignatures = []struct {
 	{"kirikiri", func(n string) bool {
 		return strings.HasSuffix(n, ".xp3")
 	}},
+	{"nexas", func(n string) bool {
+		// Script.pac / Filechk.exe 是 NeXAS（戏画）游戏目录的标志件。
+		return strings.EqualFold(n, "script.pac") || strings.EqualFold(n, "filechk.exe")
+	}},
+	{"nitro", func(n string) bool {
+		// nss.npa（脚本归档）与 SDActi 启动件是 Nitro+ 游戏目录的标志件。
+		return strings.EqualFold(n, "nss.npa") || strings.EqualFold(n, "nss-1.npa") ||
+			strings.EqualFold(n, "sdacti.exe")
+	}},
 }
 
 // replayableScriptExts 本仓库能直接回放的剧本后缀。
@@ -235,6 +260,16 @@ func anyScriptFile(root string) bool {
 		// NScripter 的剧本是整作一份（无需解包即可回放），同样算数。
 		switch strings.ToLower(d.Name()) {
 		case "nscript.dat", "0.txt", "00.txt":
+			found = true
+			return fs.SkipAll
+		}
+		// NeXAS 的剧本也在打包里（Script.pac，无需解包即可回放）。
+		if strings.EqualFold(d.Name(), "script.pac") {
+			found = true
+			return fs.SkipAll
+		}
+		// Nitro+ 的剧本也在打包里（nss.npa，无需解包即可回放）。
+		if strings.EqualFold(d.Name(), "nss.npa") || strings.EqualFold(d.Name(), "nss-1.npa") {
 			found = true
 			return fs.SkipAll
 		}

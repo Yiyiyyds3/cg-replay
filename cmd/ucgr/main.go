@@ -31,6 +31,8 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/nexas"
+	"ucgr/internal/adapter/nitro"
 	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/audio"
@@ -1037,6 +1039,60 @@ func cmdPlay(args []string) error {
 			w, h := library.DetectStageSize(root)
 			e, err = bgi.BuildShowEventFileStage(scriptPath, n, w, h)
 			canvasW, canvasH = w, h
+		case isNeXASPac(scriptPath):
+			// NeXAS 剧本归档（Script.pac）：--label 当 .bin 条目名，
+			// 缺省取第一个脚本。
+			root := library.GameRootOf(scriptPath)
+			w, h := library.DetectStageSize(root)
+			if w <= 0 || h <= 0 {
+				// 图全在 pac 里推不出尺寸时按 NeXAS 标准舞台（Baldr Sky 1024×768）。
+				w, h = 1024, 768
+			}
+			lbl := label
+			if lbl == "" {
+				// 第一个 .bin 条目。
+				a, perr := nexas.ParsePac(scriptPath)
+				if perr != nil {
+					return perr
+				}
+				for _, en := range a.Entries {
+					if strings.HasSuffix(strings.ToLower(en.Name), ".bin") {
+						lbl = en.Name
+						break
+					}
+				}
+				if lbl == "" {
+					return fmt.Errorf("%s 里没有 .bin 脚本", filepath.Base(scriptPath))
+				}
+			}
+			e, err = nexas.BuildPacScriptEvent(scriptPath, lbl, w, h)
+			canvasW, canvasH = w, h
+		case isNitroNpa(scriptPath):
+			// Nitro+ 剧本归档（nss.npa）：--label 当 .nss 条目名，缺省第一个脚本。
+			root := library.GameRootOf(scriptPath)
+			w, h := library.DetectStageSize(root)
+			if w <= 0 || h <= 0 {
+				// 图全在 npa 里推不出尺寸时按 Nitro+ 标准舞台（鬼哭街重制版 1024×768）。
+				w, h = 1024, 768
+			}
+			lbl := label
+			if lbl == "" {
+				a, perr := nitro.ParseNpa(scriptPath)
+				if perr != nil {
+					return perr
+				}
+				for _, en := range a.Entries {
+					if strings.HasSuffix(strings.ToLower(en.Name), ".nss") {
+						lbl = en.Name
+						break
+					}
+				}
+				if lbl == "" {
+					return fmt.Errorf("%s 里没有 .nss 脚本", filepath.Base(scriptPath))
+				}
+			}
+			e, err = nitro.BuildNssEvent(scriptPath, lbl)
+			canvasW, canvasH = w, h
 		case isNScripterScript(scriptPath):
 			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），
 			// 缺省第 1 个事件（对话起始处）。
@@ -1636,6 +1692,16 @@ func isNScripterScript(p string) bool {
 		return true
 	}
 	return false
+}
+
+// isNeXASPac 判断脚本路径是不是 NeXAS 剧本归档（Script.pac 等 .pac）。
+func isNeXASPac(p string) bool {
+	return strings.EqualFold(filepath.Ext(p), ".pac") && nexas.LooksLikePacFile(p)
+}
+
+// isNitroNpa 判断脚本路径是不是 Nitro+ 剧本归档（nss.npa 等 .npa）。
+func isNitroNpa(p string) bool {
+	return strings.EqualFold(filepath.Ext(p), ".npa") && nitro.LooksLikeNpaFile(p)
 }
 
 // engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。
