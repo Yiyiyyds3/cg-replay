@@ -34,6 +34,7 @@ import (
 	"ucgr/internal/adapter/alice"
 	"ucgr/internal/adapter/nexas"
 	"ucgr/internal/adapter/nitro"
+	"ucgr/internal/adapter/wolf"
 	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/audio"
@@ -1104,6 +1105,14 @@ func cmdPlay(args []string) error {
 			}
 			e, err = alice.BuildAINEventStage(scriptPath, label)
 			canvasW, canvasH = w, h
+		case isWolfCommonEvent(scriptPath):
+			// Wolf RPG Editor：--label 当 CommonEvent 编号（十进制），缺省第一个剧情 CE。
+			// 画布固定 800×600（data/Picture/screen.png 背景的实际尺寸，即游戏
+			// 真实分辨率；DetectStageSize 会被 3200×4800 的高清 CG 带偏）。
+			w, h := 800, 600
+			_ = library.GameRootOf(scriptPath)
+			e, err = wolf.BuildWolfEventStage(scriptPath, label)
+			canvasW, canvasH = w, h
 		case isNScripterScript(scriptPath):
 			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），
 			// 缺省第 1 个事件（对话起始处）。
@@ -1195,6 +1204,10 @@ func cmdPlay(args []string) error {
 		// 640×480 的 NScripter 舞台用 48px 字会溢出对话框，按原作 setwindow
 		// 的字号级（26px 附近）缩小。
 		opt.FontSize, opt.LineSpacing = 26, 8
+	}
+	if isWolfCommonEvent(scriptPath) && w <= 816 {
+		// 800×600 的 Wolf 舞台同理：48px 会溢出消息窗，按 Wolf 默认字号级（24px）。
+		opt.FontSize, opt.LineSpacing = 24, 8
 	}
 	if speed > 0 {
 		opt.Speed = speed
@@ -1718,6 +1731,11 @@ func isNitroNpa(p string) bool {
 // isAliceAIN 判断脚本路径是不是 AliceSoft System 4 剧本（.ain）。
 func isAliceAIN(p string) bool {
 	return strings.EqualFold(filepath.Ext(p), ".ain") && alice.LooksLikeAINFile(p)
+}
+
+// isWolfCommonEvent 判断脚本路径是不是 Wolf RPG 剧本（CommonEvent.dat）。
+func isWolfCommonEvent(p string) bool {
+	return strings.EqualFold(filepath.Base(p), "CommonEvent.dat")
 }
 
 // engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。

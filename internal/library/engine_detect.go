@@ -60,6 +60,10 @@ func DetectEngine(root string) string {
 	if findAliceAIN(root) != "" {
 		return "alice"
 	}
+	// Wolf RPG Editor：Game.exe + data/BasicData/CommonEvent.dat。
+	if findWolfGame(root) != "" {
+		return "wolf"
+	}
 	if id, err := adapter.IdentifyPath(root); err == nil {
 		return id
 	}
@@ -117,6 +121,10 @@ func GameRootOf(script string) string {
 		}
 		// AliceSoft System 4：剧本在根目录（或 Data/）的 .ain。
 		if findAliceAIN(dir) != "" {
+			return dir
+		}
+		// Wolf RPG Editor：Game.exe + data/BasicData/CommonEvent.dat。
+		if findWolfGame(dir) != "" {
 			return dir
 		}
 		base := strings.ToLower(filepath.Base(dir))
@@ -183,7 +191,7 @@ func DetectConvention(root string) (string, adapter.Convention, error) {
 		// 既没有剧本也没有认得出的打包签名：多半是别的引擎
 		// （RealLive / Siglus…）或没解包，别硬按 KiriKiri 去找。
 		return "", adapter.Convention{}, fmt.Errorf(
-			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/.ain/nscript.dat/Script.pac/nss.npa），也没认出打包签名：可能是其它引擎，或还没解包")
+			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/.ain/ CommonEvent.dat/nscript.dat/Script.pac/nss.npa），也没认出打包签名：可能是其它引擎，或还没解包")
 	}
 	if engineID == "" {
 		engineID = "kirikiri"
@@ -240,12 +248,19 @@ var packedSignatures = []struct {
 			strings.EqualFold(filepath.Ext(n), ".afa") ||
 			strings.EqualFold(n, "alicestart.ini")
 	}},
+	{"wolf", func(n string) bool {
+		// Game.exe + data/BasicData（Wolf RPG Editor 标准布局）是标志件。
+		return strings.EqualFold(n, "game.exe") ||
+			strings.EqualFold(filepath.Ext(n), ".mps") ||
+			n == "data/BasicData" || n == `data\BasicData`
+	}},
 }
 
 // replayableScriptExts 本仓库能直接回放的剧本后缀。
 var replayableScriptExts = map[string]bool{
 	".ks": true, ".scn": true, ".ast": true, ".bs": true, ".cst": true,
 	".ain": true, // AliceSoft System 4（兰斯10）
+	".dat": true, // Wolf RPG Editor（CommonEvent.dat，配合 Game.exe 识别）
 }
 
 // anyScriptFile 报告 root 下是否至少有一个可回放的剧本文件（最多探 6 层）。
@@ -291,6 +306,11 @@ func anyScriptFile(root string) bool {
 		}
 		// AliceSoft System 4 的剧本是根目录 .ain（无需解包即可回放）。
 		if strings.EqualFold(filepath.Ext(d.Name()), ".ain") {
+			found = true
+			return fs.SkipAll
+		}
+		// Wolf RPG Editor：CommonEvent.dat（配合 Game.exe，无需解包即可回放）。
+		if strings.EqualFold(d.Name(), "CommonEvent.dat") {
 			found = true
 			return fs.SkipAll
 		}

@@ -18,6 +18,7 @@ import (
 	"ucgr/internal/adapter/nitro"
 	"ucgr/internal/adapter/nscript"
 	"ucgr/internal/adapter/scn"
+	"ucgr/internal/adapter/wolf"
 	"ucgr/internal/ir"
 	"ucgr/internal/library"
 )
@@ -134,6 +135,13 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 				w, h = 1920, 1080
 			}
 			ev, err := alice.BuildAINEventStage(abs(e.Script), e.Label)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "wolf"):
+			// Wolf RPG Editor：Label = CommonEvent 编号（十进制）。
+			// 画布固定 800×600（游戏真实分辨率；高清 CG 由原作运行时缩放）。
+			w, h := 800, 600
+			_ = stageOf(conv, lib)
+			ev, err := wolf.BuildWolfEventStage(abs(e.Script), e.Label)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)

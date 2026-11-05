@@ -150,6 +150,15 @@ func DefaultAlice() Convention {
 	return Convention{EngineID: "alice", StageW: 1920, StageH: 1080}
 }
 
+// DefaultWolf Wolf RPG Editor 的默认约定。
+//
+// 剧本是 data/BasicData/CommonEvent.dat（Wolf 编译事件 + 明文 UTF-8 字符串），
+// 素材全散装在 data/ 下（CG/CharaGraphic/Picture…），全部交给自动探测；
+// 没有画廊/CG 表。舞台按 Wolf 默认 816×624。
+func DefaultWolf() Convention {
+	return Convention{EngineID: "wolf", StageW: 816, StageH: 624}
+}
+
 // autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
 //
 // 这些引擎的剧本在解包树里的层级不固定（多卷解包）或整作一份在根目录
@@ -163,6 +172,7 @@ var autoScenarioEngines = map[string]bool{
 	"nexas":      true,
 	"nitro":      true,
 	"alice":      true,
+	"wolf":       true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -187,6 +197,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultNitro(), true
 	case "alice":
 		return DefaultAlice(), true
+	case "wolf":
+		return DefaultWolf(), true
 	default:
 		return Convention{}, false
 	}
