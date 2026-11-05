@@ -93,6 +93,15 @@ func DefaultRenPy() Convention {
 	}
 }
 
+// DefaultMedia 「视频/图片为主」的默认约定（无需剧本，按尺寸门槛扫媒体）。
+func DefaultMedia() Convention {
+	return Convention{
+		EngineID:    "media",
+		ScenarioDir: ".",
+		ScriptExt:   "",
+	}
+}
+
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
 // （调用方应回退到默认约定或报错，不要瞎猜）。
 func ConventionByEngine(engineID string) (Convention, bool) {
@@ -103,6 +112,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultRMMZ(), true
 	case "renpy":
 		return DefaultRenPy(), true
+	case "media":
+		return DefaultMedia(), true
 	default:
 		return Convention{}, false
 	}

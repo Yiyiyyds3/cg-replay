@@ -29,6 +29,7 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/media"
 	"ucgr/internal/adapter/rmmz"
 	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/adapter/unitycg"
@@ -294,6 +295,9 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	case engine == "rmmz":
 		// RPG Maker：Script 是 data 目录下的 JSON，dataDir 从它反推。
 		ev, err = rmmz.BuildShow(root, filepath.ToSlash(filepath.Dir(script)), id)
+	case engine == "media":
+		// 视频/图片为主：无剧本，媒体文件即事件。
+		ev, err = media.BuildShow(root, id)
 	case engine == "renpy":
 		// Ren'Py：脚本可能嵌在 game 的子目录里，gameDir 用探测的
 		// （不能从 Script 反推 Dir，嵌套路径会推出 game/characters/events）。

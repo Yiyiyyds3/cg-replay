@@ -154,6 +154,9 @@ func scanWith(root string, conv adapter.Convention) (*Library, error) {
 	if strings.EqualFold(conv.EngineID, "unity") {
 		return ScanUnity(root)
 	}
+	if strings.EqualFold(conv.EngineID, "media") {
+		return ScanMedia(root)
+	}
 	if strings.EqualFold(conv.EngineID, "renpy") {
 		return ScanRenPy(root, conv)
 	}

@@ -28,6 +28,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/media"
 	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/audio"
 	"ucgr/internal/decode"
@@ -960,6 +961,12 @@ func cmdPlay(args []string) error {
 			err error
 		)
 		switch {
+		case strings.EqualFold(engineOverride, "media"):
+			// 视频/图片为主：--label 就是事件 id，无剧本。
+			if strings.TrimSpace(label) == "" {
+				return fmt.Errorf("media 播放需要 --label <事件id>（ucgr events 可列出）")
+			}
+			e, err = media.BuildShow(assets, label)
 		case strings.EqualFold(engineOverride, "renpy"):
 			// Ren'Py：--label 是事件单位（一个含图片演出的 label）。
 			// gameDir 用探测的——脚本可能嵌在子目录，不能从 --script 反推。
