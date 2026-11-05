@@ -56,6 +56,10 @@ func DetectEngine(root string) string {
 	if findScriptNpa(root) != "" {
 		return "nitro"
 	}
+	// AliceSoft System 4：根目录（或 Data/）下的 .ain 剧本。
+	if findAliceAIN(root) != "" {
+		return "alice"
+	}
 	if id, err := adapter.IdentifyPath(root); err == nil {
 		return id
 	}
@@ -109,6 +113,10 @@ func GameRootOf(script string) string {
 		}
 		// Nitro+：剧本打进 nss.npa。
 		if findScriptNpa(dir) != "" {
+			return dir
+		}
+		// AliceSoft System 4：剧本在根目录（或 Data/）的 .ain。
+		if findAliceAIN(dir) != "" {
 			return dir
 		}
 		base := strings.ToLower(filepath.Base(dir))
@@ -175,7 +183,7 @@ func DetectConvention(root string) (string, adapter.Convention, error) {
 		// 既没有剧本也没有认得出的打包签名：多半是别的引擎
 		// （RealLive / Siglus…）或没解包，别硬按 KiriKiri 去找。
 		return "", adapter.Convention{}, fmt.Errorf(
-			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/nscript.dat/Script.pac/nss.npa），也没认出打包签名：可能是其它引擎，或还没解包")
+			"没有找到可回放的剧本（.ks/.scn/.ast/.bs/.cst/.ain/nscript.dat/Script.pac/nss.npa），也没认出打包签名：可能是其它引擎，或还没解包")
 	}
 	if engineID == "" {
 		engineID = "kirikiri"
@@ -225,11 +233,19 @@ var packedSignatures = []struct {
 		return strings.EqualFold(n, "nss.npa") || strings.EqualFold(n, "nss-1.npa") ||
 			strings.EqualFold(n, "sdacti.exe")
 	}},
+	{"alice", func(n string) bool {
+		// Rance10.ain（剧本）与 *.afa（资源归档）是 AliceSoft System 4
+		// 游戏目录的标志件；AliceStart.ini 同样有辨识度。
+		return strings.EqualFold(filepath.Ext(n), ".ain") ||
+			strings.EqualFold(filepath.Ext(n), ".afa") ||
+			strings.EqualFold(n, "alicestart.ini")
+	}},
 }
 
 // replayableScriptExts 本仓库能直接回放的剧本后缀。
 var replayableScriptExts = map[string]bool{
 	".ks": true, ".scn": true, ".ast": true, ".bs": true, ".cst": true,
+	".ain": true, // AliceSoft System 4（兰斯10）
 }
 
 // anyScriptFile 报告 root 下是否至少有一个可回放的剧本文件（最多探 6 层）。
@@ -270,6 +286,11 @@ func anyScriptFile(root string) bool {
 		}
 		// Nitro+ 的剧本也在打包里（nss.npa，无需解包即可回放）。
 		if strings.EqualFold(d.Name(), "nss.npa") || strings.EqualFold(d.Name(), "nss-1.npa") {
+			found = true
+			return fs.SkipAll
+		}
+		// AliceSoft System 4 的剧本是根目录 .ain（无需解包即可回放）。
+		if strings.EqualFold(filepath.Ext(d.Name()), ".ain") {
 			found = true
 			return fs.SkipAll
 		}

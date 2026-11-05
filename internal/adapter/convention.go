@@ -141,11 +141,20 @@ func DefaultNitro() Convention {
 	return Convention{EngineID: "nitro", StageW: 1024, StageH: 768}
 }
 
+// DefaultAlice AliceSoft System 4 的默认约定。
+//
+// 剧本是根目录（或 Data/）下的 Rance10.ain（AI2 包裹），资源在同目录
+// Rance10CG*.afa / Rance10Flat*.afa，全部交给自动探测；没有画廊/CG 表。
+// 舞台按兰斯10 原生 1920×1080。
+func DefaultAlice() Convention {
+	return Convention{EngineID: "alice", StageW: 1920, StageH: 1080}
+}
+
 // autoScenarioEngines 剧本目录可由扫描器自动探测的引擎。
 //
 // 这些引擎的剧本在解包树里的层级不固定（多卷解包）或整作一份在根目录
-// （nscript）/打进 Script.pac（nexas），约定里的 scenario_dir 留空是
-// **正常形态**，不算配置缺失。
+// （nscript）/打进 Script.pac（nexas）/根目录 .ain（alice），约定里的
+// scenario_dir 留空是**正常形态**，不算配置缺失。
 var autoScenarioEngines = map[string]bool{
 	"artemis":    true,
 	"bgi":        true,
@@ -153,6 +162,7 @@ var autoScenarioEngines = map[string]bool{
 	"nscript":    true,
 	"nexas":      true,
 	"nitro":      true,
+	"alice":      true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -175,6 +185,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultNeXAS(), true
 	case "nitro":
 		return DefaultNitro(), true
+	case "alice":
+		return DefaultAlice(), true
 	default:
 		return Convention{}, false
 	}

@@ -8,9 +8,11 @@
 // JPEG（明文，或「整文件单字节 XOR 掩码」变种 —— 重返蓝鲸岛/海市蜃楼之馆实测 0xA4，
 // 见 jpeg.go；GDI+ 直读掩码 JPEG 会报 Out of memory，所以必须自己解）；
 // CatSystem2 HG3 的 img0000 / img_jpg 变种（.hg3，见 hg3.go；《甜蜜女友2+》4645
-// 个样本全是 img0000，img_jpg 用合成样本验证）。
-// 未支持：TLG6 / TLG0、HG3 的 img_wbp 变种 —— 一律返回明确错误，
-// 不静默失败（对应 P1-7「缺资源告警」）。
+// 个样本全是 img0000，img_jpg 用合成样本验证）；
+// AliceSoft AJP（JPEG+掩码容器，见 ajp.go）/ QNT（见 qnt.go）——兰斯10 实测全量；
+// DCF 差分 CG（见 dcf.go）需经 DecodeDCF 注入底图查找回调（底图在 AFA 归档内）。
+// 未支持：TLG6 / TLG0、HG3 的 img_wbp 变种、AJP 的 PMS8/WebP 掩码变种 ——
+// 一律返回明确错误，不静默失败（对应 P1-7「缺资源告警」）。
 //
 // TLG5 结构（据 GARbro `ArcFormats/KiriKiri/ImageTLG.cs` 的 ReadV5 实现，已用本机样本核对）：
 //
@@ -63,6 +65,14 @@ func Decode(data []byte) (*Image, error) {
 		return nil, fmt.Errorf("TLG0 暂未实现")
 	case bytes.HasPrefix(data, hg3Magic):
 		return DecodeHG3(data, 0)
+	case bytes.HasPrefix(data, []byte("AJP\x00")):
+		return decodeAJP(data)
+	case bytes.HasPrefix(data, []byte("QNT\x00")):
+		return decodeQNT(data)
+	case bytes.HasPrefix(data, []byte("dcf ")):
+		// DCF 是差分 CG，必须拿到底图归档查找回调才能合成，
+		// 走 DecodeDCF(data, lookup)；底图缺失时无法出图。
+		return nil, fmt.Errorf("DCF 差分图需经 DecodeDCF 并提供底图查找回调解码")
 	}
 	// JPEG：明文直接解；掩码变种（整文件单字节 XOR）先还原再解。
 	if b, mask, ok := UnmaskJPEG(data); ok {

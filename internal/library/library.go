@@ -135,6 +135,8 @@ func ScanWith(root string, conv adapter.Convention) (*Library, error) {
 		return ScanNeXAS(root, conv)
 	case "nitro":
 		return ScanNitro(root, conv)
+	case "alice":
+		return ScanAlice(root, conv)
 	}
 	if conv.ScenarioDir == "" {
 		conv = conv.Merge(adapter.DefaultKiriKiri())

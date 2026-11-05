@@ -108,9 +108,9 @@ bin/ucgr.exe play --script <xxx.txt.scn> --assets <9nine解包目录>
 - 部分解包产物本身损坏：0x20 混淆变体（整份文件异或 0x20，头写作 `psb `）里有一批 `.scn` 的名字表/字符串表对不齐。解析器会**跳过单个坏节点**（同层子节点各带独立偏移，坏一个不连累兄弟），整份无法解析的剧本则跳文件；两种情况都写进事件库 `warnings`，不会静默少事件
 - `cglist.csv` 在春色/雪色/新章被单字节异或（键 0x13/0x45/0x10），读取时穷举 1..255 并用「像不像 CG 表」自校验
 
-## 多引擎批量适配（CatSystem2 / Artemis / BGI / NScripter / NeXAS / Nitro+）
+## 多引擎批量适配（CatSystem2 / Artemis / BGI / NScripter / NeXAS / Nitro+ / AliceSoft）
 
-在 9nine（PSB/scn）之后，同一套「约定 + 事件库 + IR 回放」管线又接入了六个明文/半明文/字节码剧本引擎，注册表现共 8 个：`kirikiri / scn / artemis / bgi / catsystem2 / nscript / nexas / nitro`。
+在 9nine（PSB/scn）之后，同一套「约定 + 事件库 + IR 回放」管线又接入了七个明文/半明文/字节码剧本引擎，注册表现共 9 个：`kirikiri / scn / artemis / bgi / catsystem2 / nscript / nexas / nitro / alice`。
 
 - **事件粒度对齐原作**：CatSystem2 一个 `.cst` 一个场景事件（标题取首句对白）；Artemis 一份 `.ast` 一个事件；BGI 一份 `.bs` 按「换背景/换事件」切多个事件；scn 仍按 scene / cglist 行
 - **剧本目录自动探测**：约定里 `scenario_dir` 留空时按扩展名递归收集（`.ast`/`.bs`/`.cst`），KiriKiri 按「scenario/scn/script 目录名优先、`.ks` 密度兜底」选层；scn 追加「解包整理/data_脚本与数据/scn」等整理布局
@@ -122,7 +122,7 @@ bin/ucgr.exe play --script <xxx.txt.scn> --assets <9nine解包目录>
 # 任一引擎的解包目录：扫出原作自己的事件表
 bin/ucgr.exe events <解包目录> [--out lib.json]
 
-# 直接按剧本回放（按扩展名/文件名分派 .scn/.ast/.cst/.bs/.ks/nscript.dat/Script.pac/nss.npa）
+# 直接按剧本回放（按扩展名/文件名分派 .scn/.ast/.cst/.bs/.ks/nscript.dat/Script.pac/nss.npa/.ain）
 bin/ucgr.exe play --script <xxx.cst> --assets <解包目录> [--shot 目录 --at ms]
 ```
 
@@ -143,8 +143,9 @@ bin/ucgr.exe play --script <xxx.cst> --assets <解包目录> [--shot 目录 --at
 | Baldr Sky（Steam 中文版） | nexas | 1024×768 | 203 |
 | BALDRSKY DIVEX | nexas | 1024×768 | 141 |
 | 鬼哭街重制版 | nitro | 1024×768 | 61 |
+| 兰斯10 | alice | 1920×1080 | 7256 |
 
-**覆盖进度（2026-11-04）**：8 个引擎适配器覆盖 32 款 / 254.92 GB（81.4%）。
+**覆盖进度（2026-11-05）**：9 个引擎适配器覆盖 33 款 / 258.72 GB（82.7%）。
 NScripter 适配器要点：`nscript.dat` = XOR 0x84 的 CP932 明文（密文/明文关键字
 嗅探，寒蝉解的剧本解出来以空行开头）；NSA 归档大端索引，压缩 0=无 / 1=SPB /
 2=LZSS / 3=NBZ(bzip2)，SPB 解出 24bpp BMP（蛇形行序）；`bg sora` 这类裸名是
@@ -160,8 +161,13 @@ index 是含目录条目的循环序号；内容 key 按明文名派生
 `((nameKey - Σ字节) * len + arcKey) * unpacked & 0xff`（Garbro 的 RawName
 公式只覆盖部分条目，明文名优先 + 魔数校验兜底，全 4 包 3354 条目 100%）；
 汉化覆盖包 nss-1.npa（GBK）同格兼容、按平假名率自动分流；图片由
-GameLoader 的 NPA 兜底池取图。未适配 15 款 / 58.09 GB：Unity 3、
-FAVORITE 2、其余单件 10。
+GameLoader 的 NPA 兜底池取图。
+AliceSoft（System 4）适配器要点：`Rance10.ain` = AI2/zlib 包裹的区段流脚本
+（v12：FUNC 37698 函数 / MSG1 269676 条加密消息，`b[i]-=i+0x60`），函数名含
+CJK 的就是原作场景函数（「萨娜琪亚／参战」），反汇编 S_PUSH+MSG 切事件；
+图片全在 `Rance10CG*.afa`（AJP=JPEG+XOR 掩码、QNT=双布局+2×2 重排+减法预测、
+DCF=16×16 差分块合成，底图链式递归、悬空降级直解），由 GameLoader 的 AFA
+兜底池取图。未适配 14 款 / 54.29 GB：Unity 3、FAVORITE 2、其余单件 9。
 
 ## 已验证的实现基线（2026-10-17）
 

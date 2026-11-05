@@ -34,10 +34,12 @@ func GameLoader(root string) Loader {
 	nsaCache := map[string]image.Image{} // NSA 解出的图（内存，无文件路径）
 	pacCache := map[string]image.Image{} // NeXAS PAC 解出的图（Baldr Sky）
 	npaCache := map[string]image.Image{} // NPA 解出的图（鬼哭街重制版）
+	afaCache := map[string]image.Image{} // AFA 解出的图（兰斯10）
 	var index map[string]string
 	var nsas *nsaPool    // NScripter 归档兜底（海猫出题的图全在 arc*.nsa）
 	var pacs *pacPool    // NeXAS 归档兜底（Baldr Sky 的图全在 Bmp/Stand/System.pac）
 	var npas *npaPool    // Nitro+ 归档兜底（鬼哭街重制版的图全在 cg.npa）
+	var afas *afaPool    // AliceSoft 归档兜底（兰斯10 的图全在 Rance10CG*.afa）
 	buildIndex := func() {
 		index = map[string]string{}
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -93,6 +95,9 @@ func GameLoader(root string) Loader {
 			return img, nil
 		}
 		if img, ok := npaCache[rel]; ok {
+			return img, nil
+		}
+		if img, ok := afaCache[rel]; ok {
 			return img, nil
 		}
 		slashRel := filepath.FromSlash(rel)
@@ -160,6 +165,18 @@ func GameLoader(root string) Loader {
 			if data, ok := npas.image(rel); ok {
 				if img, err := DecodeImage(data); err == nil {
 					npaCache[rel] = img
+					return img, nil
+				}
+			}
+		}
+		// 最后试 AliceSoft 归档（*.afa；AJP/QNT 直解，DCF 池内合成）。
+		if afas == nil {
+			afas = newAfaPool(root)
+		}
+		if !afas.empty() {
+			if data, ok := afas.image(rel); ok {
+				if img, err := DecodeImage(data); err == nil {
+					afaCache[rel] = img
 					return img, nil
 				}
 			}

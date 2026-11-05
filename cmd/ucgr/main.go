@@ -31,6 +31,7 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/alice"
 	"ucgr/internal/adapter/nexas"
 	"ucgr/internal/adapter/nitro"
 	"ucgr/internal/adapter/nscript"
@@ -1093,6 +1094,16 @@ func cmdPlay(args []string) error {
 			}
 			e, err = nitro.BuildNssEvent(scriptPath, lbl)
 			canvasW, canvasH = w, h
+		case isAliceAIN(scriptPath):
+			// AliceSoft System 4（兰斯10）：--label 当场景函数名，缺省第一个。
+			root := library.GameRootOf(scriptPath)
+			w, h := library.DetectStageSize(root)
+			if w <= 0 || h <= 0 {
+				// 图全在 afa 里推不出尺寸时按兰斯10 原生舞台（1920×1080）。
+				w, h = 1920, 1080
+			}
+			e, err = alice.BuildAINEventStage(scriptPath, label, w, h)
+			canvasW, canvasH = w, h
 		case isNScripterScript(scriptPath):
 			// NScripter 整作一份剧本：--chapter 当事件序号（1 起），
 			// 缺省第 1 个事件（对话起始处）。
@@ -1702,6 +1713,11 @@ func isNeXASPac(p string) bool {
 // isNitroNpa 判断脚本路径是不是 Nitro+ 剧本归档（nss.npa 等 .npa）。
 func isNitroNpa(p string) bool {
 	return strings.EqualFold(filepath.Ext(p), ".npa") && nitro.LooksLikeNpaFile(p)
+}
+
+// isAliceAIN 判断脚本路径是不是 AliceSoft System 4 剧本（.ain）。
+func isAliceAIN(p string) bool {
+	return strings.EqualFold(filepath.Ext(p), ".ain") && alice.LooksLikeAINFile(p)
 }
 
 // engineOverride 全局 --engine <id>：跳过自动识别，直接指定引擎。

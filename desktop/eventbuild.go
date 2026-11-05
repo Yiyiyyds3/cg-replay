@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/adapter/alice"
 	"ucgr/internal/adapter/kirikiri"
 	"ucgr/internal/adapter/nexas"
 	"ucgr/internal/adapter/nitro"
@@ -124,6 +125,15 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 				w, h = 1024, 768
 			}
 			ev, err := nitro.BuildNssEventStage(abs(e.Script), e.Label, w, h)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "alice"):
+			// AliceSoft System 4：Label = 场景函数名。舞台推不出来按
+			// 兰斯10 原生 1920×1080。
+			w, h := stageOf(conv, lib)
+			if w <= 0 || h <= 0 {
+				w, h = 1920, 1080
+			}
+			ev, err := alice.BuildAINEventStage(abs(e.Script), e.Label, w, h)
 			return ev, e.Title, err
 		default:
 			ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)
