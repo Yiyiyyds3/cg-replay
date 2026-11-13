@@ -9,8 +9,7 @@ $Repo = 'Yiyiyyds3/cg-replay'
 if (-not $env:GH_TOKEN) {
     Write-Error 'GH_TOKEN 未设置。请先：$env:GH_TOKEN = "<你的PAT>"'
 }
-gh auth login --with-token <<< $env:GH_TOKEN 2>$null
-if ($LASTEXITCODE -ne 0) { "gh auth login via stdin" | gh auth login --with-token }
+$env:GH_TOKEN | gh auth login --with-token
 gh auth status
 
 # ---------- 1. Milestone 0.4.0 ----------
@@ -112,7 +111,6 @@ foreach ($i in $issues) {
         Remove-Item $tmp
         Write-Host "issue 已创建 #$found : $($i.title)"
     }
-    $issueNums += $found | Where-Object { $issueNums -notcontains $found } # dedupe guard
     # 关联 merge commit 评论（幂等：查是否已有该 hash 的评论）
     $shortHash = $i.merge.Substring(0,7)
     $hasComment = gh api "repos/$Repo/issues/$found/comments" --jq ".[] | select(.body | contains(`"$shortHash`")) | .id" | Select-Object -First 1
