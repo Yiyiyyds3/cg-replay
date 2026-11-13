@@ -21,6 +21,7 @@ import (
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
+	"ucgr/internal/vision"
 )
 
 func TestRealCS2EndToEnd(t *testing.T) {
@@ -202,8 +203,8 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 			p.Advance(16, player.Input{})
 			if step%100 == 0 || p.Done() {
 				if img, _, err := player.RenderFrameWithVideo(p, load, videoProv, 1280, 720); err == nil {
-					if r := nonBlackRatio(img); r > best {
-						best = r
+					if st := vision.Analyze(img); st.NonBlackRatio > best {
+						best = st.NonBlackRatio
 					}
 				}
 			}
@@ -239,23 +240,4 @@ func TestRealCS2UnpackedPlayback(t *testing.T) {
 	if rendered == 0 {
 		t.Fatal("没有任何事件能画出画面（非黑像素 < 2%）")
 	}
-}
-
-// nonBlackRatio 统计非黑像素比例（每 2 像素采一个）。
-func nonBlackRatio(img *image.RGBA) float64 {
-	var nonBlack, total int
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y += 2 {
-		for x := b.Min.X; x < b.Max.X; x += 2 {
-			r, g, bl, _ := img.At(x, y).RGBA()
-			total++
-			if r > 0x1000 || g > 0x1000 || bl > 0x1000 {
-				nonBlack++
-			}
-		}
-	}
-	if total == 0 {
-		return 0
-	}
-	return float64(nonBlack) / float64(total)
 }

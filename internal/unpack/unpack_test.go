@@ -243,8 +243,8 @@ func TestUnpackXP3MinimalSet(t *testing.T) {
 	for _, rel := range []string{
 		"raw/data/scenario/cgrai00.ks",
 		"raw/data/scenario/01kuukou.ks",
-		"raw/data/image/cg001_a.png",
-		"raw/data/image/cg002_a.png",
+		"raw/data/image/cg/cg001_a.png",
+		"raw/data/image/cg/cg002_a.png",
 		"ucgr-convention.json",
 	} {
 		if _, err := os.Stat(filepath.Join(dest, filepath.FromSlash(rel))); err != nil {
@@ -282,7 +282,7 @@ func TestUnpackScopeAllIncludesSceneRefs(t *testing.T) {
 	if res.Files == 0 {
 		t.Fatal("ScopeAll 应解出文件")
 	}
-	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "bg_scene.jpg")); err != nil {
+	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "bg", "bg_scene.jpg")); err != nil {
 		t.Fatalf("ScopeAll 应解出场景引用的背景：%v", err)
 	}
 }
@@ -309,7 +309,7 @@ func TestUnpackAdlrEntryTreatedAsPlaintext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("解包不应失败：%v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "cg001_a.png")); err != nil {
+	if _, err := os.Stat(filepath.Join(dest, "raw", "data", "image", "cg", "cg001_a.png")); err != nil {
 		t.Fatalf("带 adlr 的条目应照常解出（adlr 只是校验和）：%v", err)
 	}
 	// 但要记下来提示「若解出的是乱码可选解密方案」。

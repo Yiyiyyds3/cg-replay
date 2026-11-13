@@ -125,12 +125,12 @@ func TestUnpackArtemisPFS(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dest, "scenario", "01_01.ast")); err != nil {
 		t.Fatalf("剧本没落盘：%v", err)
 	}
-	// 被引用的图落盘
-	if _, err := os.Stat(filepath.Join(dest, "image", "ev_cut_001_00")); err != nil {
+	// 被引用的图落盘：CG 按角色进入 cg/ 子目录
+	if _, err := os.Stat(filepath.Join(dest, "image", "cg", "ev_cut_001_00")); err != nil {
 		t.Fatalf("被引用的素材没落盘：%v", err)
 	}
 	// 未被引用的不该解出（最小集合的意义）
-	if _, err := os.Stat(filepath.Join(dest, "image", "unused.png")); err == nil {
+	if _, err := os.Stat(filepath.Join(dest, "image", "misc", "unused.png")); err == nil {
 		t.Fatal("未被引用的素材不该被解出")
 	}
 	// 约定文件
@@ -347,7 +347,7 @@ func TestUnpackSkipVideo(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ExtractWith(skip=%v): %v", skip, err)
 		}
-		movie := filepath.Join(dest, "raw", "data", "image", "op_demo.mpg")
+		movie := filepath.Join(dest, "raw", "data", "image", "movie", "op_demo.mpg")
 		_, statErr := os.Stat(movie)
 		if skip {
 			if statErr == nil {
@@ -452,7 +452,7 @@ func TestUnpackIncremental(t *testing.T) {
 	}
 
 	// 删掉一个文件 → 只补那一个
-	if err := os.Remove(filepath.Join(dest, "raw", "data", "image", "b.png")); err != nil {
+	if err := os.Remove(filepath.Join(dest, "raw", "data", "image", "misc", "b.png")); err != nil {
 		t.Fatal(err)
 	}
 	r3, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll})
@@ -508,7 +508,7 @@ func TestUnpackArchiveChanged(t *testing.T) {
 	if _, err := ExtractWith(xp3, dest, Options{Scope: ScopeAll}); err != nil {
 		t.Fatal(err)
 	}
-	asset := filepath.Join(dest, "raw", "data", "image", "a.png")
+	asset := filepath.Join(dest, "raw", "data", "image", "misc", "a.png")
 	if got, _ := os.ReadFile(asset); string(got) != "AAAA" {
 		t.Fatalf("首次内容应为 AAAA，实际 %q", got)
 	}
@@ -551,7 +551,7 @@ func TestExistingVideos(t *testing.T) {
 		t.Fatalf("应数出 1 个影片，实际 %d", got)
 	}
 	// 用户手动删掉 → 立刻反映为 0
-	vid := filepath.Join(dest, "raw", "data", "image", "op.mpg")
+	vid := filepath.Join(dest, "raw", "data", "image", "movie", "op.mpg")
 	if err := os.Remove(vid); err != nil {
 		t.Fatal(err)
 	}
