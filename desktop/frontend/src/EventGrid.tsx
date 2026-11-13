@@ -1,23 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Clock,
-  Database,
+  Eye,
   FolderOpen,
   Gamepad2,
   Loader2,
   PackageOpen,
-  PanelLeftClose,
-  PanelLeftOpen,
   Pencil,
-  Plus,
   RefreshCw,
   Search,
-  Settings,
   Ship,
   Star,
   Users,
+  X,
 } from "lucide-react";
 import { SettingsDialog } from "./SettingsDialog";
+import { WorkspaceShell, type ActivityId } from "@/shell/WorkspaceShell";
+import { WorkspaceSidebar } from "@/shell/WorkspaceSidebar";
 import {
   api,
   type CardItem,
@@ -51,11 +50,42 @@ const AUTOPRUNE_KEY = "ucgr.autoPruneRecent"; // 启动自动清理 72h 前最�
 const EXTRACT_VIDEO_KEY = "ucgr.extractVideo";
 const PRUNE_DAYS = 3; // 冷归档窗口（与 UI 文案一致）
 
-// M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
+// VSCode 工作区：左侧资源浏览器 + 主区标签页 + 卡片墙 / 回放。
+export type WorkspacePreview = {
+  kind: string;
+  id: string;
+  title: string;
+  note?: string;
+  video?: boolean;
+  cover: string | null;
+  gameTitle: string;
+};
+
 export default function EventGrid({
   onOpen,
+  bridge,
+  tabs,
+  activeTabId,
+  switching,
+  replay,
+  onSelectTab,
+  onCloseTab,
 }: {
   onOpen: (kind: string, id: string, title: string) => void;
+  bridge: string;
+  tabs: {
+    id: string;
+    title: string;
+    kind: "library" | "replay";
+    kindLabel?: string;
+    gameTitle?: string;
+    closable?: boolean;
+  }[];
+  activeTabId: string;
+  switching: boolean;
+  replay: ReactNode;
+  onSelectTab: (id: string) => void;
+  onCloseTab: (id: string) => void;
 }) {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [lib, setLib] = useState<LibraryDTO | null>(null);
@@ -141,6 +171,9 @@ export default function EventGrid({
     total: number;
   } | null>(null);
   const allBooted = useRef(false); // StrictMode 双挂载只加载一次
+  const [activity, setActivity] = useState<ActivityId>("library");
+  const [treeFilter, setTreeFilter] = useState("");
+  const [preview, setPreview] = useState<WorkspacePreview | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return window.localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -408,20 +441,37 @@ export default function EventGrid({
     }
   };
 
-  // 切到「全部」时加载一次（StrictMode 双挂载用 ref 防重入）。
+  // 切到「全部」/ 角色视图时加载一次（StrictMode 双挂载用 ref 防重入）。
   useEffect(() => {
-    if (tab !== "all" || allBooted.current) return;
+    const needsAll = tab === "all" || activity === "characters";
+    if (!needsAll || allBooted.current) return;
     allBooted.current = true;
     void loadAll();
-  }, [tab]);
+  }, [tab, activity]);
+
+  // 侧栏最近 / 收藏按需刷新，不强制触发全量索引。
+  useEffect(() => {
+    if (activity === "recent") {
+      void api
+        .catalogRecent(RECENT_LIMIT)
+        .then(setRecentItems)
+        .catch((e: any) =>
+          setAllWarnings((w) => [...w, `最近播放读取失败：${e?.message ?? String(e)}`]),
+        );
+    }
+    if (activity === "favorites") void refreshFavs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity]);
 
   // 跨游戏打开：先切到该游戏（后端 SetActiveGame 重扫/读库），再进回放。
+  // kind 为空表示来源（收藏）不带类型，按当前/目标游戏的库反查。
   const openFromGame = async (
     gameID: string,
     kind: string,
     id: string,
     title: string,
   ) => {
+    let resolvedKind = kind;
     if (gameID && gameID !== games?.active) {
       setBusy(true);
       try {
@@ -430,14 +480,17 @@ export default function EventGrid({
         setGames(gs);
         setLib(l);
         covers.current.clear();
+        if (!resolvedKind) resolvedKind = resolveKindInLibrary(l, id);
       } catch (e: any) {
         setStatus({ state: "error", message: e?.message ?? String(e) });
         return;
       } finally {
         setBusy(false);
       }
+    } else if (!resolvedKind) {
+      resolvedKind = resolveKindInLibrary(lib, id);
     }
-    onOpen(kind, id, title);
+    onOpen(resolvedKind, id, title);
   };
 
   // 封面按游戏路由（跨游戏卡片墙）；缺失回 null，不阻断卡片。
@@ -470,17 +523,6 @@ export default function EventGrid({
       /* 无持久化不影响使用 */
     }
   }, [collapsed]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        setCollapsed((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   // 添加游戏（同一目录重复添加 = 切换并重扫，后端保证不重复登记）。
   const pickAndAdd = async () => {
@@ -636,6 +678,12 @@ export default function EventGrid({
     }
   };
 
+  const selectActivity = (next: ActivityId) => {
+    setActivity(next);
+    setCollapsed(false);
+    if (next === "settings") setSettingsOpen(true);
+  };
+
   const cards: CardItem[] = useMemo(() => {
     if (!lib) return [];
     const query = q.trim().toLowerCase();
@@ -723,336 +771,316 @@ export default function EventGrid({
   const activeGame = gameList.find((g) => g.id === games?.active);
   const activeTitle = activeGame?.title ?? lib?.game ?? "CG 演出回放";
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <GameSidebar
-        games={gameList}
-        active={games?.active ?? ""}
-        busy={busy}
-        busyGame={busyGame}
-        collapsed={collapsed}
-        catalog={catalog}
-        favGames={favGames}
-        favEventCount={favItems.length}
-        onToggle={() => setCollapsed((v) => !v)}
-        onSelect={(id) => void switchGame(id)}
-        onAdd={() => void pickAndAdd()}
-        onUnpack={pickAndUnpack}
-        onToggleGameFav={(id) => void toggleGameFav(id)}
-      />
+  const currentTab = tabs.find((t) => t.id === activeTabId);
+  const eventTotal =
+    (lib?.cgs?.length ?? 0) + (lib?.scenes?.length ?? 0) + (lib?.chapters?.length ?? 0);
+  const libraryStatus = {
+    connected: bridge.length > 0,
+    bridge,
+    libraryName: activeTitle,
+    eventCount: eventTotal,
+    activeTitle: currentTab?.title ?? "事件库",
+  };
+  const activityCounts = {
+    library: gameList.length,
+    recent: recentItems.length,
+    favorites: favItems.length + favCharItems.length,
+    characters: speakers.length,
+  };
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* 顶栏：当前游戏 + 页签 + 搜索 + 刷新 */}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur lg:gap-3">
-          <div className="hidden min-w-0 max-w-[180px] shrink-0 lg:block">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-sm font-semibold">{activeTitle}</h1>
-              {gameList.length > 1 && (
-                <Badge variant="secondary" className="shrink-0 px-1.5 text-[10px]">
-                  {gameList.length} 库
-                </Badge>
-              )}
+  const libraryView = (
+    <div className="library-view">
+      <header className="library-toolbar">
+        <div className="library-breadcrumb" title={lib?.root}>
+          <Gamepad2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="truncate">{activeTitle}</span>
+          <span className="library-breadcrumb-sep">/</span>
+          <span className="truncate text-muted-foreground">事件库</span>
+          {gameList.length > 1 && (
+            <Badge variant="secondary" className="library-count-badge">
+              {gameList.length} 库
+            </Badge>
+          )}
+        </div>
+
+        <nav className="library-page-tabs" aria-label="事件类型">
+          {(
+            [
+              ["all", "全部", allEvents ? allEvents.length : null],
+              ["cg", "CG 鉴赏", lib?.cgs?.length ?? 0],
+              ["scene", "主线场景", lib?.scenes?.length ?? 0],
+              ["chapter", "演出段落", lib?.chapters?.length ?? 0],
+            ] as [Tab, string, number | null][]
+          ).map(([key, label, count]) => (
+            <button
+              type="button"
+              key={key}
+              onClick={() => setTab(key)}
+              className={"library-page-tab" + (tab === key ? " is-active" : "")}
+            >
+              {label}
+              {count != null && <span>{count}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <span className="library-toolbar-spacer" />
+
+        <div className="library-search">
+          <Search className="library-search-icon" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={tab === "all" ? "按游戏名 / 事件标题筛选…" : "搜索 cg17 / 标题…"}
+            className="library-search-input"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="library-toolbar-button"
+          title="重扫当前游戏"
+          onClick={() => void reload(true)}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </header>
+
+      {banner && <div className="editor-banner">{banner}</div>}
+      {tab !== "all" && allWarnings.length > 0 && (
+        <div className="editor-warning-list">
+          {allWarnings.map((w, i) => (
+            <div key={i} className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span className="min-w-0 break-words">{w}</span>
             </div>
-            <p className="truncate text-[10px] leading-tight text-muted-foreground" title={lib?.root}>
-              {lib?.root ?? "从左侧选择游戏库"}
-            </p>
-          </div>
-          <nav className="flex shrink-0 gap-1">
-            {(
-              [
-                ["all", `全部 ${allEvents ? allEvents.length : "·"}`],
-                ["cg", `CG鉴赏 ${lib?.cgs?.length ?? 0}`],
-                ["scene", `主线场景 ${lib?.scenes?.length ?? 0}`],
-                ["chapter", `演出段落 ${lib?.chapters?.length ?? 0}`],
-              ] as [Tab, string][]
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className={
-                  "rounded-md px-2.5 py-1.5 text-sm transition-colors " +
-                  (tab === k
-                    ? "bg-secondary font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="flex-1" />
-          <div className="relative shrink-0">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={tab === "all" ? "按游戏名 / 事件标题筛选…" : "搜索 cg17 / 标题…"}
-              className="h-9 w-32 rounded-md border border-input bg-input/40 pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring lg:w-44 xl:w-60"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0"
-            title="重扫当前游戏"
-            onClick={() => void reload(true)}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0"
-            title="设置"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        </header>
+          ))}
+        </div>
+      )}
 
-        {/* 错误横幅区：任何异常都常驻可见（对齐 FR-12） */}
-        {banner && (
-          <div className="shrink-0 bg-destructive px-5 py-1.5 text-sm">{banner}</div>
-        )}
-        {/* 非致命警告：CG/场景页也要可见（「全部」页有自己的警告区，避免重复） */}
-        {tab !== "all" && allWarnings.length > 0 && (
-          <div className="max-h-24 shrink-0 overflow-y-auto border-b border-amber-900/60 bg-amber-950/30 px-5 py-1.5 text-xs text-amber-200">
-            {allWarnings.map((w, i) => (
-              <div key={i} className="flex gap-2">
-                <span aria-hidden>•</span>
-                <span className="min-w-0 break-words">{w}</span>
+      {unpackPlan && (
+        <section className="editor-notice editor-notice-primary">
+          <div className="flex items-start gap-3">
+            <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="text-sm font-medium">
+                {unpackPlan.unsupported ? "这个路径没法自动解包" : "可以自动解包"}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* 解包预览（拖进来或选目录后：先看会解出什么，再确认） */}
-        {unpackPlan && (
-          <section className="rounded-md border border-primary/40 bg-primary/5 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="text-sm font-medium">
-                  {unpackPlan.unsupported ? "这个路径没法自动解包" : "可以自动解包"}
+              <div className="truncate text-[11px] text-muted-foreground" title={unpackPath}>
+                {unpackPath}
+              </div>
+              {!unpackPlan.unsupported && (
+                <div className="text-[11px] text-muted-foreground">
+                  引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
+                  预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
+                  {(unpackPlan.est_bytes ?? 0) > 0 &&
+                    ` · 预计占盘 ${(unpackPlan.est_bytes / 1048576).toFixed(0)} MB`}
+                  {unpackPlan.encrypted > 0 &&
+                    (unpackPlan.engine_id === "kirikiri"
+                      ? ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`
+                      : ` · ${unpackPlan.encrypted} 个条目带加密标记（当前不会自动解密）`)}
                 </div>
-                <div className="truncate text-[11px] text-muted-foreground" title={unpackPath}>
-                  {unpackPath}
-                </div>
-                {!unpackPlan.unsupported && (
-                  <div className="text-[11px] text-muted-foreground">
-                    引擎 {unpackPlan.engine_id || "?"} · 剧本 {unpackPlan.scenario_files} 个 ·
-                    预计 {unpackPlan.labels} 个事件 · 引用素材 {unpackPlan.refs} 个
-                    {(unpackPlan.est_bytes ?? 0) > 0 &&
-                      ` · 预计占盘 ${(unpackPlan.est_bytes / 1048576).toFixed(0)} MB`}
-                    {unpackPlan.encrypted > 0 &&
-                      (unpackPlan.engine_id === "kirikiri"
-                        ? ` · ${unpackPlan.encrypted} 个条目带 adlr 校验和（乱码时可选解密方案）`
-                        : ` · ${unpackPlan.encrypted} 个条目带加密标记（当前不会自动解密）`)}
-                  </div>
-                )}
-                {unpackPlan.kind === "archive" && unpackPlan.engine_id === "kirikiri" && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-                    <span className="text-muted-foreground">解密方案</span>
-                    <select
-                      value={unpackScheme}
-                      onChange={(e) => setUnpackScheme(e.target.value)}
-                      disabled={unpacking}
-                      aria-label="XP3 解密方案"
-                      className="h-7 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                    >
-                      <option value="">不解密（推荐先试）</option>
-                      <option value="hash">hash（adlr 派生）</option>
-                      <option value="natsupochi">natsupochi</option>
-                      <option value="poringsoft">poringsoft</option>
-                      <option value="sourire">sourire</option>
-                      <option value="haikuo">haikuo</option>
-                      <option value="xor">xor（固定密钥）</option>
-                    </select>
-                    {unpackScheme === "xor" && (
-                      <input
-                        value={unpackKey}
-                        onChange={(e) => setUnpackKey(e.target.value)}
-                        disabled={unpacking}
-                        aria-label="xor 固定密钥"
-                        placeholder="0-255 或 0x5A"
-                        className="h-7 w-28 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
-                      />
-                    )}
-                    <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
-                  </div>
-                )}
-                {!unpackPlan.unsupported && (unpackPlan.imported_videos ?? 0) > 0 && (
-                  <div
-                    className="pt-1 text-[11px]"
-                    title="以磁盘上的实际文件为准；重解不会删除已有影片，只补缺的。"
+              )}
+              {unpackPlan.kind === "archive" && unpackPlan.engine_id === "kirikiri" && (
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                  <span className="text-muted-foreground">解密方案</span>
+                  <select
+                    value={unpackScheme}
+                    onChange={(e) => setUnpackScheme(e.target.value)}
+                    disabled={unpacking}
+                    aria-label="XP3 解密方案"
+                    className="h-7 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                   >
-                    {(unpackPlan.imported_videos ?? 0) < unpackPlan.videos ? (
-                      <span className="text-amber-300">
-                        已有 {unpackPlan.imported_videos} / {unpackPlan.videos} 个影片 ·
-                        {extractVideo
-                          ? `重解会补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`
-                          : `当前设为跳过影片；勾选下方「提取 OP/ED 影片」后再重解可补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-400">
-                        影片已全部提取（{unpackPlan.imported_videos} 个）
-                      </span>
-                    )}
-                  </div>
-                )}
-                {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
-                  <div className="pt-1">
-                    <label
-                      className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
-                      title="关掉后影片事件不能播；已解包的游戏需重解才能补上。之后可在右上角 ⚙ 设置里改。"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={extractVideo}
-                        onChange={(e) => setExtractVideoPref(e.target.checked)}
-                        disabled={unpacking}
-                        className="h-3.5 w-3.5 accent-primary"
-                      />
-                      <span>
-                        {(unpackPlan.imported_videos ?? 0) > 0
-                          ? `补齐缺失的 OP/ED 影片（已有 ${unpackPlan.imported_videos} / 共 ${unpackPlan.videos} 个）`
-                          : `提取 OP/ED 影片（共 ${unpackPlan.videos} 个 · ${(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）`}
-                      </span>
-                    </label>
-                  </div>
-                )}
-                {askVideo && !unpackPlan.unsupported && (
-                  <div className="mt-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
-                    <div className="text-[11px] text-foreground">
-                      有 {unpackPlan.videos} 个影片（{(unpackPlan.video_bytes / 1048576).toFixed(0)} MB），一起提取？
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setExtractVideo(true); // 只影响本次；持久默认值在 ⚙ 设置里改
-                          void runUnpack(false, forceReextract);
-                        }}
-                        disabled={unpacking || busy}
-                      >
-                        一起提取（推荐）
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setExtractVideo(false); // 只影响本次；持久默认值在 ⚙ 设置里改
-                          void runUnpack(true, forceReextract);
-                        }}
-                        disabled={unpacking || busy}
-                      >
-                        跳过影片
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setAskVideo(false)} disabled={unpacking}>
-                        再想想
-                      </Button>
-                    </div>
-                    <div className="mt-1.5 text-[10px] text-muted-foreground">
-                      仅本次生效；默认值可在 ⚙ 设置里改
-                    </div>
-                  </div>
-                )}
-                {!unpackPlan.unsupported && unpackPlan.imported && (
+                    <option value="">不解密（推荐先试）</option>
+                    <option value="hash">hash（adlr 派生）</option>
+                    <option value="natsupochi">natsupochi</option>
+                    <option value="poringsoft">poringsoft</option>
+                    <option value="sourire">sourire</option>
+                    <option value="haikuo">haikuo</option>
+                    <option value="xor">xor（固定密钥）</option>
+                  </select>
+                  {unpackScheme === "xor" && (
+                    <input
+                      value={unpackKey}
+                      onChange={(e) => setUnpackKey(e.target.value)}
+                      disabled={unpacking}
+                      aria-label="xor 固定密钥"
+                      placeholder="0-255 或 0x5A"
+                      className="h-7 w-28 rounded-md border border-input bg-input/40 px-2 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
+                    />
+                  )}
+                  <span className="text-muted-foreground">先试不解密；解出乱码再换方案</span>
+                </div>
+              )}
+              {!unpackPlan.unsupported && (unpackPlan.imported_videos ?? 0) > 0 && (
+                <div
+                  className="pt-1 text-[11px]"
+                  title="以磁盘上的实际文件为准；重解不会删除已有影片，只补缺的。"
+                >
+                  {(unpackPlan.imported_videos ?? 0) < unpackPlan.videos ? (
+                    <span className="text-amber-300">
+                      已有 {unpackPlan.imported_videos} / {unpackPlan.videos} 个影片 ·
+                      {extractVideo
+                        ? `重解会补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`
+                        : `当前设为跳过影片；勾选下方「提取 OP/ED 影片」后再重解可补上差的 ${unpackPlan.videos - (unpackPlan.imported_videos ?? 0)} 个`}
+                    </span>
+                  ) : (
+                    <span className="text-emerald-400">
+                      影片已全部提取（{unpackPlan.imported_videos} 个）
+                    </span>
+                  )}
+                </div>
+              )}
+              {!unpackPlan.unsupported && unpackPlan.videos > 0 && (
+                <div className="pt-1">
                   <label
-                    className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground"
-                    title="默认只补缺失的文件；如果换了补丁但画面没变，勾这个全部重写一遍。"
+                    className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
+                    title="关掉后影片事件不能播；已解包的游戏需重解才能补上。之后可在活动栏设置里改。"
                   >
                     <input
                       type="checkbox"
-                      checked={forceReextract}
-                      onChange={(e) => setForceReextract(e.target.checked)}
+                      checked={extractVideo}
+                      onChange={(e) => setExtractVideoPref(e.target.checked)}
                       disabled={unpacking}
                       className="h-3.5 w-3.5 accent-primary"
                     />
-                    <span>强制重解（全部重写；默认只补缺失）</span>
+                    <span>
+                      {(unpackPlan.imported_videos ?? 0) > 0
+                        ? `补齐缺失的 OP/ED 影片（已有 ${unpackPlan.imported_videos} / 共 ${unpackPlan.videos} 个）`
+                        : `提取 OP/ED 影片（共 ${unpackPlan.videos} 个 · ${(unpackPlan.video_bytes / 1048576).toFixed(0)} MB）`}
+                    </span>
                   </label>
-                )}
-                {unpackPlan.unsupported && (
-                  <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
-                )}
-                {unpackPlan.notes.map((n, i) => (
-                  <div key={i} className="text-[11px] text-amber-300">
-                    {n}
+                </div>
+              )}
+              {askVideo && !unpackPlan.unsupported && (
+                <div className="mt-1 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                  <div className="text-[11px] text-foreground">
+                    有 {unpackPlan.videos} 个影片（{(unpackPlan.video_bytes / 1048576).toFixed(0)} MB），一起提取？
                   </div>
-                ))}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button variant="ghost" size="sm" onClick={() => void openLocalPath(unpackPath)}>
-                  打开位置
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setUnpackPlan(null)} disabled={unpacking}>
-                  取消
-                </Button>
-                {!unpackPlan.unsupported && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      // 默认提取 → 有影片（或还有缺的影片）就先问一次；
-                      // 用户已取消勾选则直接按跳过走。
-                      const allImported =
-                        (unpackPlan.imported_videos ?? 0) >= unpackPlan.videos;
-                      if (extractVideo && !allImported && unpackPlan.videos > 0 && !askVideo) {
-                        setAskVideo(true);
-                        return;
-                      }
-                      void runUnpack(!extractVideo, forceReextract);
-                    }}
-                    disabled={unpacking || busy}
-                  >
-                    {unpacking ? "解包中…" : "开始解包"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 已解包但事件库未接入：产物保留，给打开目录/手动退路（阶段 4） */}
-        {unpackResult && (
-          <section className="border-y border-amber-900/60 bg-amber-950/20 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="text-sm font-medium text-amber-200">
-                  已解包，但还不能进事件库
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  引擎 {unpackResult.engine_id || "?"} · 解出 {unpackResult.files} 个文件（
-                  {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个事件
-                  {unpackResult.missing.length ? ` · ${unpackResult.missing.length} 个素材没找到` : ""}
-                  {unpackResult.encrypted.length ? ` · ${unpackResult.encrypted.length} 个加密条目未解出` : ""}
-                </div>
-                <div className="truncate text-[11px] text-muted-foreground" title={unpackResult.dest}>
-                  {unpackResult.dest}
-                </div>
-                {unpackResult.reason && (
-                  <div className="text-[11px] text-amber-300">{unpackResult.reason}</div>
-                )}
-                {unpackResult.hint && (
-                  <div className="text-[11px] leading-relaxed text-muted-foreground">
-                    {unpackResult.hint}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setExtractVideo(true);
+                        void runUnpack(false, forceReextract);
+                      }}
+                      disabled={unpacking || busy}
+                    >
+                      一起提取（推荐）
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setExtractVideo(false);
+                        void runUnpack(true, forceReextract);
+                      }}
+                      disabled={unpacking || busy}
+                    >
+                      跳过影片
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAskVideo(false)} disabled={unpacking}>
+                      再想想
+                    </Button>
                   </div>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => void openLocalPath(unpackResult.dest)}>
-                  <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-                  打开目录
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setUnpackResult(null)}>
-                  关闭
-                </Button>
-              </div>
+                  <div className="mt-1.5 text-[10px] text-muted-foreground">
+                    仅本次生效；默认值可在活动栏设置里改
+                  </div>
+                </div>
+              )}
+              {!unpackPlan.unsupported && unpackPlan.imported && (
+                <label
+                  className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-muted-foreground"
+                  title="默认只补缺失的文件；如果换了补丁但画面没变，勾这个全部重写一遍。"
+                >
+                  <input
+                    type="checkbox"
+                    checked={forceReextract}
+                    onChange={(e) => setForceReextract(e.target.checked)}
+                    disabled={unpacking}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  <span>强制重解（全部重写；默认只补缺失）</span>
+                </label>
+              )}
+              {unpackPlan.unsupported && (
+                <div className="text-[11px] text-amber-300">{unpackPlan.reason}</div>
+              )}
+              {unpackPlan.notes.map((n, i) => (
+                <div key={i} className="text-[11px] text-amber-300">
+                  {n}
+                </div>
+              ))}
             </div>
-          </section>
-        )}
+            <div className="flex shrink-0 gap-2">
+              <Button variant="ghost" size="sm" onClick={() => void openLocalPath(unpackPath)}>
+                打开位置
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setUnpackPlan(null)} disabled={unpacking}>
+                取消
+              </Button>
+              {!unpackPlan.unsupported && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const allImported =
+                      (unpackPlan.imported_videos ?? 0) >= unpackPlan.videos;
+                    if (extractVideo && !allImported && unpackPlan.videos > 0 && !askVideo) {
+                      setAskVideo(true);
+                      return;
+                    }
+                    void runUnpack(!extractVideo, forceReextract);
+                  }}
+                  disabled={unpacking || busy}
+                >
+                  {unpacking ? "解包中…" : "开始解包"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
-        {/* 「全部」页签：跨游戏卡片墙 / 台词检索 / 最近播放 */}
+      {unpackResult && (
+        <section className="editor-notice editor-notice-warning">
+          <div className="flex items-start gap-3">
+            <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="text-sm font-medium text-amber-200">
+                已解包，但还不能进事件库
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                引擎 {unpackResult.engine_id || "?"} · 解出 {unpackResult.files} 个文件（
+                {(unpackResult.bytes / 1048576).toFixed(1)} MB）· 识别到 {unpackResult.events} 个事件
+                {unpackResult.missing.length ? ` · ${unpackResult.missing.length} 个素材没找到` : ""}
+                {unpackResult.encrypted.length ? ` · ${unpackResult.encrypted.length} 个加密条目未解出` : ""}
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground" title={unpackResult.dest}>
+                {unpackResult.dest}
+              </div>
+              {unpackResult.reason && (
+                <div className="text-[11px] text-amber-300">{unpackResult.reason}</div>
+              )}
+              {unpackResult.hint && (
+                <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  {unpackResult.hint}
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => void openLocalPath(unpackResult.dest)}>
+                <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                打开目录
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setUnpackResult(null)}>
+                关闭
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="library-main">
         {tab === "all" ? (
           <AllGames
             events={allEvents ?? []}
@@ -1075,6 +1103,7 @@ export default function EventGrid({
             busy={busy}
             onOpen={openFromGame}
             onCover={coverFor}
+            onPreview={setPreview}
             onToggleFav={toggleFav}
             onSaveFavMeta={saveFavMeta}
             onToggleCharFav={toggleCharFav}
@@ -1086,26 +1115,95 @@ export default function EventGrid({
             }}
           />
         ) : (
-          /* 卡片墙 */
-          <main className="grid flex-1 auto-rows-max content-start gap-4 overflow-y-auto p-5"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-            {cards.map((c) => (
-              <EventCard
-                key={`${lib?.root ?? ""}:${c.kind}:${c.id}`}
-                card={c}
-                gameID={games?.active ?? ""}
-                lookup={coverFor}
-                onClick={() => onOpen(c.kind, c.id, c.title)}
-              />
-            ))}
-            {cards.length === 0 && (
-              <div className="col-span-full py-24 text-center text-sm text-muted-foreground">
-                没有匹配的事件
-              </div>
-            )}
+          <main className="event-grid-scroll">
+            <div className="event-grid">
+              {cards.map((c) => (
+                <EventCard
+                  key={`${lib?.root ?? ""}:${c.kind}:${c.id}`}
+                  card={c}
+                  gameID={games?.active ?? ""}
+                  gameTitle={activeTitle}
+                  lookup={coverFor}
+                  onPreview={setPreview}
+                  onClick={() => onOpen(c.kind, c.id, c.title)}
+                />
+              ))}
+              {cards.length === 0 && (
+                <div className="event-grid-empty">没有匹配的事件</div>
+              )}
+            </div>
           </main>
         )}
       </div>
+
+      {preview && (
+        <PreviewPane preview={preview} onClose={() => setPreview(null)} />
+      )}
+    </div>
+  );
+
+  return (
+    <WorkspaceShell
+      libraryName={activeTitle}
+      libraryRoot={lib?.root}
+      connected={bridge.length > 0}
+      bridge={bridge}
+      sidebarCollapsed={collapsed}
+      onToggleSidebar={() => setCollapsed((v) => !v)}
+      activity={activity}
+      activityCounts={activityCounts}
+      onSelectActivity={selectActivity}
+      sidebar={
+        <WorkspaceSidebar
+          activity={activity}
+          games={gameList}
+          active={games?.active ?? ""}
+          busy={busy}
+          busyGame={busyGame}
+          catalog={catalog}
+          lib={lib}
+          tab={tab}
+          treeFilter={treeFilter}
+          onTreeFilter={setTreeFilter}
+          onTabChange={(next) => setTab(next)}
+          onSelectGame={(id) => void switchGame(id)}
+          onAddGame={() => void pickAndAdd()}
+          onUnpack={pickAndUnpack}
+          onToggleGameFav={(id) => void toggleGameFav(id)}
+          onOpenEvent={openFromGame}
+          recent={recentItems}
+          favItems={favItems}
+          favGames={favGames}
+          favChars={favChars}
+          favCharItems={favCharItems}
+          speakers={speakers}
+          extractVideo={extractVideo}
+          autoPrune={autoPrune}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onReload={() => void reload(true)}
+          onToggleFav={(gameID, kind, id) => void toggleFav(gameID, kind, id)}
+          onToggleCharFav={(gameID, name) => void toggleCharFav(gameID, name)}
+          onToggleSidebar={() => setCollapsed((v) => !v)}
+        />
+      }
+      tabs={tabs}
+      activeTabId={activeTabId}
+      onSelectTab={onSelectTab}
+      onCloseTab={onCloseTab}
+      status={libraryStatus}
+    >
+      {activeTabId === "library" ? (
+        libraryView
+      ) : (
+        <div className="replay-pane">{replay}</div>
+      )}
+
+      {switching && (
+        <div className="workspace-switching" role="status" aria-live="polite">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          正在切换回放会话…
+        </div>
+      )}
 
       <SettingsDialog
         open={settingsOpen}
@@ -1116,326 +1214,17 @@ export default function EventGrid({
         onToggleAutoPrune={() => void toggleAutoPrune()}
         onReset={resetSettings}
       />
-    </div>
+    </WorkspaceShell>
   );
 }
 
-// ---------- 左侧游戏栏（VS Code 侧栏风格） ----------
-
-function GameSidebar({
-  games,
-  active,
-  busy,
-  busyGame,
-  collapsed,
-  catalog,
-  favGames,
-  favEventCount,
-  onToggle,
-  onSelect,
-  onAdd,
-  onUnpack,
-  onToggleGameFav,
-}: {
-  games: GameDTO[];
-  active: string;
-  busy: boolean;
-  busyGame: string;
-  collapsed: boolean;
-  catalog: CatalogStatsDTO | null;
-  favGames: Set<string>;
-  favEventCount: number;
-  onToggle: () => void;
-  onSelect: (id: string) => void;
-  onAdd: () => void;
-  onUnpack: () => void;
-  onToggleGameFav: (id: string) => void;
-}) {
-  const [filter, setFilter] = useState("");
-  const q = filter.trim().toLowerCase();
-  const shown = games.filter(
-    (g) =>
-      !q ||
-      g.title.toLowerCase().includes(q) ||
-      g.root.toLowerCase().includes(q) ||
-      g.id.toLowerCase().includes(q),
-  );
-  const shownFav = shown.filter((g) => favGames.has(g.id));
-  const shownRest = shown.filter((g) => !favGames.has(g.id));
-
-  // 一行游戏：主点击区（选择/切换）+ 行尾星标（game 级收藏）。
-  // 星标是主 button 的兄弟节点——button 嵌 button 不合法。
-  const renderRow = (g: GameDTO) => {
-    const isActive = g.id === active;
-    const pending = busyGame === g.id;
-    const fav = favGames.has(g.id);
-    return (
-      <div
-        key={g.id}
-        className={cn(
-          "group relative flex items-center gap-1 rounded-md pr-1 transition-colors",
-          isActive
-            ? "bg-secondary text-foreground"
-            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-          busy && "cursor-not-allowed opacity-60",
-        )}
-      >
-        {isActive && (
-          <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-        )}
-        <button
-          onClick={() => onSelect(g.id)}
-          disabled={busy}
-          aria-current={isActive ? "page" : undefined}
-          title={`${g.title}\n${g.root}`}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-left"
-        >
-          <span
-            className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
-              isActive
-                ? "border-primary/40 bg-primary/15 text-primary"
-                : "border-border bg-background/40",
-            )}
-          >
-            <Gamepad2 className="h-4 w-4" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium">{g.title}</span>
-            <span className="block truncate text-[10px] text-muted-foreground">
-              {shortRoot(g.root)}
-            </span>
-          </span>
-        </button>
-        <button
-          onClick={() => onToggleGameFav(g.id)}
-          disabled={busy}
-          title={fav ? "取消收藏游戏" : "收藏游戏"}
-          className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-opacity",
-            fav
-              ? "text-amber-400 opacity-100"
-              : "text-muted-foreground/60 opacity-0 hover:text-amber-400 focus-visible:opacity-100 group-hover:opacity-100",
-            busy && "cursor-not-allowed opacity-50",
-          )}
-        >
-          <Star className={cn("h-3.5 w-3.5", fav && "fill-current")} />
-        </button>
-        {pending ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-        ) : isActive ? (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-        ) : null}
-      </div>
-    );
-  };
-
-  if (collapsed) {
-    return (
-      <aside className="flex h-full w-16 shrink-0 flex-col border-r border-border bg-card/30">
-        <div className="flex h-14 shrink-0 items-center justify-center border-b border-border">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
-            <Ship className="h-4 w-4" />
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-3">
-          {games.map((g) => {
-            const isActive = g.id === active;
-            const pending = busyGame === g.id;
-            return (
-              <button
-                key={g.id}
-                onClick={() => onSelect(g.id)}
-                disabled={busy}
-                aria-current={isActive ? "page" : undefined}
-                title={`${g.title}\n${g.root}`}
-                className={cn(
-                  "mx-auto flex h-9 w-9 items-center justify-center rounded-md border text-[11px] font-semibold transition-colors",
-                  isActive
-                    ? "border-primary/50 bg-primary/15 text-primary"
-                    : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
-                  busy && "cursor-not-allowed opacity-50",
-                )}
-              >
-                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : gameInitials(g.title)}
-              </button>
-            );
-          })}
-        </div>
-        <div className="space-y-1 border-t border-border p-2">
-          <div
-            title={catalogTitle(catalog)}
-            className="mx-auto flex h-8 w-9 items-center justify-center"
-          >
-            <Database
-              className={cn(
-                "h-4 w-4",
-                catalog?.error ? "text-amber-400" : "text-muted-foreground/70",
-              )}
-            />
-          </div>
-          <button
-            onClick={onAdd}
-            disabled={busy}
-            title="添加游戏"
-            className="mx-auto flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onToggle}
-            title="展开游戏栏 (Ctrl+B)"
-            className="mx-auto flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="flex h-full w-[240px] shrink-0 flex-col border-r border-border bg-card/30">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
-          <Ship className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[13px] font-semibold">CG 演出回放</div>
-          <div className="truncate text-[10px] text-muted-foreground">多游戏库</div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground"
-          title="收起游戏栏 (Ctrl+B)"
-          onClick={onToggle}
-        >
-          <PanelLeftClose className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between px-3 pb-1.5 pt-4">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          游戏库
-        </span>
-        <Badge variant="secondary" className="px-1.5 text-[10px]">
-          {games.length}
-        </Badge>
-      </div>
-
-      {games.length > 4 && (
-        <div className="px-2 pb-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="筛选游戏…"
-              className="h-8 w-full rounded-md border border-input bg-input/40 pl-7 pr-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-        {/* 收藏的游戏置顶（game 级收藏；星标在行尾，hover 显现/已收藏常驻） */}
-        {shownFav.length > 0 && (
-          <>
-            <div className="flex items-center justify-between px-1 pb-1 pt-1">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400/80">
-                收藏的游戏
-              </span>
-              <Badge variant="secondary" className="px-1.5 text-[10px]">
-                {shownFav.length}
-              </Badge>
-            </div>
-            {shownFav.map(renderRow)}
-          </>
-        )}
-        <div className="flex items-center justify-between px-1 pb-1 pt-1">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            游戏库
-          </span>
-          <Badge variant="secondary" className="px-1.5 text-[10px]">
-            {games.length}
-          </Badge>
-        </div>
-        {shownRest.map(renderRow)}
-        {shown.length === 0 && (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">
-            没有匹配的游戏
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-1 border-t border-border px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[10px]" title={catalogTitle(catalog)}>
-          <Database
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              catalog?.error ? "text-amber-400" : "text-primary/70",
-            )}
-          />
-          {catalog?.error ? (
-            <span className="truncate text-amber-400">索引失败</span>
-          ) : catalog ? (
-            <span className="truncate text-muted-foreground">
-              索引 {catalog.events} 事件 · {catalog.games} 库
-            </span>
-          ) : (
-            <span className="truncate text-muted-foreground">索引检查中…</span>
-          )}
-        </div>
-        <div
-          className="flex items-center gap-1.5 text-[10px]"
-          title={`收藏 ${favGames.size} 个游戏 / ${favEventCount} 个事件\n游戏星标在行尾；事件星标在「全部」页签卡片与回放页。`}
-        >
-          <Star className="h-3.5 w-3.5 shrink-0 text-amber-400/80" />
-          <span className="truncate text-muted-foreground">
-            收藏 {favGames.size} 游戏 · {favEventCount} 事件
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-1 border-t border-border p-2">
-        <Button
-          variant="ghost"
-          className="h-9 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={onAdd}
-          disabled={busy}
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          {busy ? "正在登记…" : "添加游戏"}
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-9 w-full justify-start gap-2 px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={onUnpack}
-          disabled={busy}
-          title="把 galgame 拖进窗口，或点这里选目录：自动解包并剪成「只够重演 CG 事件」的最小集合"
-        >
-          <PackageOpen className="h-4 w-4" />
-          导入游戏（自动解包）
-        </Button>
-      </div>
-    </aside>
-  );
-}
-
-/** 索引角标 tooltip：失败原因常驻可查，不静默。 */
-function catalogTitle(c: CatalogStatsDTO | null): string {
-  if (!c) return "中心库索引检查中…";
-  if (c.error) return `中心库索引失败：${c.error}`;
-  return `本地 SQLite 索引\n${c.games} 个游戏 / ${c.events} 个事件 / ${c.text_lines} 条台词\n只存可检索元数据，回放仍读原始素材。`;
-}
-
-/** 折叠态图标：中文取首字，拉丁字母取前两位。 */
-function gameInitials(title: string): string {
-  const t = (title ?? "").trim();
-  if (!t) return "?";
-  const chars = Array.from(t);
-  return /^[A-Za-z0-9]/.test(chars[0]) ? chars.slice(0, 2).join("").toUpperCase() : chars[0];
+/** 收藏行不带 kind：按当前游戏库反查事件类型（cg / scene / chapter）。 */
+function resolveKindInLibrary(lib: LibraryDTO | null, id: string): string {
+  if (!lib) return "cg";
+  if ((lib.cgs ?? []).some((e) => e.id === id)) return "cg";
+  if ((lib.scenes ?? []).some((e) => e.id === id)) return "scene";
+  if ((lib.chapters ?? []).some((e) => e.id === id)) return "chapter";
+  return "cg";
 }
 
 /** 侧栏副标题只显示盘符 + 父目录；标题本身通常就是游戏目录名，完整路径放 title。 */
@@ -1488,6 +1277,7 @@ function AllGames({
   busy,
   onOpen,
   onCover,
+  onPreview,
   onToggleFav,
   onSaveFavMeta,
   onToggleCharFav,
@@ -1514,6 +1304,7 @@ function AllGames({
   busy: boolean;
   onOpen: (gameID: string, kind: string, id: string, title: string) => void;
   onCover: (gameID: string, kind: string, id: string) => Promise<string | null>;
+  onPreview: (preview: WorkspacePreview) => void;
   onToggleFav: (gameID: string, kind: string, id: string) => void;
   onSaveFavMeta: (gameID: string, itemID: string, rating: number, note: string) => Promise<void>;
   onToggleCharFav: (gameID: string, name: string) => void;
@@ -1946,7 +1737,9 @@ function AllGames({
                         <EventCard
                           card={cardFor(e)}
                           gameID={e.game_id}
+                          gameTitle={g.game.game_title}
                           lookup={onCover}
+                          onPreview={onPreview}
                           onClick={() => onOpen(e.game_id, e.kind, e.id, e.title)}
                         />
                         {/* 星标是卡的兄弟节点（button 嵌 button 不合法）；默认隐显，
@@ -2145,20 +1938,27 @@ function FavMetaEditor({
   );
 }
 
-// ---------- 卡片 ----------
+// ---------- 卡片与悬浮预览 ----------
 function EventCard({
   card,
   gameID,
+  gameTitle,
   lookup,
+  onPreview,
   onClick,
 }: {
   card: CardItem;
   gameID: string;
+  gameTitle: string;
   lookup: (gameID: string, kind: string, id: string) => Promise<string | null>;
+  onPreview: (preview: WorkspacePreview) => void;
   onClick: () => void;
 }) {
   const [cover, setCover] = useState<string | null>(null);
   const [miss, setMiss] = useState(false); // 封面缺失：角标可见，不静默
+  const [hovered, setHovered] = useState(false);
+  const isVideo = card.kind === "scene" && "video" in card && !!card.video;
+
   useEffect(() => {
     let alive = true;
     void lookup(gameID, card.kind, card.id).then((u) => {
@@ -2171,42 +1971,125 @@ function EventCard({
     };
   }, [gameID, card.kind, card.id]);
 
+  const emitPreview = () => {
+    onPreview({
+      kind: card.kind,
+      id: card.id,
+      title: card.title,
+      note: card.note,
+      video: isVideo,
+      cover,
+      gameTitle,
+    });
+  };
+
+  // 封面异步加载完成时，若仍悬停/聚焦则刷新一次大图。
+  useEffect(() => {
+    if (hovered) emitPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cover, hovered]);
+
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="group relative overflow-hidden rounded-lg border border-border bg-card text-left transition-shadow hover:border-primary/60 hover:shadow-md"
+      onMouseEnter={() => {
+        setHovered(true);
+        emitPreview();
+      }}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => {
+        setHovered(true);
+        emitPreview();
+      }}
+      onBlur={() => setHovered(false)}
+      className="event-card group"
     >
-      <div className="relative aspect-[220/124] w-full overflow-hidden bg-secondary/60">
+      <div className="event-card-cover">
         {cover ? (
           <img src={cover} alt="" className="h-full w-full object-cover" draggable={false} />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-accent/40 text-muted-foreground/40">
+          <div className="event-card-placeholder">
             <Ship className="h-8 w-8" />
           </div>
         )}
-        {card.kind === "scene" && "video" in card && card.video && (
-          <span
-            className="absolute right-1.5 top-1.5 rounded border border-primary/50 bg-background/80 px-1 py-0.5 text-[10px] text-primary"
-            title="该事件是影片（OP/ED）"
-          >
+        <span className="event-card-hover-hint">
+          <Eye className="h-3.5 w-3.5" />
+          预览
+        </span>
+        {isVideo && (
+          <span className="event-card-video" title="该事件是影片（OP/ED）">
             ▶ 影片
           </span>
         )}
-        {miss && (
-          <span className="absolute left-1.5 top-1.5 rounded border border-amber-900 bg-amber-950/80 px-1 py-0.5 text-[10px] text-amber-400">
-            无封面
-          </span>
-        )}
+        {miss && <span className="event-card-missing">无封面</span>}
       </div>
-      <div className="space-y-1 px-3 py-2">
-        <div className="truncate text-xs text-muted-foreground">{card.id}</div>
-        <div className="truncate text-sm">{card.title}</div>
+      <div className="event-card-body">
+        <div className="event-card-id">{card.id}</div>
+        <div className="event-card-title">{card.title}</div>
         {card.note && (
-          <Badge variant="secondary" className="mt-0.5">
+          <Badge variant="secondary" className="mt-1">
             {card.note}
           </Badge>
         )}
       </div>
     </button>
+  );
+}
+
+const PREVIEW_KIND_LABEL: Record<string, string> = {
+  cg: "CG 鉴赏",
+  scene: "主线场景",
+  chapter: "演出段落",
+};
+
+function PreviewPane({
+  preview,
+  onClose,
+}: {
+  preview: WorkspacePreview;
+  onClose: () => void;
+}) {
+  return (
+    <aside className="preview-pane" aria-label="事件预览">
+      <div className="preview-pane-head">
+        <span className="preview-pane-title">
+          <Eye className="h-3.5 w-3.5" />
+          预览
+        </span>
+        <span className="preview-pane-kind">
+          {PREVIEW_KIND_LABEL[preview.kind] ?? preview.kind}
+        </span>
+        <button
+          type="button"
+          className="preview-pane-close"
+          onClick={onClose}
+          title="关闭预览"
+          aria-label="关闭预览"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="preview-pane-cover">
+        {preview.cover ? (
+          <img src={preview.cover} alt={preview.title} draggable={false} />
+        ) : (
+          <div className="preview-pane-placeholder">
+            <Ship className="h-10 w-10" />
+            <span>暂无封面</span>
+          </div>
+        )}
+        {preview.video && <span className="preview-pane-video">▶ 影片事件</span>}
+      </div>
+      <div className="preview-pane-body">
+        <div className="preview-pane-id">{preview.id}</div>
+        <h3 className="preview-pane-name">{preview.title}</h3>
+        <div className="preview-pane-meta">
+          <span>{preview.gameTitle}</span>
+          {preview.note && <Badge variant="secondary">{preview.note}</Badge>}
+        </div>
+        <p className="preview-pane-hint">点击卡片打开回放标签 · 悬停卡片可切换预览</p>
+      </div>
+    </aside>
   );
 }

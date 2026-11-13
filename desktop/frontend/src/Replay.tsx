@@ -235,6 +235,25 @@ export default function Replay({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      // 弹层打开时 Esc 归弹层（否则会顺手把回放标签一起关掉）。
+      if (
+        e.key === "Escape" &&
+        document.querySelector('[role="dialog"][aria-modal="true"]')
+      ) {
+        return;
+      }
+      // 焦点在输入类控件里时不抢按键（进度条方向键交给原生控件）。
+      const el = e.target as HTMLElement | null;
+      if (
+        e.key !== "Escape" &&
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
       switch (e.key) {
         case " ":
         case "Enter":
