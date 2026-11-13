@@ -35,6 +35,7 @@ import (
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
+	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"

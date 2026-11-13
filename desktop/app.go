@@ -10,8 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,9 +20,9 @@ import (
 	"ucgr/internal/adapter/rmmz"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/catalog"
+	"ucgr/internal/cover"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
-	"ucgr/internal/replay"
 )
 
 // gameConvention 取一个游戏的扫描约定：
@@ -379,7 +377,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	engineID, conv, cerr := resolveGameConvention(clean)
+	_, conv, cerr := resolveGameConvention(clean)
 	if cerr != nil {
 		return nil, cerr
 	}
@@ -511,9 +509,9 @@ func (a *App) Rescan() (*library.Library, error) {
 	return lib, nil
 }
 
-// GetCover CG 卡封面（懒加载 + 磁盘缓存 covers/<game>/<id>.png，返回 data URL 交给 <img>）。
-// 只用 Pages[0] 原图裁 55:31 比例，不做整段合成（网格打开要快）。
-// 场景/段落暂无封面（前端用占位渐变），M3 回放页复用本函数做抽帧封面。
+// GetCover 事件卡封面（懒加载 + 版本化磁盘缓存 covers/<game>/<kind>_<id>_v2.png，
+// 返回 data URL 交给 <img>）。CG/场景/段落共用内部 cover 包的时间轴采样：
+// 沿事件取 12 帧评分，避开入场黑幕；全黑才回退静态图并盖「无有效画面」角标。
 // 跨游戏视图（全部游戏卡片墙）用 GetCoverForGame 指定游戏。
 func (a *App) GetCover(kind, id string) (string, error) {
 	c, _ := a.loadConf()
@@ -545,38 +543,39 @@ func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, safeName(kind)+"_"+safeName(id)+".png")
-	if _, err := os.Stat(path); err != nil {
-		lib, err := a.loadOrScanLib(g)
-		if err != nil {
-			return "", err
-		}
-		load := replay.GameLoader(g.Root)
-		var rel string
-		switch kind {
-		case "cg":
-			cg := lib.FindCG(id)
-			switch {
-			case cg == nil:
-				return "", fmt.Errorf("找不到 CG 事件 %s", id)
-			case len(cg.Pages) > 0:
-				rel = cg.Pages[0]
-			case cg.Thumb != "":
-				rel = cg.Thumb
-			default:
-				return "", fmt.Errorf("CG 事件 %s 没有页面图", id)
-			}
-		default:
-			return "", fmt.Errorf("暂不支持 %s 封面", kind)
-		}
-		src, err := load(rel)
-		if err != nil {
-			return "", fmt.Errorf("封面图 %s 加载失败：%w", rel, err)
-		}
-		if err := saveRatioCrop(src, path, 440, 248); err != nil {
-			return "", err
-		}
+	path := coverCachePath(dir, kind, id)
+	if coverCacheUsable(path) {
+		return coverDataURL(path)
 	}
+
+	// 同一张封面只让一个调用生成：卡片墙并发请求时不重复跑采样。
+	unlock := lockCover(path)
+	defer unlock()
+	if coverCacheUsable(path) {
+		return coverDataURL(path)
+	}
+
+	lib, err := a.loadOrScanLib(g)
+	if err != nil {
+		return "", err
+	}
+	src, meta, err := a.buildCover(g, lib, kind, id)
+	if err != nil {
+		return "", err
+	}
+	final := cover.CropFit(src, coverW, coverH)
+	if !meta.Valid {
+		cover.StampFallback(final)
+	}
+	if err := saveCoverPNGAtomic(final, path); err != nil {
+		return "", err
+	}
+	// meta 写失败下次会重新生成；本次图片仍返回，不阻断卡片墙。
+	_ = writeCoverMeta(path, meta)
+	return coverDataURL(path)
+}
+
+func coverDataURL(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -625,34 +624,4 @@ func safeName(s string) string {
 		}
 		return r
 	}, s)
-}
-
-// saveRatioCrop 中心裁到 targetW:targetH 比例再缩放，PNG 落盘。
-func saveRatioCrop(src image.Image, path string, targetW, targetH int) error {
-	b := src.Bounds()
-	sw, sh := b.Dx(), b.Dy()
-	tr := float64(targetW) / float64(targetH)
-	sr := float64(sw) / float64(sh)
-	cw, chh := sw, sh
-	if sr > tr { // 太宽 → 裁两边
-		cw = int(tr*float64(sh) + 0.5)
-	} else { // 太高 → 裁上下
-		chh = int(float64(sw)/tr + 0.5)
-	}
-	ox, oy := (sw-cw)/2, (sh-chh)/2
-
-	out := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
-	for y := 0; y < targetH; y++ {
-		sy := oy + y*chh/targetH
-		for x := 0; x < targetW; x++ {
-			newOut := src.At(b.Min.X+ox+x*cw/targetW, b.Min.Y+sy)
-			out.Set(x, y, newOut)
-		}
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return png.Encode(f, out)
 }
