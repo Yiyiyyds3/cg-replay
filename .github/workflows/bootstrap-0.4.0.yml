@@ -1,0 +1,89 @@
+# bootstrap-0.4.0.yml —— 在没有本机 gh/PAT 的环境里，用 GitHub Actions 自带的
+# GITHUB_TOKEN 把 0.4.0 的 milestone / labels / 4 个 issue 建起来。
+#
+# 触发：push 本文件到 main，或在 Actions 页手动 workflow_dispatch。
+# 幂等：先查再建；重复运行不会产生重复 issue。
+# 权限：只申请 issues: write（GITHUB_TOKEN 默认无权建 Project v2，看板留给有 PAT 时补）。
+name: bootstrap-0.4.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-0.4.0.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create milestone, labels and issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # ---------- milestone ----------
+          MS=$(gh api "repos/$REPO/milestones?state=all&per_page=100" \
+               --jq '.[] | select(.title=="0.4.0") | .number' | head -n1 || true)
+          if [ -z "${MS:-}" ]; then
+            MS=$(gh api "repos/$REPO/milestones" \
+                 -f title='0.4.0' \
+                 -f state='open' \
+                 -f description='解包分类/黑帧、封面黑屏、点击互动与文本/音频、VSCode 风格 UI' \
+                 --jq '.number')
+          fi
+          echo "milestone 0.4.0 = #$MS"
+
+          # ---------- labels ----------
+          ensure_label() {
+            name="$1"; color="$2"; desc="$3"
+            if gh label list -R "$REPO" --limit 200 --json name --jq '.[].name' | grep -qx "$name"; then
+              echo "label $name exists"
+            else
+              gh label create "$name" -R "$REPO" --color "$color" --description "$desc"
+            fi
+          }
+          ensure_label "bug" "d73a4a" "Something isn't working"
+          ensure_label "enhancement" "a2eeef" "New feature or request"
+          ensure_label "design" "5319e7" "UI / UX design"
+
+          # ---------- issues ----------
+          create_issue() {
+            title="$1"; body="$2"; labels="$3"
+            n=$(gh issue list -R "$REPO" --state all --search "$title in:title" \
+                --json number --jq '.[0].number' 2>/dev/null || true)
+            if [ -n "${n:-}" ]; then
+              echo "issue exists: #$n $title"
+              return
+            fi
+            gh issue create -R "$REPO" --title "$title" --body "$body" \
+              --label "$labels" --milestone "$MS"
+          }
+
+          create_issue \
+            "[Bug] 解包后 CG 分类错位与纯黑界面误判" \
+            $'## 背景\n解包把 CG / 背景 / 立绘 / UI 全部平铺到 `raw/data/image/`，同名互相覆盖，事件库与封面因此把背景当 CG；纯黑帧（入场淡入、转场黑幕）曾被当成有效画面。\n\n## 验收\n- [ ] 解包产物按 `cg/`、`bg/`、`stand/`、`movie/`、`ui/` 分目录，同名不覆盖\n- [ ] 旧平铺目录与旧事件库仍能加载（子目录回退）\n- [ ] 纯黑判定走多帧采样；单帧/两帧黑为 Inconclusive，不触发交互或会话拒绝\n- [ ] 单测覆盖分类、同名、黑帧边界\n\n## 实现\n- commit `c0fb138` / merge `e5ec406`\n- 关键：`internal/asset/role.go`、`internal/replay/visibility.go`、`internal/vision/frame.go`\n\n## 验证\n`go test ./internal/asset ./internal/replay ./internal/unpack ./internal/vision` 全绿。' \
+            "bug"
+
+          create_issue \
+            "[Bug] CG 预览图截取显示入场黑屏" \
+            $'## 背景\n封面直接取 `Pages[0]` / `Thumb` 或台本最大 `layer_show`，遇到入场黑幕就是一张纯黑卡片。\n\n## 验收\n- [ ] 沿时间轴 8~16 点采样，按非黑比例/颜色方差/边缘密度评分选最佳帧\n- [ ] 全黑才回退首图/最大层，并标记「无有效画面」\n- [ ] 缓存版本失效旧黑图\n- [ ] 单测覆盖黑帧→彩色帧、全黑回退、评分边界\n\n## 实现\n- commit `4634636` / merge `d363737`\n- 关键：`internal/cover/cover.go`、`desktop/cover.go`\n\n## 验证\n`go test ./internal/cover` 与 desktop 包全绿；真实语料 96 张 CG 卡片截图封面均为有效画面（`docs/assets/0.4.0-ui-cards.png`）。' \
+            "bug"
+
+          create_issue \
+            "[Feature] 回放点击互动与文本/音频" \
+            $'## 背景\n回放只能看控制条按钮推进；CG 鉴赏台本只有图片，没有台词与语音。\n\n## 验收\n- [ ] 鼠标点击舞台触发一次推进（按钮/进度条/抽屉不误触）\n- [ ] 双击全屏；拖动不触发推进\n- [ ] CG 剧情模式优先关联主线场景，带台词与语音；无数据时如实提示\n- [ ] 暂停/等待态点击也生效\n- [ ] 后端单测 + 前端 `npm run build` 通过\n\n## 实现\n- commit `175073a` / merge `9726989`\n- 关键：`desktop/cgstory.go`、`desktop/replay.go`、`desktop/frontend/src/Replay.tsx`\n\n## 验证\n`desktop` 包单测覆盖 InputClick 推进、剧情构建回退、Voice/Text 透传；前端构建 1647 modules 通过。' \
+            "enhancement"
+
+          create_issue \
+            "[Design] 工作区与导航栏 VSCode 风格重构" \
+            $'## 背景\n原界面是单页卡片墙 + 整页回放，缺少编辑器式的工作区与导航。\n\n## 验收\n- [ ] 标题栏 + 活动栏 + 侧栏 + 编辑器标签页 + 状态栏\n- [ ] VSCode 深色色板（#1e1e1e/#252526/#007acc 等）\n- [ ] 保留卡片墙/页签/搜索/收藏/最近/角色/解包/设置全部功能\n- [ ] 回放作为主区标签页，侧栏可折叠、窄窗自适应\n- [ ] `npm run build` 零 TS 错误\n\n## 实现\n- commit `614680b` / merge `96eecdc`\n- 关键：`desktop/frontend/src/shell/WorkspaceShell.tsx`、`WorkspaceSidebar.tsx`、`App.tsx`、`index.css`\n\n## 验证\n前端构建通过；真实窗口截图 `docs/assets/0.4.0-ui.png`、`docs/assets/0.4.0-ui-cards.png`。' \
+            "design"
+
+          echo "done"
