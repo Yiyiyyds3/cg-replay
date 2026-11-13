@@ -35,6 +35,7 @@ import (
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
+	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
@@ -60,6 +61,20 @@ type replaySession struct {
 	kind  string // cg / scene / chapter
 	id    string
 	title string
+	// gameID 会话所属游戏（SessionMeta 回传前端做收藏/跨游戏定位）。
+	gameID string
+
+	// mode 当前模式（story / gallery，非 CG 为空）。
+	// galleryEv/storyEv 同时留在内存里：前端「剧情 / 鉴赏」切换只换播放器，
+	// 不重新解析剧本；dialogue 是给前端的台词数据（含「无台词」的如实说明）。
+	mode      string
+	galleryEv *ir.Event
+	storyEv   *ir.Event
+	dialogue  *DialogueDTO
+
+	// voiceRef/voiceAt 最近一次语音 op（frameLocked 透传给前端做状态指示）。
+	voiceRef string
+	voiceAt  int64
 
 	// sw/sh 本会话的渲染画布（= 事件声明的原生舞台；素材按原生坐标合成，
 	// 画布尺寸必须匹配，否则素材会挤在左上角）。
@@ -114,6 +129,23 @@ type SessionMeta struct {
 	DurationMs int64  `json:"duration_ms"`
 	// Spine 非空：前端用 WebGL canvas 渲染骨骼动画（Go 侧不编码 JPEG）。
 	Spine *SpineDTO `json:"spine,omitempty"`
+	// Mode 当前回放模式：story（剧情：主线演出，带台词/语音）/ gallery（鉴赏：纯图 CG）。
+	// 非 CG 事件为空串。Modes 列出可切换的模式，>=2 时前端显示「剧情 / 鉴赏」。
+	Mode  string   `json:"mode,omitempty"`
+	Modes []string `json:"modes,omitempty"`
+	// Dialogue CG 的台词数据（可用性 + 条数 + 无数据原因）。非 CG 事件为 nil。
+	Dialogue *DialogueDTO `json:"dialogue,omitempty"`
+}
+
+// VoiceDTO 帧级语音状态。
+//
+// player 只把 voice_play 派给音频层，音频层不回报播放进度（voice.go 也不含时长查询），
+// 所以这里给「最近一次触发的语音 + 触发时的演出时刻」，前端只当作「这句有语音」的
+// 指示，不谎报播放进度与剩余时长。
+type VoiceDTO struct {
+	Ref     string `json:"ref"`
+	SinceMs int64  `json:"since_ms"`
+	Muted   bool   `json:"muted"`
 }
 
 // FrameDTO 一帧的前端所需全集。
@@ -133,6 +165,8 @@ type FrameDTO struct {
 	Layers  []LayerDTO `json:"layers"`
 	Texts   []BoxDTO   `json:"texts"`
 	Cached  bool       `json:"cached"`
+	// Voice 最近触发的语音（nil = 本会话还没有语音）。
+	Voice *VoiceDTO `json:"voice,omitempty"`
 }
 
 // LayerDTO 调试抽屉 D 的图层一览。
@@ -154,18 +188,25 @@ type rgbaDTO struct {
 
 // BoxDTO 前端文本覆盖层（几何由后端给，前端照抄定位；框图缺席时可用底色兜底）。
 type BoxDTO struct {
-	Layer        string    `json:"layer"`
-	X            float64   `json:"x"`
-	Y            float64   `json:"y"`
-	W            float64   `json:"w"`
-	H            float64   `json:"h"`
-	HasGeom      bool      `json:"has_geom"`
-	Visible      bool      `json:"visible"`
-	FrameColor   rgbaDTO   `json:"frame_color"`
-	FrameOpacity uint8     `json:"frame_opacity"`
-	FontSize     float64   `json:"font_size"`
-	LineSpacing  float64   `json:"line_spacing"`
-	Lines        []LineDTO `json:"lines"`
+	Layer        string  `json:"layer"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	W            float64 `json:"w"`
+	H            float64 `json:"h"`
+	HasGeom      bool    `json:"has_geom"`
+	Visible      bool    `json:"visible"`
+	FrameColor   rgbaDTO `json:"frame_color"`
+	FrameOpacity uint8   `json:"frame_opacity"`
+	FontSize     float64 `json:"font_size"`
+	LineSpacing  float64 `json:"line_spacing"`
+	// 内边距与框图名：前端按原生舞台坐标排版台词（文本框底色/框图已由
+	// Go 侧 RenderFrame 画进 JPEG，前端只负责写字，不能重复画底）。
+	MarginL float64   `json:"margin_l"`
+	MarginT float64   `json:"margin_t"`
+	MarginR float64   `json:"margin_r"`
+	MarginB float64   `json:"margin_b"`
+	Frame   string    `json:"frame,omitempty"`
+	Lines   []LineDTO `json:"lines"`
 }
 
 type LineDTO struct {
@@ -360,6 +401,19 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	if err != nil {
 		return SessionMeta{}, fmt.Errorf("构建台本失败：%w", err)
 	}
+	// CG：先按画廊台本构建，再尝试换成「剧情模式」（主线章节，带台词/语音）。
+	// 换不动就原样留在鉴赏模式，Dialogue 里写明「该 CG 无台词数据」。
+	var galleryEv, storyEv *ir.Event
+	var dialogue *DialogueDTO
+	if kind == "cg" {
+		galleryEv = ev
+		if e := lib.FindCG(id); e != nil {
+			ev, dialogue = applyCGStory(ev, root, lib, e)
+			if ev != galleryEv {
+				storyEv = ev
+			}
+		}
+	}
 	if len(ev.Show) == 0 {
 		return SessionMeta{}, fmt.Errorf("%s 没有可回放的演出（台本 0 条）", title)
 	}
@@ -375,18 +429,29 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	}
 
 	s := &replaySession{
-		root:    root,
-		kind:    kind,
-		id:      id,
-		title:   title,
-		sw:      sw,
-		sh:      sh,
-		ev:      ev,
-		opts:    player.DefaultOptions(),
-		auto:    a.confAuto(),
-		playing: true,
-		missing: map[string]string{},
-		spine:   spine,
+		root:      root,
+		kind:      kind,
+		id:        id,
+		title:     title,
+		gameID:    g.ID,
+		sw:        sw,
+		sh:        sh,
+		ev:        ev,
+		galleryEv: galleryEv,
+		storyEv:   storyEv,
+		dialogue:  dialogue,
+		opts:      player.DefaultOptions(),
+		auto:      a.confAuto(),
+		playing:   true,
+		missing:   map[string]string{},
+		spine:     spine,
+	}
+	if kind == "cg" {
+		if storyEv != nil {
+			s.mode = "story"
+		} else {
+			s.mode = "gallery" // 回退纯图也是明确的鉴赏模式（前端不显示空模式）
+		}
 	}
 	s.opts.FontSize = 48
 	// 影片时长：台本里通常不写，靠 ffprobe 查；失败原因交给播放器写进诊断。
@@ -402,7 +467,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {
 		s.audio = sys
-		s.p.Audio = sys.Handle
+		s.p.Audio = s.audioHandle(sys.Handle)
 	}
 	s.p.Advance(0, player.Input{}) // 先把 t=0 的台本指令执行掉（同 play()）
 	s.lastTick = time.Now()
@@ -431,18 +496,85 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		a.logAuxError("catalog recent", rerr)
 	}
 
-	return SessionMeta{
-		Kind:       kind,
-		ID:         id,
-		Title:      title,
-		GameID:     g.ID,
-		StageW:     sw,
-		StageH:     sh,
-		OpCount:    len(ev.Show),
-		TextCount:  len(ev.Texts),
+	return s.metaLocked(), nil
+}
+
+// metaLocked 组装会话元信息（会话未共享时或持有 s.mu 时调用）。
+func (s *replaySession) metaLocked() SessionMeta {
+	meta := SessionMeta{
+		Kind:       s.kind,
+		ID:         s.id,
+		Title:      s.title,
+		GameID:     s.gameID,
+		StageW:     s.sw,
+		StageH:     s.sh,
+		OpCount:    len(s.ev.Show),
+		TextCount:  countShowOps(s.ev, ir.ShowTextRun),
 		DurationMs: s.durMs,
+		Mode:       s.mode,
+		Dialogue:   s.dialogue,
 		Spine:      s.spine,
-	}, nil
+	}
+	if s.kind == "cg" {
+		if s.storyEv != nil {
+			meta.Modes = []string{"story", "gallery"}
+		} else {
+			meta.Modes = []string{"gallery"}
+		}
+	}
+	return meta
+}
+
+// audioHandle 在系统音频回调外面包一层，记下「最近触发的语音」。
+// 只做记录，不改播放语义（BGM/SE/语音仍然原样交给底层 handle）。
+func (s *replaySession) audioHandle(handle func(ir.ShowOp)) func(ir.ShowOp) {
+	return func(op ir.ShowOp) {
+		if op.Kind == ir.ShowVoicePlay {
+			s.voiceRef = op.Ref
+			if s.p != nil {
+				s.voiceAt = s.p.Now()
+			}
+		}
+		if handle != nil {
+			handle(op)
+		}
+	}
+}
+
+// resetTimelineLocked 按当前 s.ev 重建播放器（剧情/鉴赏切换用）。
+//
+// 保留音频挂接（BGM 不断），清掉画面签名/缺素材记账/帧快照，
+// 时长按新台本重算——两个模式的时长刻度本来就不一样。
+func (s *replaySession) resetTimelineLocked() {
+	p := player.New(s.ev, s.opts)
+	if s.p != nil {
+		p.Audio = s.p.Audio
+	} else if s.audio != nil {
+		p.Audio = s.audioHandle(s.audio.Handle)
+	}
+	p.Advance(0, player.Input{})
+	s.p = p
+	s.closeVideo()
+	s.input = player.Input{}
+	s.missing = map[string]string{}
+	s.lastSig, s.lastJPEG, s.lastDrawn = "", "", nil
+	s.lastEnc = time.Time{}
+	s.lastTick = time.Now()
+	s.waited, s.waitedAt = false, time.Time{}
+	s.voiceRef, s.voiceAt = "", 0
+	s.durMs = 0
+	for _, op := range s.ev.Show {
+		if op.TMs > s.durMs {
+			s.durMs = op.TMs
+		}
+	}
+	if s.ev.EndMs > s.durMs {
+		s.durMs = s.ev.EndMs
+	}
+	s.snapMu.Lock()
+	s.snapOK = false
+	s.snapLast = FrameDTO{}
+	s.snapMu.Unlock()
 }
 
 // closeSessionLocked 关掉当前会话（调方必须持有 a.sessMu）。
@@ -537,6 +669,9 @@ func (s *replaySession) frameLocked() FrameDTO {
 		Texts:   boxDTOs(f),
 	}
 	dto.Cached = sig == s.lastSig
+	if s.voiceRef != "" {
+		dto.Voice = &VoiceDTO{Ref: s.voiceRef, SinceMs: s.voiceAt, Muted: s.muted}
+	}
 	// Spine 会话没有 Go 侧画面：不编码 JPEG，前端 canvas 按 Now 自己出帧。
 	// 仍然更新快照，s.mu 忙时 GetFrame 能拿到最新的时间与播放状态。
 	if s.spine != nil {
@@ -640,6 +775,11 @@ func boxDTOs(f player.Frame) []BoxDTO {
 			FrameOpacity: t.FrameOpacity,
 			FontSize:     t.FontSize,
 			LineSpacing:  t.LineSpacing,
+			MarginL:      t.MarginL,
+			MarginT:      t.MarginT,
+			MarginR:      t.MarginR,
+			MarginB:      t.MarginB,
+			Frame:        t.Frame,
 		}
 		for _, ln := range t.Lines {
 			b.Lines = append(b.Lines, LineDTO{Speaker: ln.Speaker, Text: ln.Text})
@@ -739,6 +879,11 @@ func (a *App) TogglePlay() (bool, error) {
 }
 
 // InputClick 注入一次点击推进（对齐 CLI「空格/回车」）。
+//
+// 暂停态也生效：点击推进是「过掉当前点击点」，与自动播放开关无关
+// （frameLocked 里 `playing || in.Advance` 才会调 p.Advance）。
+// 只对 text 点击点有效；停在 [wait]/影片/转场这类时间阻塞点时点击不越过
+// （与原作一致，硬跳时间轴请用 SeekTo）。
 func (a *App) InputClick() error {
 	if a.sess == nil {
 		return fmt.Errorf("没有活动会话")
@@ -746,8 +891,43 @@ func (a *App) InputClick() error {
 	s := a.sess
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.p == nil {
+		return fmt.Errorf("会话已关闭")
+	}
 	s.input.Advance = true
+	// 手动推进要立刻结算：把等待计时起点更新到现在，避免自动推进
+	// 在点击后马上又补一次（两连跳）。
+	s.waitedAt = time.Now()
 	return nil
+}
+
+// SetReplayMode 切 CG 的回放模式：story（剧情演出，带台词/语音）/ gallery（纯图鉴赏）。
+//
+// 两个台本都在开会话时构建好，切换只重建播放器（保留音频挂接与播放开关），
+// 不做第二次剧本解析。返回切换后的 SessionMeta（时长/op 数/台词数据都会变）。
+func (a *App) SetReplayMode(mode string) (SessionMeta, error) {
+	if a.sess == nil {
+		return SessionMeta{}, fmt.Errorf("没有活动会话")
+	}
+	s := a.sess
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "story":
+		if s.storyEv == nil {
+			return SessionMeta{}, fmt.Errorf("该事件没有剧情演出数据（只有纯图 CG）")
+		}
+		s.ev, s.mode = s.storyEv, "story"
+	case "gallery":
+		if s.galleryEv == nil {
+			return SessionMeta{}, fmt.Errorf("该事件不是 CG 鉴赏条目，没有鉴赏模式")
+		}
+		s.ev, s.mode = s.galleryEv, "gallery"
+	default:
+		return SessionMeta{}, fmt.Errorf("未知回放模式 %q（可选 story / gallery）", mode)
+	}
+	s.resetTimelineLocked()
+	return s.metaLocked(), nil
 }
 
 // ToggleAuto 切自动推进（与 CLI M 键同语义，写回 conf.Auto）。

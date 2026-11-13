@@ -134,6 +134,10 @@ export function SetMuted(arg1) {
   return window['go']['main']['App']['SetMuted'](arg1);
 }
 
+export function SetReplayMode(arg1) {
+  return window['go']['main']['App']['SetReplayMode'](arg1);
+}
+
 export function SetRoot(arg1) {
   return window['go']['main']['App']['SetRoot'](arg1);
 }
