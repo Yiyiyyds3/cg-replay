@@ -1,4 +1,4 @@
-﻿// 回放页（方案 B M3）：舞台 + 控制条 + 调试抽屉 D。
+// 回放页（方案 B M3）：舞台 + 控制条 + 调试抽屉 D。
 // 数据流：60ms 轮询 api.getFrame()（Go 端墙钟推进 + 画面指纹缓存），
 // jpeg 非空才写 <img>.src。缺素材红横幅常驻（FR-12 不静默）。
 // 快捷键：Space/Enter 点击推进，D 调试抽屉，F 截图，Esc 返回，
@@ -137,6 +137,25 @@ export default function Replay({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      // 弹层打开时 Esc 归弹层（否则会顺手把回放标签一起关掉）。
+      if (
+        e.key === "Escape" &&
+        document.querySelector('[role="dialog"][aria-modal="true"]')
+      ) {
+        return;
+      }
+      // 焦点在输入类控件里时不抢按键（进度条方向键交给原生控件）。
+      const el = e.target as HTMLElement | null;
+      if (
+        e.key !== "Escape" &&
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
       switch (e.key) {
         case " ":
         case "Enter":
