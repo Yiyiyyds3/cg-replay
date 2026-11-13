@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/asset"
 )
 
 // archiveParseError 带上「是哪个归档解析失败」，供上层按真实文件嗅探格式。
@@ -72,8 +73,10 @@ type archiveSet struct {
 	closers []func() error
 
 	// 名字索引只建一次：lookup 原来每次调用都重建，条目上万时是 O(n²)。
-	byBase map[string]archiveEntry // 文件名（小写，含扩展名）→ 条目
-	byStem map[string]archiveEntry // 去扩展名的文件名（小写）→ 条目
+	// 同名条目保留全部候选：脚本可能只给裸名，必须按引用里的目录/角色提示
+	// 选对，不能按 map 顺序随便拿一个（否则背景图会顶掉同名 CG）。
+	byBase map[string][]archiveEntry // 文件名（小写，含扩展名）→ 条目
+	byStem map[string][]archiveEntry // 去扩展名的文件名（小写）→ 条目
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
@@ -238,9 +241,10 @@ func (s *archiveSet) read(e archiveEntry) ([]byte, error) {
 // nameIndex 按文件名与「无扩展名」各建一份索引——演出脚本里的 storage 名
 // 常常不带扩展名，两份索引都要有才找得到。
 //
-// 索引只建一次（lookup 会被引用集反复调用）。同名条目按路径排序取第一个，
-// 保证跨归档同名时的选择是确定的（map 迭代顺序随机，会让「解出哪份」飘）。
-func (s *archiveSet) nameIndex() (map[string]archiveEntry, map[string]archiveEntry) {
+// 索引只建一次（lookup 会被引用集反复调用）。同名条目全部保留，按路径
+// 排序后用 lookup 的角色/目录评分选最佳候选，保证结果确定且不把背景图
+// 当成同名 CG。
+func (s *archiveSet) nameIndex() (map[string][]archiveEntry, map[string][]archiveEntry) {
 	if s.byBase != nil {
 		return s.byBase, s.byStem
 	}
@@ -249,33 +253,61 @@ func (s *archiveSet) nameIndex() (map[string]archiveEntry, map[string]archiveEnt
 		paths = append(paths, p)
 	}
 	sort.Strings(paths)
-	s.byBase = map[string]archiveEntry{}
-	s.byStem = map[string]archiveEntry{}
+	s.byBase = map[string][]archiveEntry{}
+	s.byStem = map[string][]archiveEntry{}
 	for _, p := range paths {
 		e := s.entries[p]
 		lb := strings.ToLower(e.base())
-		if _, ok := s.byBase[lb]; !ok {
-			s.byBase[lb] = e
-		}
+		s.byBase[lb] = append(s.byBase[lb], e)
 		ls := strings.ToLower(e.stem())
-		if _, ok := s.byStem[ls]; !ok {
-			s.byStem[ls] = e
-		}
+		s.byStem[ls] = append(s.byStem[ls], e)
 	}
 	return s.byBase, s.byStem
 }
 
-// lookup 按引用名找条目：先按完整文件名，再按去扩展名的名字。
+// lookup 按引用名找条目：先按完整文件名，再按去扩展名的名字；同名候选
+// 按「引用里的目录提示 + 角色一致 + 路径后缀」评分，分数相同时路径序靠前。
 func (s *archiveSet) lookup(ref string) (archiveEntry, bool) {
 	byBase, byStem := s.nameIndex()
 	ref = strings.TrimSpace(ref)
 	lb := strings.ToLower(filepath.Base(filepath.FromSlash(ref)))
-	if e, ok := byBase[lb]; ok {
-		return e, true
-	}
 	ls := strings.TrimSuffix(lb, filepath.Ext(lb))
-	if e, ok := byStem[ls]; ok {
-		return e, true
+	var cands []archiveEntry
+	cands = append(cands, byBase[lb]...)
+	cands = append(cands, byStem[ls]...)
+	if len(cands) == 0 {
+		return archiveEntry{}, false
 	}
-	return archiveEntry{}, false
+	best := cands[0]
+	bestScore := -1
+	for _, e := range cands {
+		score := assetLookupScore(ref, e.path)
+		if score > bestScore {
+			best, bestScore = e, score
+		}
+	}
+	return best, true
+}
+
+// assetLookupScore 给同名候选打分：引用里的目录/角色提示越具体，分越高。
+func assetLookupScore(ref, path string) int {
+	refSlash := strings.ToLower(filepath.ToSlash(strings.TrimSpace(ref)))
+	pathSlash := strings.ToLower(filepath.ToSlash(path))
+	refStem := strings.TrimSuffix(strings.TrimPrefix(filepath.ToSlash(refSlash), "/"), filepath.Ext(refSlash))
+	pathStem := strings.TrimSuffix(strings.TrimPrefix(filepath.ToSlash(pathSlash), "/"), filepath.Ext(pathSlash))
+	score := 0
+	if refStem != "" && (pathStem == refStem || strings.HasSuffix(pathStem, "/"+refStem)) {
+		score += 100 + len(refStem)*2
+	}
+	if asset.RoleOf(ref) == asset.RoleOf(path) {
+		score += 60
+	}
+	// 引用里带扩展名时，扩展名一致是强提示（foo.png 不该拿 foo.tlg）。
+	refExt := strings.ToLower(filepath.Ext(refSlash))
+	if refExt != "" && refExt == strings.ToLower(filepath.Ext(pathSlash)) {
+		score += 10
+	}
+	// 同时命中多个候选时，浅层路径更可能是游戏主素材。
+	score -= strings.Count(pathSlash, "/")
+	return score
 }

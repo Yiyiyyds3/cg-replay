@@ -13,18 +13,22 @@
 //     分派接入，本分支不改变登记行为。
 //   - 加密条目（XP3 adlr / BSE 加密图）：**不解密**，如实报告跳过（要每作密钥）。
 //
-// 落盘布局刻意与现有加载器一致（raw/data/scenario + raw/data/image），
-// 所以解包产物能直接被 library.Scan + replay.GameLoader 消费，不需要改加载侧。
+// 素材落盘按角色分到 raw/data/image/{cg,bg,stand,movie,ui,misc}/，并保留
+// 归档内相对子路径；剧本仍在 raw/data/scenario。这样同类同名文件不会互相
+// 覆盖，背景/UI 也不会再被当成 CG 槽位。replay.GameLoader 会先按原相对
+// 路径、再按文件名在角色目录里回退，旧版平铺产物仍可加载。
 package unpack
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/asset"
 )
 
 // Scope 最小集合的取材范围。
@@ -337,6 +341,7 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 	}
 	var videoNames []string // 解出的影片（相对产物根），写进清单备查
 	totalFiles, totalBytes := 0, int64(0)
+	usedAssetPaths := map[string]string{} // 小写目标路径 → 源条目路径（防大小写不敏感文件系统撞名）
 
 	// 增量是否可信：只有「源归档与上次解包时一致」才允许复用已存在的文件。
 	// 否则说明用户换了补丁/更新了游戏，即使产物大小碰巧一样也可能内容变了；
@@ -434,8 +439,14 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			}
 		}
 	}
-	// 素材落盘（只解被引用的）。
+	// 素材落盘（只解被引用的）。引用名排序后再处理：撞名兜底的「谁拿
+	// 主路径、谁加哈希后缀」必须可复现，不能受 map 迭代顺序影响。
+	refs := make([]string, 0, len(refSet))
 	for ref := range refSet {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+	for _, ref := range refs {
 		e, ok := assets.lookup(ref)
 		if !ok {
 			res.Missing = append(res.Missing, ref)
@@ -450,7 +461,8 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			// 真解不开时上面的解析失败告警会指出。
 			res.Encrypted = append(res.Encrypted, e.path)
 		}
-		assetPath := filepath.Join(dest, filepath.FromSlash(deps.ImageDir), e.base())
+		assetPath := asset.DestPath(dest, deps.ImageDir, e.path)
+		assetPath = uniqueAssetPath(assetPath, e.path, usedAssetPaths)
 		want := int64(0)
 		for _, sg := range e.segs {
 			want += sg.Size
@@ -682,4 +694,37 @@ func CountVideos(root string) int {
 func sameSize(path string, want int64) bool {
 	st, err := os.Stat(path)
 	return err == nil && !st.IsDir() && st.Size() == want
+}
+
+// uniqueAssetPath 给同一目标路径上的不同源条目加稳定后缀。
+//
+// 角色目录 + 原相对子路径已经能隔开绝大多数同名文件；这里再兜底处理
+// Windows 大小写不敏感（Ev/a.png 与 ev/a.png）或非法字符清洗后的碰撞。
+// 后缀按源条目路径哈希，重跑解包仍然稳定，不会每次换名字。
+func uniqueAssetPath(path, source string, used map[string]string) string {
+	key := strings.ToLower(filepath.Clean(path))
+	if prev, ok := used[key]; !ok || strings.EqualFold(prev, source) {
+		used[key] = source
+		return path
+	}
+	ext := filepath.Ext(path)
+	stem := strings.TrimSuffix(path, ext)
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.ToLower(filepath.ToSlash(source))))
+	for i := 0; ; i++ {
+		suffix := fmt.Sprintf("~%08x", h.Sum32())
+		if i > 0 {
+			suffix += fmt.Sprintf("-%d", i)
+		}
+		cand := stem + suffix + ext
+		ck := strings.ToLower(filepath.Clean(cand))
+		if prev, exists := used[ck]; exists {
+			if strings.EqualFold(prev, source) {
+				return cand // 同一个源重复出现：沿用上次的哈希路径
+			}
+			continue
+		}
+		used[ck] = source
+		return cand
+	}
 }

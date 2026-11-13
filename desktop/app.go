@@ -379,7 +379,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	engineID, conv, cerr := resolveGameConvention(clean)
+	_, conv, cerr := resolveGameConvention(clean)
 	if cerr != nil {
 		return nil, cerr
 	}

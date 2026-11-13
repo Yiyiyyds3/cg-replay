@@ -9,6 +9,7 @@ import (
 	"ucgr/internal/ir"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
+	"ucgr/internal/vision"
 )
 
 // TestRealCS2VideoOP 真机验证：OP 事件能被识别成影片，并能抽到画面帧。
@@ -54,21 +55,12 @@ func TestRealCS2VideoOP(t *testing.T) {
 	if b.Dx() < 100 || b.Dy() < 100 {
 		t.Fatalf("帧尺寸异常：%v", b)
 	}
-	// 非黑像素比例：确认真的抽到了画面
-	var nonBlack, total int
-	for y := b.Min.Y; y < b.Max.Y; y += 8 {
-		for x := b.Min.X; x < b.Max.X; x += 8 {
-			r, g, bl, _ := img.At(x, y).RGBA()
-			total++
-			if r > 0x1000 || g > 0x1000 || bl > 0x1000 {
-				nonBlack++
-			}
-		}
-	}
-	ratio := float64(nonBlack) / float64(total)
-	t.Logf("2s 处帧：%dx%d，非黑像素 %.1f%%", b.Dx(), b.Dy(), ratio*100)
-	if ratio < 0.05 {
-		t.Fatalf("抽出的帧几乎全黑（%.1f%%），可能没解码成功", ratio*100)
+	// 非黑像素比例：确认真的抽到了画面（与回放侧共用 vision 口径）。
+	st := vision.Analyze(img)
+	t.Logf("2s 处帧：%dx%d，非黑像素 %.1f%%，颜色方差 %.1f",
+		b.Dx(), b.Dy(), st.NonBlackRatio*100, st.ColorVariance)
+	if st.NonBlackRatio < 0.05 {
+		t.Fatalf("抽出的帧几乎全黑（%.1f%%），可能没解码失败", st.NonBlackRatio*100)
 	}
 }
 
