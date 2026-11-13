@@ -29,16 +29,19 @@ jobs:
           set -euo pipefail
 
           # ---------- milestone ----------
+          # 注意：gh issue create --milestone 需要 milestone 标题（名称），不是编号；
+          # 之前传编号 "1" 导致 issue 创建失败（run 43450435061）。
+          MS_NAME='0.4.0'
           MS=$(gh api "repos/$REPO/milestones?state=all&per_page=100" \
                --jq '.[] | select(.title=="0.4.0") | .number' | head -n1 || true)
           if [ -z "${MS:-}" ]; then
             MS=$(gh api "repos/$REPO/milestones" \
-                 -f title='0.4.0' \
+                 -f title="$MS_NAME" \
                  -f state='open' \
                  -f description='解包分类/黑帧、封面黑屏、点击互动与文本/音频、VSCode 风格 UI' \
                  --jq '.number')
           fi
-          echo "milestone 0.4.0 = #$MS"
+          echo "milestone $MS_NAME = #$MS"
 
           # ---------- labels ----------
           ensure_label() {
@@ -56,14 +59,14 @@ jobs:
           # ---------- issues ----------
           create_issue() {
             title="$1"; body="$2"; labels="$3"
-            n=$(gh issue list -R "$REPO" --state all --search "$title in:title" \
-                --json number --jq '.[0].number' 2>/dev/null || true)
-            if [ -n "${n:-}" ]; then
-              echo "issue exists: #$n $title"
+            # 用全量标题精确匹配：标题含 [ ] 与中文，search 限定符容易误判。
+            if gh issue list -R "$REPO" --state all --limit 200 --json title \
+                 --jq '.[].title' | grep -Fxq "$title"; then
+              echo "issue exists: $title"
               return
             fi
             gh issue create -R "$REPO" --title "$title" --body "$body" \
-              --label "$labels" --milestone "$MS"
+              --label "$labels" --milestone "$MS_NAME"
           }
 
           create_issue \
