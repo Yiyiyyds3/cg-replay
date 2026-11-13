@@ -250,6 +250,9 @@ export const api = {
   pause: () => bridge().Pause() as Promise<void>,
   togglePlay: () => bridge().TogglePlay() as Promise<boolean>,
   inputClick: () => bridge().InputClick() as Promise<void>,
+  /** 切 CG 回放模式：story=剧情（台词/语音）/ gallery=鉴赏（纯图）；返回切换后的元信息 */
+  setReplayMode: (mode: "story" | "gallery") =>
+    bridge().SetReplayMode(mode) as Promise<SessionMeta>,
   toggleAuto: () => bridge().ToggleAuto() as Promise<boolean>,
   setMuted: (m: boolean) => bridge().SetMuted(m) as Promise<void>,
   seekTo: (ms: number) => bridge().SeekTo(Math.round(ms)) as Promise<void>,
@@ -302,7 +305,32 @@ export interface SessionMeta {
   op_count: number;
   text_count: number;
   duration_ms: number; // Show 台本时钟最大值（进度参考刻度），可能为 0（无 wait/wt 事件）
+  /** 当前回放模式：story=剧情（主线演出，带台词/语音）/ gallery=鉴赏（纯图 CG）；非 CG 为空 */
+  mode?: "story" | "gallery" | "";
+  /** 可切换的模式；>=2 时显示「剧情 / 鉴赏」切换 */
+  modes?: string[];
+  /** CG 台词数据；available=false 时 note 说明为什么没有（不假装有） */
+  dialogue?: DialogueDTO;
   spine?: SpineDTO; // 非空 = Spine 骨骼动画，舞台由 WebGL canvas 渲染
+}
+
+/** 剧情模式/台词数据（desktop/cgstory.go DialogueDTO）。 */
+export interface DialogueDTO {
+  available: boolean;
+  text_lines: number;
+  voice_lines: number;
+  chapter?: string;
+  script?: string;
+  page?: string;
+  note?: string;
+  candidates?: number;
+}
+
+/** 帧级语音状态：最近一次触发的语音 + 触发时的演出时刻。 */
+export interface VoiceDTO {
+  ref: string;
+  since_ms: number;
+  muted: boolean;
 }
 
 export interface LayerDTO {
@@ -333,13 +361,19 @@ export interface BoxDTO {
   frame_opacity: number;
   font_size: number;
   line_spacing: number;
+  margin_l: number;
+  margin_t: number;
+  margin_r: number;
+  margin_b: number;
+  /** 框图素材名（如 win3.png）：底色/框图由 Go 侧画进 JPEG，前端只负责写字 */
+  frame?: string;
   lines: LineDTO[];
 }
 
 export interface FrameDTO {
   jpeg: string; // dataURL，同画面指纹时为 ""
   now: number;
-  dur: number;
+  dur_ms: number; // 会话时长刻度（Go FrameDTO.DurMs；切换剧情/鉴赏会变）
   playing: boolean;
   done: boolean;
   waiting: boolean;
@@ -351,7 +385,9 @@ export interface FrameDTO {
   missing: string[]; // 缺素材 ref（FR-12：常驻红横幅，不静默）
   drawn: string[]; // 实际绘制清单与失败诊断（影片取帧错误在这里）
   layers: LayerDTO[]; // 调试抽屉 D
-  texts: BoxDTO[]; // 调试抽屉 D（文本框状态）
+  texts: BoxDTO[]; // 舞台台词覆盖层（说话人 + 文本；底色/框图已在 JPEG 里）
+  /** 最近触发的语音（nil = 本会话还没有语音）；只作「这句有语音」的指示 */
+  voice?: VoiceDTO;
 }
 
 /** 导出结果（desktop/export.go ExportResult）。 */

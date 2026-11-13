@@ -69,6 +69,8 @@ export function SetActiveGame(arg1:string):Promise<library.Library>;
 
 export function SetMuted(arg1:boolean):Promise<void>;
 
+export function SetReplayMode(arg1:string):Promise<main.SessionMeta>;
+
 export function SetRoot(arg1:string):Promise<library.Library>;
 
 export function StartExport(arg1:string):Promise<void>;

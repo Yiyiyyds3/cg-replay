@@ -161,6 +161,11 @@ export namespace main {
 	    frame_opacity: number;
 	    font_size: number;
 	    line_spacing: number;
+	    margin_l: number;
+	    margin_t: number;
+	    margin_r: number;
+	    margin_b: number;
+	    frame?: string;
 	    lines: LineDTO[];
 	
 	    static createFrom(source: any = {}) {
@@ -180,6 +185,11 @@ export namespace main {
 	        this.frame_opacity = source["frame_opacity"];
 	        this.font_size = source["font_size"];
 	        this.line_spacing = source["line_spacing"];
+	        this.margin_l = source["margin_l"];
+	        this.margin_t = source["margin_t"];
+	        this.margin_r = source["margin_r"];
+	        this.margin_b = source["margin_b"];
+	        this.frame = source["frame"];
 	        this.lines = this.convertValues(source["lines"], LineDTO);
 	    }
 	
@@ -470,6 +480,7 @@ export namespace main {
 	    layers: LayerDTO[];
 	    texts: BoxDTO[];
 	    cached: boolean;
+	    voice?: VoiceDTO;
 	
 	    static createFrom(source: any = {}) {
 	        return new FrameDTO(source);
@@ -492,6 +503,7 @@ export namespace main {
 	        this.layers = this.convertValues(source["layers"], LayerDTO);
 	        this.texts = this.convertValues(source["texts"], BoxDTO);
 	        this.cached = source["cached"];
+	        this.voice = this.convertValues(source["voice"], VoiceDTO);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -624,6 +636,48 @@ export namespace main {
 	        this.warnings = source["warnings"];
 	    }
 	}
+	export class DialogueDTO {
+	    available: boolean;
+	    text_lines: number;
+	    voice_lines: number;
+	    chapter?: string;
+	    script?: string;
+	    page?: string;
+	    note?: string;
+	    candidates?: number;
+
+	    static createFrom(source: any = {}) {
+	        return new DialogueDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.text_lines = source["text_lines"];
+	        this.voice_lines = source["voice_lines"];
+	        this.chapter = source["chapter"];
+	        this.script = source["script"];
+	        this.page = source["page"];
+	        this.note = source["note"];
+	        this.candidates = source["candidates"];
+	    }
+	}
+	export class VoiceDTO {
+	    ref: string;
+	    since_ms: number;
+	    muted: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new VoiceDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ref = source["ref"];
+	        this.since_ms = source["since_ms"];
+	        this.muted = source["muted"];
+	    }
+	}
 	export class SessionMeta {
 	    kind: string;
 	    id: string;
@@ -634,6 +688,9 @@ export namespace main {
 	    op_count: number;
 	    text_count: number;
 	    duration_ms: number;
+	    mode?: string;
+	    modes?: string[];
+	    dialogue?: DialogueDTO;
 	    spine?: SpineDTO;
 	
 	    static createFrom(source: any = {}) {
@@ -651,6 +708,9 @@ export namespace main {
 	        this.op_count = source["op_count"];
 	        this.text_count = source["text_count"];
 	        this.duration_ms = source["duration_ms"];
+	        this.mode = source["mode"];
+	        this.modes = source["modes"];
+	        this.dialogue = this.convertValues(source["dialogue"], DialogueDTO);
 	        this.spine = source["spine"];
 	    }
 	}

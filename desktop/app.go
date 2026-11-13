@@ -377,6 +377,8 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 基线修复：resolveGameConvention 的 engineID 在这里没用（引擎号以
+	// conv.EngineID 为准），main 上遗留的未使用变量会让整个 desktop 包编译不过。
 	_, conv, cerr := resolveGameConvention(clean)
 	if cerr != nil {
 		return nil, cerr

@@ -56,11 +56,7 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 		if e == nil {
 			return nil, "", fmt.Errorf("找不到 CG 事件 %s", id)
 		}
-		if strings.EqualFold(engine, "scn") {
-			ev, err := scn.BuildShowCG(root, abs(e.Script), e.Thumb, scnOptions(conv))
-			return ev, e.Title, err
-		}
-		ev, err := kirikiri.BuildShowSegment(abs(e.Script), e.Label)
+		ev, _, _, err := buildCGEvent(root, engine, conv, lib, e)
 		return ev, e.Title, err
 
 	case "scene":
@@ -153,4 +149,58 @@ func engineOf(s string) string {
 		return "kirikiri"
 	}
 	return s
+}
+
+// buildCGEvent 构建一个 CG 事件：优先「剧情模式」（主线演出，含台词/语音），
+// 取不到才退回纯图鉴赏（画廊脚本的 *cgNN 段）。
+//
+// 返回 (回放用台本, 鉴赏用台本, 台词数据, error)。两个台本在剧情模式下不同：
+// 前端「剧情 / 鉴赏」切换就是在这两者之间换，鉴赏原样保留画廊多页翻页。
+func buildCGEvent(root, engine string, conv adapter.Convention, lib *library.Library, e *library.CGEvent) (primary, gallery *ir.Event, dialogue *DialogueDTO, err error) {
+	abs := func(rel string) string { return filepath.Join(root, filepath.FromSlash(rel)) }
+	if strings.EqualFold(engine, "scn") {
+		gallery, err = scn.BuildShowCG(root, abs(e.Script), e.Thumb, scnOptions(conv))
+	} else {
+		gallery, err = kirikiri.BuildShowSegment(abs(e.Script), e.Label)
+	}
+	if err != nil {
+		return nil, gallery, nil, err
+	}
+	primary, dialogue = applyCGStory(gallery, root, lib, e)
+	return primary, gallery, dialogue, nil
+}
+
+// applyCGStory 尝试把已构建好的纯图 CG 台本换成剧情模式台本。
+//
+// 换不动（找不到引用、构建失败、构建后没有台词）就原样返回，并把原因写进
+// Dialogue.Note —— 前端据此显示「该 CG 无台词数据」，不假装有。
+func applyCGStory(ev *ir.Event, root string, lib *library.Library, e *library.CGEvent) (*ir.Event, *DialogueDTO) {
+	link, lerr := resolveCGStory(root, lib, e)
+	if lerr == nil && link != nil {
+		if sev, berr := buildCGStoryEvent(root, link); berr == nil {
+			if d := dialogForStory(link, sev); d.Available {
+				return sev, d
+			}
+		}
+	}
+	// 画廊台本自己带台词时（个别引擎的 CG 列表含对白）如实统计，不覆盖。
+	d := &DialogueDTO{
+		TextLines:  countShowOps(ev, ir.ShowTextRun),
+		VoiceLines: countShowOps(ev, ir.ShowVoicePlay),
+	}
+	d.Available = d.TextLines > 0
+	if d.Available {
+		return ev, d
+	}
+	// 回退原因分开写：找不到引用 ≠ 找到引用但那段没有台词，前者是数据缺失，
+	// 后者是剧本演出的真实形态，前端横幅都不假装有台词。
+	switch {
+	case lerr != nil:
+		d.Note = fmt.Sprintf("该 CG 无台词数据：主线脚本关联失败（%v）", lerr)
+	case link != nil:
+		d.Note = "该 CG 无台词数据：主线里找到了同一张图，但对应演出段没有可回放台词"
+	default:
+		d.Note = cgNoDialogueNote
+	}
+	return ev, d
 }

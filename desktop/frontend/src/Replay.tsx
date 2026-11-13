@@ -1,10 +1,19 @@
-﻿// 回放页（方案 B M3）：舞台 + 控制条 + 调试抽屉 D。
+// 回放页（方案 B M3）：舞台 + 控制条 + 调试抽屉 D。
 // 数据流：60ms 轮询 api.getFrame()（Go 端墙钟推进 + 画面指纹缓存），
 // jpeg 非空才写 <img>.src。缺素材红横幅常驻（FR-12 不静默）。
+// 交互：舞台点击/轻触推进（拖动不算、双击全屏），台词按原生几何叠在画面上
+// （文字由前端写，底色/框图已在 Go 侧 JPEG 里），语音状态按帧显示。
 // 快捷键：Space/Enter 点击推进，D 调试抽屉，F 截图，Esc 返回，
 // A 自动推进，M 静音，←/→ ±5s，P 播放/暂停。
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +27,9 @@ import {
   Pause,
   Volume2,
   VolumeX,
+  Mic,
+  Maximize2,
+  Minimize2,
   FileImage,
   FileVideo,
   Star,
@@ -53,6 +65,92 @@ export default function Replay({
   const [fav, setFav] = useState(false); // 本事件收藏状态（星标）
   const [favBusy, setFavBusy] = useState(false);
   const isSpine = !!meta.spine; // 骨骼动画：画面走 WebGL，Go 侧没有 JPEG/截图/导出
+
+  // ---------- CG 剧情 / 鉴赏模式（Go 侧两套台本，切换只换播放器） ----------
+  const [mode, setMode] = useState<string>(meta.mode ?? "");
+  const [dialogue, setDialogue] = useState(meta.dialogue);
+  const [modeBusy, setModeBusy] = useState(false);
+
+  const switchMode = async (next: "story" | "gallery") => {
+    if (modeBusy || mode === next) return;
+    setModeBusy(true);
+    try {
+      const nm = await api.setReplayMode(next);
+      setMode(nm.mode ?? next);
+      setDialogue(nm.dialogue ?? dialogue);
+      setErr("");
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setModeBusy(false);
+    }
+  };
+
+  // ---------- 舞台点击推进 / 拖动排除 / 双击全屏 ----------
+  const clickTimer = useRef<number | null>(null);
+  const dragRef = useRef({ x: 0, y: 0, moved: false });
+  const [isFs, setIsFs] = useState(false);
+
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // 离开回放时取消还没触发的单击定时器，避免退出瞬间又把下一次会话推进一格。
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current != null) {
+        window.clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+      }
+    };
+  }, []);
+
+  const advance = async () => {
+    try {
+      await api.inputClick();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (e: any) {
+      setErr(`全屏切换失败：${e?.message ?? String(e)}`);
+    }
+  };
+
+  const onStagePointerDown = (e: ReactPointerEvent) => {
+    dragRef.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+  const onStagePointerMove = (e: ReactPointerEvent) => {
+    const d = dragRef.current;
+    if (!d.moved && (Math.abs(e.clientX - d.x) > 8 || Math.abs(e.clientY - d.y) > 8)) {
+      d.moved = true; // 拖动/滑过（去拖进度条、抽屉、选文字）不算点击推进
+    }
+  };
+  const onStageClick = (e: ReactMouseEvent) => {
+    if (dragRef.current.moved) return;
+    if (e.detail > 1) return; // 双击的第二下不推进
+    if (clickTimer.current != null) return;
+    // 稍等 180ms 再推进：若紧接着来 dblclick 就取消（双击=全屏，不误触两次推进）。
+    clickTimer.current = window.setTimeout(() => {
+      clickTimer.current = null;
+      void advance();
+    }, 180);
+  };
+  const onStageDoubleClick = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    if (clickTimer.current != null) {
+      window.clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    void toggleFullscreen();
+  };
 
   // 进入回放：读收藏列表定位本事件星标（列表小，一次拉全）。
   useEffect(() => {
@@ -130,7 +228,7 @@ export default function Replay({
   };
 
   const onSeek = (pct: number) => {
-    void seekStep(Math.round(pct * (meta.duration_ms || 0)));
+    void seekStep(Math.round(pct * dur));
   };
 
   // 快捷键
@@ -140,7 +238,12 @@ export default function Replay({
       switch (e.key) {
         case " ":
         case "Enter":
+          // 原作语义：空格/回车 = 点击推进（不是播放开关；播放开关在 P）。
           e.preventDefault();
+          void advance();
+          break;
+        case "p":
+        case "P":
           void api.togglePlay().catch((e) => setErr(e?.message ?? String(e)));
           break;
         case "d":
@@ -254,8 +357,9 @@ export default function Replay({
     }
   };
 
-  // 进度条刻度：脚本时钟最大值（dur_ms），可能为 0（无 wait/wt 的事件）
-  const dur = meta.duration_ms || 0;
+  // 进度条刻度：脚本时钟最大值（dur_ms），可能为 0（无 wait/wt 的事件）。
+  // 剧情/鉴赏切换后台本变了，时长以帧里的 dur_ms 为准（会话内实时值）。
+  const dur = f?.dur_ms ?? meta.duration_ms ?? 0;
   const pct = dur > 0 ? Math.min(1, (f?.now ?? 0) / dur) : 0;
 
   // 资产检视器数据：ref 去重 + 使用状态（缺素材优先、未引用过的不出现）
@@ -275,6 +379,59 @@ export default function Replay({
     return arr;
   }, [f]);
 
+  // 舞台台词覆盖层：直接用 SVG viewBox 贴原生舞台坐标（0 0 stage_w stage_h），
+  // 与 object-contain 的 JPEG 共用同一块「等比内切矩形」，窗口缩放/黑边都不跑位。
+  // 文字必须由前端画——Go 侧 RenderFrame 只画对话框底色/框图（win3.png），
+  // 文字原本交给平台层 GDI，Web 前端这里用 SVG text。
+  const stageTexts = useMemo(() => {
+    const boxes = (f?.texts ?? []).filter(
+      (b) => b.visible && b.lines.length > 0 && b.has_geom && b.w > 0 && b.h > 0,
+    );
+    // 有名字牌（message1）时，台词行不再重复说话人（原名牌已经显示）。
+    const hasPlate = boxes.some((b) => b.layer === "message1");
+    return (
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox={`0 0 ${meta.stage_w} ${meta.stage_h}`}
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+      >
+        {boxes.map((b) => {
+          const x = b.x + b.margin_l;
+          let y = b.y + b.margin_t;
+          return (
+            <g key={b.layer} style={{ fontFamily: '"Noto Sans CJK SC","Microsoft YaHei",sans-serif' }}>
+              {b.lines.map((ln, i) => {
+                y += b.font_size; // 本行基线（行距 = 字号 + line_spacing）
+                const lineY = y;
+                y += b.line_spacing;
+                const showSpeaker = b.layer !== "message1" && !!ln.speaker && !hasPlate;
+                return (
+                  <text
+                    key={i}
+                    x={x}
+                    y={lineY}
+                    fontSize={b.font_size}
+                    fill="#fff"
+                    stroke="rgba(0,0,0,0.85)"
+                    strokeWidth={2}
+                    paintOrder="stroke"
+                    xmlSpace="preserve"
+                  >
+                    {showSpeaker && (
+                      <tspan opacity={0.8}>{ln.speaker}：</tspan>
+                    )}
+                    <tspan>{ln.text}</tspan>
+                  </text>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }, [f?.texts, meta.stage_w, meta.stage_h]);
+
   return (
     <div className="relative flex h-screen flex-col bg-background text-foreground">
       {/* 顶栏 */}
@@ -286,6 +443,44 @@ export default function Replay({
           {meta.title}
         </div>
         <Badge variant="secondary">{KIND_LABEL[meta.kind] ?? meta.kind}</Badge>
+        {/* CG 剧情 / 鉴赏切换：Go 侧两套台本都在内存里，切换只重建播放器 */}
+        {meta.kind === "cg" && (meta.modes?.length ?? 0) >= 2 && (
+          <div className="flex overflow-hidden rounded border border-border text-xs">
+            <button
+              type="button"
+              disabled={modeBusy}
+              onClick={() => void switchMode("story")}
+              className={
+                "px-2 py-1 transition-colors " +
+                (mode === "story"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary")
+              }
+              title="剧情模式：主线原演出（含台词与语音）"
+            >
+              剧情
+            </button>
+            <button
+              type="button"
+              disabled={modeBusy}
+              onClick={() => void switchMode("gallery")}
+              className={
+                "px-2 py-1 transition-colors " +
+                (mode === "gallery"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary")
+              }
+              title="鉴赏模式：画廊原段（纯图，可翻页）"
+            >
+              鉴赏
+            </button>
+          </div>
+        )}
+        {dialogue?.available && (
+          <Badge variant="outline" title={`剧情章节：${dialogue.chapter ?? "—"}`}>
+            台词 {dialogue.text_lines} · 语音 {dialogue.voice_lines}
+          </Badge>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -348,6 +543,14 @@ export default function Replay({
           </>
         )}
         <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => void toggleFullscreen()}
+          title={isFs ? "退出全屏（双击画面也可）" : "全屏（双击画面也可）"}
+        >
+          {isFs ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+        </Button>
+        <Button
           variant={showInsp ? "secondary" : "ghost"}
           size="icon"
           onClick={() => setShowInsp((v) => !v)}
@@ -378,6 +581,20 @@ export default function Replay({
           1×1 透明占位继续合成，可跳过该事件或补素材后重扫。
         </div>
       )}
+      {/* CG 台词数据横幅：有剧情就提示可切；真没有就如实说，不假装有 */}
+      {meta.kind === "cg" && dialogue && !dialogue.available && (
+        <div className="border-b border-amber-900 bg-amber-950/80 px-4 py-1.5 text-xs text-amber-300">
+          {dialogue.note ?? "该 CG 无台词数据"}
+          。当前以鉴赏模式播放（仅图片，无文本/语音）。
+        </div>
+      )}
+      {meta.kind === "cg" && dialogue?.available && mode === "gallery" && (
+        <div className="border-b border-border bg-secondary/60 px-4 py-1.5 text-xs text-muted-foreground">
+          当前为鉴赏模式（纯图，可能多页翻页）。切到「剧情」可看这段 CG 在
+          {dialogue.chapter ? `「${dialogue.chapter}」` : "主线"}
+          里的原始演出：台词 {dialogue.text_lines} 条 · 语音 {dialogue.voice_lines} 句。
+        </div>
+      )}
       {/* 会话错误红横幅 */}
       {err && (
         <div className="border-b border-red-900 bg-red-950/80 px-4 py-1.5 text-xs text-red-300">
@@ -403,36 +620,58 @@ export default function Replay({
         </div>
       )}
 
-      {/* 舞台（4:3，1600×1200 画面） */}
-      <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+      {/* 舞台：画面 + 台词覆盖层。点击/轻触推进（拖动、按钮、抽屉都不触发），双击全屏 */}
+      <main
+        className={
+          "relative flex flex-1 items-center justify-center overflow-hidden bg-black " +
+          (f?.waiting ? "cursor-pointer" : "cursor-default")
+        }
+        style={{ touchAction: "manipulation" }}
+        onPointerDown={onStagePointerDown}
+        onPointerMove={onStagePointerMove}
+        onClick={onStageClick}
+        onDoubleClick={onStageDoubleClick}
+        title={f?.waiting ? "点击继续（双击全屏）" : "点击推进（双击全屏）"}
+      >
         <div
           className="flex h-full max-w-full items-center justify-center"
           style={{
             transform: `translate(${f?.quake_x ?? 0}px, ${f?.quake_y ?? 0}px)`,
           }}
         >
-          {meta.spine ? (
-            <SpineStage
-              spine={meta.spine}
-              now={f?.now ?? 0}
-              playing={!!f?.playing}
-              done={!!f?.done}
-              onError={setErr}
-            />
-          ) : (
-            <img
-              ref={imgRef}
-              alt={meta.title}
-              className="max-h-full max-w-full object-contain"
-              draggable={false}
-            />
-          )}
+          <div className="relative flex h-full w-full items-center justify-center">
+            {meta.spine ? (
+              <SpineStage
+                spine={meta.spine}
+                now={f?.now ?? 0}
+                playing={!!f?.playing}
+                done={!!f?.done}
+                onError={setErr}
+              />
+            ) : (
+              <>
+                <img
+                  ref={imgRef}
+                  alt={meta.title}
+                  className="h-full w-full object-contain"
+                  draggable={false}
+                />
+                {/* 台词（说话人 + 文本）：SVG 覆盖，pointer-events-none 不挡点击 */}
+                {stageTexts}
+              </>
+            )}
+          </div>
         </div>
-        {/* 点击推进（对齐原作「点击继续」） */}
-        <div
-          className="absolute inset-0 cursor-pointer"
-          onClick={() => api.inputClick().catch((e) => setErr(e?.message ?? String(e)))}
-        />
+        {/* 点击推进提示 + 等待态 */}
+        <div className="pointer-events-none absolute bottom-3 right-3 rounded bg-black/60 px-2 py-1 text-[11px] text-white/85 shadow">
+          {f?.waiting ? "点击画面继续 ▸" : "点击画面推进 · 双击全屏"}
+        </div>
+        {f?.waiting && (
+          <span className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-[11px] text-amber-200">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-300" />
+            等待推进
+          </span>
+        )}
       </main>
 
       {/* 控制条 */}
@@ -480,6 +719,20 @@ export default function Replay({
         >
           {f?.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </Button>
+        {/* 语音状态：只报「最近触发的一句」，不谎报播放进度/时长 */}
+        {f?.voice && (
+          <Badge
+            variant={f.voice.muted ? "outline" : "secondary"}
+            title={`本句语音：${f.voice.ref}（时长由素材决定；静音时仍随帧推进）`}
+          >
+            {f.voice.muted ? (
+              <VolumeX className="mr-1 h-3 w-3" />
+            ) : (
+              <Mic className="mr-1 h-3 w-3" />
+            )}
+            语音
+          </Badge>
+        )}
         {f?.waiting && <Badge variant="warn">等待推进</Badge>}
         {f?.done && <Badge variant="outline">结束</Badge>}
       </footer>
