@@ -14,7 +14,7 @@
 | [43450435061](https://github.com/Yiyiyyds3/cg-replay/actions/runs/43450435061) | `d0a94c8` | failure | `gh issue create --milestone` 传了 milestone 编号 `1`，issue 全部未建（milestone #1 已建成功） |
 | [43452287099](https://github.com/Yiyiyyds3/cg-replay/actions/runs/43452287099) | `ae466fc` | success | milestone 改用名称 `0.4.0` + issue 去重改全量标题精确匹配（`grep -Fxq`），4 个 issue 一次建成 |
 
-- 失败修复提交：`ae466fcc`（`ci: 修复 issue 引导的 milestone 名称与去重判断`）。
+- 失败修复提交：`ae466fc27f44a94d0018bf5eaeaba95957822e4f`（`ci: 修复 issue 引导的 milestone 名称与去重判断`）。
 
 ## 二、落库方式
 
