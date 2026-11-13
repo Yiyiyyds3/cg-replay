@@ -110,6 +110,7 @@ foreach ($i in $issues) {
         $found = gh issue create --repo $Repo --title $i.title --body-file $tmp --milestone $ms --label $i.labels --jq '.number'
         Remove-Item $tmp
         Write-Host "issue 已创建 #$found : $($i.title)"
+        $issueNums += $found
     }
     # 关联 merge commit 评论（幂等：查是否已有该 hash 的评论）
     $shortHash = $i.merge.Substring(0,7)
