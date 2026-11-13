@@ -695,7 +695,15 @@ func (p *Player) textBoxes() []TextBox {
 			out = append(out, box)
 			continue
 		}
-		box.Visible = st.Visible
+		// 只有被 [position]/[layopt] 显式写过 visible 才尊重它。RPG Maker 等
+		// 适配器的 layer_attr 只带 left/top/width/height，用来给消息层定几何，
+		// 并不表示「隐藏台词框」；此时新建层的零值 Visible=false 会把有台词的
+		// 框整个吞掉（实测 RMMZ 97 个场景事件全程 texts 可见数=0）。
+		if _, explicitly := st.Attrs["visible"]; explicitly {
+			box.Visible = st.Visible
+		} else {
+			box.Visible = true
+		}
 		box.X, box.Y = st.X, st.Y
 		box.W = fattr(st.Attrs, "width")
 		box.H = fattr(st.Attrs, "height")

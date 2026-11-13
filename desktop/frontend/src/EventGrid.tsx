@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type Tab = "all" | "cg" | "scene" | "chapter";
+export type Tab = "all" | "cg" | "scene" | "chapter";
 
 type Status =
   | { state: "loading" }
@@ -54,14 +54,21 @@ const PRUNE_DAYS = 3; // 冷归档窗口（与 UI 文案一致）
 // M2 事件网格（卡墙）。M3：卡片点击 → App 路由切回放页。
 export default function EventGrid({
   onOpen,
+  tab,
+  onTabChange,
 }: {
   onOpen: (kind: string, id: string, title: string) => void;
+  // 页签状态由 App 持有：切到回放页时本组件会卸载，返回后要回到原来的页签
+  // （以前放在组件内 useState，返回时重置成 "cg"，从主线场景退出会跳到 CG 鉴赏）。
+  tab: Tab;
+  onTabChange: (t: Tab) => void;
 }) {
   const [status, setStatus] = useState<Status>({ state: "loading" });
   const [lib, setLib] = useState<LibraryDTO | null>(null);
   const [games, setGames] = useState<GamesDTO | null>(null);
   const [catalog, setCatalog] = useState<CatalogStatsDTO | null>(null);
-  const [tab, setTab] = useState<Tab>("cg");
+  // 包装一层：组件内所有 setTab(...) 调用点无需改动，状态实际存在 App。
+  const setTab = (t: Tab) => onTabChange(t);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyGame, setBusyGame] = useState("");

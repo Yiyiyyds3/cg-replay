@@ -297,7 +297,7 @@ export interface SessionMeta {
   id: string;
   title: string;
   game_id: string; // 收藏/跨游戏定位用
-  stage_w: number; // 目前固定 1600×1200
+  stage_w: number; // 按约定 / 素材推断，缺省 1600×1200
   stage_h: number;
   op_count: number;
   text_count: number;
@@ -329,7 +329,7 @@ export interface BoxDTO {
   h: number;
   has_geom: boolean;
   visible: boolean;
-  frame_color: number[];
+  frame_color: { r: number; g: number; b: number };
   frame_opacity: number;
   font_size: number;
   line_spacing: number;
@@ -339,7 +339,7 @@ export interface BoxDTO {
 export interface FrameDTO {
   jpeg: string; // dataURL，同画面指纹时为 ""
   now: number;
-  dur: number;
+  dur_ms: number;
   playing: boolean;
   done: boolean;
   waiting: boolean;

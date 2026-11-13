@@ -35,6 +35,7 @@ import (
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
 	"ucgr/internal/ir"
+	"ucgr/internal/library"
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
@@ -147,9 +148,12 @@ type LayerDTO struct {
 	Missing bool    `json:"missing"`
 }
 
-// rgbaDTO FrameColor 的 JSON 友好形态。
+// rgbaDTO FrameColor 的 JSON 友好形态。显式 tag 避免序列化成 {R,G,B}
+// 与前端手写的 number[] 形状对不上。
 type rgbaDTO struct {
-	R, G, B uint8
+	R uint8 `json:"r"`
+	G uint8 `json:"g"`
+	B uint8 `json:"b"`
 }
 
 // BoxDTO 前端文本覆盖层（几何由后端给，前端照抄定位；框图缺席时可用底色兜底）。

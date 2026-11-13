@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { api, onExportEvents, type FrameDTO, type SessionMeta } from "@/lib/api";
 import SpineStage from "@/components/SpineStage";
+import StageText from "@/components/StageText";
 
 const KIND_LABEL: Record<string, string> = {
   cg: "CG 鉴赏",
@@ -44,6 +45,7 @@ export default function Replay({
   const [showDbg, setShowDbg] = useState(false);
   const [showInsp, setShowInsp] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
   const [shot, setShot] = useState(""); // 最近一次截图保存路径提示
   const [exporting, setExporting] = useState<"" | "gif" | "mp4">("");
   const [exportPct, setExportPct] = useState(0);
@@ -404,7 +406,7 @@ export default function Replay({
       )}
 
       {/* 舞台（4:3，1600×1200 画面） */}
-      <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+      <main ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
         <div
           className="flex h-full max-w-full items-center justify-center"
           style={{
@@ -428,6 +430,16 @@ export default function Replay({
             />
           )}
         </div>
+        {/* 台词覆盖层：几何由 Go 侧按舞台坐标给出，这里按图片实际显示区域映射 */}
+        {!meta.spine && (
+          <StageText
+            boxes={f?.texts ?? []}
+            stageW={meta.stage_w || 1600}
+            stageH={meta.stage_h || 1200}
+            stageRef={stageRef}
+            imgRef={imgRef}
+          />
+        )}
         {/* 点击推进（对齐原作「点击继续」） */}
         <div
           className="absolute inset-0 cursor-pointer"

@@ -2,7 +2,7 @@
 // 路由状态放在这里而非 EventGrid 内：回放页退出时要能回到卡墙原位。
 
 import { useEffect, useState } from "react";
-import EventGrid from "@/EventGrid";
+import EventGrid, { type Tab } from "@/EventGrid";
 import Replay from "@/Replay";
 import { api, type SessionMeta } from "@/lib/api";
 
@@ -13,6 +13,8 @@ type View =
 export default function App() {
   const [bridge, setBridge] = useState<string>("");
   const [view, setView] = useState<View>({ page: "grid" });
+  // 卡墙页签提到这里：EventGrid 在回放期间会卸载，状态放它内部会被重置。
+  const [tab, setTab] = useState<Tab>("cg");
 
   useEffect(() => {
     void api.pingVersion().then(setBridge).catch(() => setBridge(""));
@@ -36,7 +38,7 @@ export default function App() {
   };
 
   return view.page === "grid" ? (
-    <EventGrid onOpen={openEvent} />
+    <EventGrid onOpen={openEvent} tab={tab} onTabChange={setTab} />
   ) : (
     <Replay meta={view.meta} onExit={exitReplay} />
   );

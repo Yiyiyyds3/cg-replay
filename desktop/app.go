@@ -22,6 +22,7 @@ import (
 	"ucgr/internal/adapter/rmmz"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/catalog"
+	"ucgr/internal/ir"
 	"ucgr/internal/library"
 	"ucgr/internal/registry"
 	"ucgr/internal/replay"
@@ -379,7 +380,7 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	engineID, conv, cerr := resolveGameConvention(clean)
+	_, conv, cerr := resolveGameConvention(clean)
 	if cerr != nil {
 		return nil, cerr
 	}
@@ -539,6 +540,22 @@ func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
 }
 
 // coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
+// looksLikeUIAsset 按路径判断素材是不是界面零件（框、按钮、图标、底色…）。
+// 这是启发式：只用于封面选图，取不到时 coverForGame 有兜底，不影响回放。
+func looksLikeUIAsset(rel string) bool {
+	p := strings.ToLower(filepath.ToSlash(rel))
+	for _, w := range []string{
+		"ui sozai", "ui_", "/ui/", "system/", "icon", "frame", "window",
+		"button", "cursor", "gauge", "menu", "backimage", "/素材/",
+	} {
+		if strings.Contains(p, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// coverForGame 返回某个事件封面的 dataURL；按游戏分目录缓存，重扫不重复生成。
 func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
 	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
@@ -567,7 +584,56 @@ func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
 				return "", fmt.Errorf("CG 事件 %s 没有页面图", id)
 			}
 		default:
-			return "", fmt.Errorf("暂不支持 %s 封面", kind)
+			// 场景 / 演出段落没有 Pages/Thumb 字段。用该事件台本里第一条
+			// layer_show 的素材当封面（通常是背景或首张事件图），取不到就
+			// 如实报错，不拿别的事件图凑数。
+			if kind != "scene" && kind != "chapter" {
+				return "", fmt.Errorf("暂不支持 %s 封面", kind)
+			}
+			conv, cerr := gameConvention(g.Root, g.Engine)
+			if cerr != nil {
+				return "", cerr
+			}
+			ev, _, berr := buildEvent(g.Root, g.Engine, conv, lib, kind, id)
+			if berr != nil {
+				return "", fmt.Errorf("构建 %s 台本失败：%w", kind, berr)
+			}
+			// 不取「第一条」layer_show：那往往是 UI 框 / 底色；也不能只挑面积
+			// 最大的 —— 实测有 4000×3000 的空心 UI 边框比真正的 1280×720 CG 还大。
+			// 先排掉明显是界面零件的路径，再在剩下的里按画面面积挑；一个都不剩
+			// （该事件确实只有 UI 素材）才退回全部候选里最大的，保证不空白。
+			refs := make([]string, 0, 8)
+			seen := map[string]bool{}
+			for _, op := range ev.Show {
+				r := strings.TrimSpace(op.Ref)
+				if op.Kind == ir.ShowLayerShow && r != "" && !seen[r] {
+					seen[r] = true
+					refs = append(refs, r)
+				}
+			}
+			var bestArea int
+			pick := func(allowUI bool) {
+				for _, r := range refs {
+					if !allowUI && looksLikeUIAsset(r) {
+						continue
+					}
+					im, lerr := load(r)
+					if lerr != nil {
+						continue // 单个素材解不开不拖垮整张封面
+					}
+					b := im.Bounds()
+					if area := b.Dx() * b.Dy(); area > bestArea {
+						bestArea, rel = area, r
+					}
+				}
+			}
+			pick(false)
+			if rel == "" {
+				pick(true)
+			}
+			if rel == "" {
+				return "", fmt.Errorf("%s 事件 %s 的台本里没有可解码的图层素材（试过 %d 个引用）", kind, id, len(refs))
+			}
 		}
 		src, err := load(rel)
 		if err != nil {

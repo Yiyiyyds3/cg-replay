@@ -16,6 +16,7 @@ import (
 	"ucgr/internal/adapter/nexas"
 	"ucgr/internal/adapter/nitro"
 	"ucgr/internal/adapter/nscript"
+	"ucgr/internal/adapter/rmmz"
 	"ucgr/internal/adapter/scn"
 	"ucgr/internal/ir"
 	"ucgr/internal/library"
@@ -116,6 +117,12 @@ func buildEvent(root, engine string, conv adapter.Convention, lib *library.Libra
 				w, h = 1024, 768
 			}
 			ev, err := nexas.BuildPacScriptEvent(abs(e.Script), e.Label, w, h)
+			return ev, e.Title, err
+		case strings.EqualFold(engine, "rmmz"):
+			// RPG Maker：Script 指向 data 目录下的 JSON，dataDir 从它反推；
+			// Label 就是 rmmz 的事件 key。此前无此分支，scene 会落到 KiriKiri
+			// 解析器，台词索引和封面都拿不到内容。
+			ev, err := rmmz.BuildShow(root, filepath.ToSlash(filepath.Dir(e.Script)), e.Label)
 			return ev, e.Title, err
 		case strings.EqualFold(engine, "nitro"):
 			// Nitro+：Label = .nss 条目名。舞台推不出来按鬼哭街重制版 1024×768。

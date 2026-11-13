@@ -73,6 +73,7 @@ export namespace library {
 	    }
 	}
 	export class Library {
+	    schema?: number;
 	    root: string;
 	    engine_id?: string;
 	    game?: string;
@@ -80,6 +81,9 @@ export namespace library {
 	    cgs: CGEvent[];
 	    scenes: SceneEvent[];
 	    chapters?: ChapterEvent[];
+	    warnings?: string[];
+	    stage_w?: number;
+	    stage_h?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Library(source);
@@ -87,6 +91,7 @@ export namespace library {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schema = source["schema"];
 	        this.root = source["root"];
 	        this.engine_id = source["engine_id"];
 	        this.game = source["game"];
@@ -94,6 +99,9 @@ export namespace library {
 	        this.cgs = this.convertValues(source["cgs"], CGEvent);
 	        this.scenes = this.convertValues(source["scenes"], SceneEvent);
 	        this.chapters = this.convertValues(source["chapters"], ChapterEvent);
+	        this.warnings = source["warnings"];
+	        this.stage_w = source["stage_w"];
+	        this.stage_h = source["stage_h"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -134,9 +142,9 @@ export namespace main {
 	    }
 	}
 	export class rgbaDTO {
-	    R: number;
-	    G: number;
-	    B: number;
+	    r: number;
+	    g: number;
+	    b: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new rgbaDTO(source);
@@ -144,9 +152,9 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.R = source["R"];
-	        this.G = source["G"];
-	        this.B = source["B"];
+	        this.r = source["r"];
+	        this.g = source["g"];
+	        this.b = source["b"];
 	    }
 	}
 	export class BoxDTO {
@@ -570,34 +578,34 @@ export namespace main {
 	}
 	
 	
-	export class SpineTextureDTO {
-	    name: string;
-	    data_url: string;
-
-	    static createFrom(source: any = {}) {
-	        return new SpineTextureDTO(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.data_url = source["data_url"];
-	    }
-	}
 	export class SpineAnimationDTO {
 	    name: string;
 	    loop: boolean;
 	    dur_ms: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SpineAnimationDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.loop = source["loop"];
 	        this.dur_ms = source["dur_ms"];
+	    }
+	}
+	export class SpineTextureDTO {
+	    name: string;
+	    data_url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SpineTextureDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.data_url = source["data_url"];
 	    }
 	}
 	export class SpineDTO {
@@ -608,21 +616,39 @@ export namespace main {
 	    animation: string;
 	    loop: boolean;
 	    warnings?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SpineDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skeleton = source["skeleton"];
 	        this.atlas = source["atlas"];
-	        this.textures = source["textures"];
-	        this.animations = source["animations"];
+	        this.textures = this.convertValues(source["textures"], SpineTextureDTO);
+	        this.animations = this.convertValues(source["animations"], SpineAnimationDTO);
 	        this.animation = source["animation"];
 	        this.loop = source["loop"];
 	        this.warnings = source["warnings"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SessionMeta {
 	    kind: string;
@@ -651,8 +677,26 @@ export namespace main {
 	        this.op_count = source["op_count"];
 	        this.text_count = source["text_count"];
 	        this.duration_ms = source["duration_ms"];
-	        this.spine = source["spine"];
+	        this.spine = this.convertValues(source["spine"], SpineDTO);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SpeakerDTO {
 	    game_id: string;
@@ -674,6 +718,9 @@ export namespace main {
 	        this.events = source["events"];
 	    }
 	}
+	
+	
+	
 	export class UnpackImportDTO {
 	    dest: string;
 	    engine_id: string;
