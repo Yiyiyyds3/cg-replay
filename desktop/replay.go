@@ -13,6 +13,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -39,6 +40,7 @@ import (
 	"ucgr/internal/player"
 	"ucgr/internal/replay"
 	"ucgr/internal/video"
+	"ucgr/internal/vision"
 )
 
 const (
@@ -52,6 +54,10 @@ const (
 	videoFPS      = 20                    // 影片流的目标帧率（与渲染上限一致）
 
 	durSnapshots = 240 // 时长估计取样点数
+
+	// visibilitySamples 黑屏守卫的采样帧数。必须 ≥ vision.MinTemporalSamples：
+	// 单帧/两帧纯黑只是入场淡入，不能作「整段纯黑」的结论。
+	visibilitySamples = 5
 )
 
 // replaySession 当前回放会话（同一时刻最多一个）。
@@ -295,6 +301,124 @@ func (a *App) confAuto() bool {
 	return ok && c.Auto
 }
 
+// needsVisibilityCheck 判断事件是否需要做多帧可见度守卫。
+//
+// 三类事件不采样：
+//   - 含影片指令（ShowVideoPlay）或影片图层：影片黑场（OP/ED 起点、转场）是正常
+//     演出，静态合成拿不到帧，采下去只会把影片误判成整段纯黑；
+//   - 没有任何 layer_show 的纯台词事件：舞台底本来就是黑的，判它「全黑」没有意义；
+//   - Spine 由前端 canvas 出图（Go 侧无 JPEG），在调用处按 spine != nil 跳过。
+func needsVisibilityCheck(ev *ir.Event) bool {
+	if ev == nil {
+		return false
+	}
+	hasImage := false
+	for _, op := range ev.Show {
+		if op.Kind == ir.ShowVideoPlay {
+			return false
+		}
+		if op.Kind != ir.ShowLayerShow {
+			continue
+		}
+		ref := strings.TrimSpace(op.Ref)
+		if ref == "" {
+			continue
+		}
+		if ir.IsVideoRef(ref) {
+			return false
+		}
+		hasImage = true
+	}
+	return hasImage
+}
+
+// visibilityProbeLoader 把素材 loader 包成可见度采样专用版本。
+//
+// 为什么不直接采样：player 合成遇到缺素材只跳过图层、留黑底（错误只进帧的
+// drawn 诊断），缺图的帧会被当成黑帧汇总成 ErrAllBlack——那不是「确认全黑」，
+// 是「没素材可判」。这里把缺素材的引用记进 missing，并回一整块灰底占位，
+// 让采样结论不可能被误读；调用方看到 missing 非空就只记日志、不拦会话。
+func visibilityProbeLoader(load player.Loader, w, h int, missing *[]string) player.Loader {
+	if w <= 0 || h <= 0 {
+		w, h = 1, 1
+	}
+	var placeholder image.Image
+	return func(ref string) (image.Image, error) {
+		img, err := load(ref)
+		if err == nil {
+			return img, nil
+		}
+		*missing = append(*missing, ref)
+		if placeholder == nil {
+			gray := image.NewRGBA(image.Rect(0, 0, w, h))
+			for i := 0; i < len(gray.Pix); i += 4 {
+				gray.Pix[i], gray.Pix[i+1], gray.Pix[i+2], gray.Pix[i+3] = 96, 96, 96, 255
+			}
+			placeholder = gray
+		}
+		return placeholder, nil
+	}
+}
+
+// allBlackEventError 「整段没有有效画面」的会话拦截错误。
+// 用独立类型而不是裸 fmt.Errorf，是为了消息干净的同时保留 vision.ErrAllBlack 错误链。
+type allBlackEventError struct {
+	title  string
+	frames int
+}
+
+func (e *allBlackEventError) Error() string {
+	return fmt.Sprintf("%s 整段没有有效画面（采样 %d 帧均为纯黑）", e.title, e.frames)
+}
+
+func (e *allBlackEventError) Unwrap() error { return vision.ErrAllBlack }
+
+// guardEventVisibility 开会话前的黑屏守卫：多帧采样，只有整段都没有有效画面才拦截。
+//
+// 判定口径（与 internal/vision 一致）：
+//   - 采样/渲染失败、帧数不足的 Inconclusive、采样期间有缺素材：一律放行，
+//     只写 errors.log。守卫只拦「确认全黑」，不拦「判不出来」；
+//   - 只有 vision.ErrAllBlack 且没有缺素材，才返回 allBlackEventError 拒绝会话。
+func (a *App) guardEventVisibility(title string, ev *ir.Event, load player.Loader, w, h int) error {
+	var missing []string
+	probe := visibilityProbeLoader(load, w, h, &missing)
+	rep, err := replay.CheckEventVisibility(ev, probe, nil, w, h, visibilitySamples)
+	if err != nil && !errors.Is(err, vision.ErrAllBlack) {
+		// 采样失败（渲染/解码/帧不足）：不能当成全黑结论，记录后放行。
+		a.logAuxError("visibility guard", fmt.Errorf("%s 可见度采样未完成，放行：%w", title, err))
+		return nil
+	}
+	if len(missing) > 0 {
+		// 采样里混着缺素材的占位帧：无论结论是黑还是有图都不作数。
+		miss := uniqStrings(missing)
+		msg := fmt.Sprintf("%s 可见度采样缺 %d 个素材（%s），不判纯黑、放行",
+			title, len(miss), strings.Join(miss, "、"))
+		if err != nil {
+			msg += "：" + err.Error()
+		}
+		a.logAuxError("visibility guard", errors.New(msg))
+		return nil
+	}
+	if err != nil {
+		return &allBlackEventError{title: title, frames: rep.Frames}
+	}
+	return nil
+}
+
+// uniqStrings 去重（保持首次出现顺序），日志里不重复刷同一张缺图。
+func uniqStrings(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
+}
+
 // OpenEvent 打开事件进入回放（先关旧会话；IR 构建与 CLI play() 同口径）。
 func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	a.sessMu.Lock()
@@ -428,6 +552,20 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		}
 	}
 
+	// 一份带缓存的素材 loader：黑屏守卫与正常回放共用，守卫多采的几帧
+	// 不会让开会话时重复解码。
+	baseLoad := player.Cached(player.Loader(replay.GameLoader(root)))
+
+	// 多帧可见度守卫（验收项「纯黑界面不触发交互判定」的落地点）：
+	// 单帧黑幕是入场淡入/转场，不能拦会话；只有 5 帧采样整段无有效画面才拒绝。
+	// Spine（前端 canvas 出图）与影片事件（黑场是正常演出）不采样，
+	// 采样失败/缺素材只记日志放行——详见 guardEventVisibility。
+	if spine == nil && needsVisibilityCheck(ev) {
+		if gerr := a.guardEventVisibility(title, ev, baseLoad, sw, sh); gerr != nil {
+			return SessionMeta{}, gerr
+		}
+	}
+
 	s := &replaySession{
 		root:      root,
 		kind:      kind,
@@ -463,7 +601,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 		return video.Duration(p)
 	}
 	s.opts.StageW, s.opts.StageH = sw, sh // 消息层默认几何按舞台底部排
-	s.load = s.stageLoader(player.Cached(player.Loader(replay.GameLoader(root))))
+	s.load = s.stageLoader(baseLoad)      // 与黑屏守卫共用同一份缓存 loader
 	s.p = player.New(ev, s.opts)
 	if sys, aerr := audio.NewSystem(root); aerr == nil {
 		s.audio = sys
