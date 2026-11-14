@@ -61,6 +61,7 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 | `43617084266` | `fa8db7b` | 首次 push workflow | success | 建 milestone + 4 标签 + 117 条 issue |
 | `43617554439` | `97655e4` | push（同步段兼容性改进） | success | 二次运行，117 条全部判定「已存在」跳过，无重复 |
 | 之后由 `reports/audit/**` 提交触发的 run | `7044928` | push（审计 JSON） | 运行中即已生效 | 同步段真实生效：`#20 [游戏] 大雷/女主角（大雷）` 由 `status/待处理` 换成 `status/已验收` |
+| `43618818227` | `3031745` | push（批 2 审计 JSON + 看板标签拆分） | success | 新建 `status/待修`；21 款同步完成，线上分布 已验收 6 / 待修 5 / 卡点跳过 8 / 进行中 2 / 待处理 96（见第 7.3 节） |
 
 第二次运行的幂等性在 GitHub 上是可验证的：跑完后 `[游戏] ` issue 总数仍为 117、标题去重后仍为 117，milestone `游戏库全量验收` 的 `open_issues` 仍是 117。
 
@@ -179,9 +180,31 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 1. 批 1 的 4 条标签会在本次 push 触发的 run 里**被重新同步一次**：`The Blood of Yidhra` 由 `status/卡点跳过` → `status/待修`（因为 fail 现在有独立标签），其余 4 条不变。这正是拆分生效的可验证点。
 2. 「已验收 = 6」仍是**批量层 pass**，不等于 7 条清单全过（第 4/5/6 条无实机证据，见 `reports/游戏库验收_批2报告.md` 第三节）。要真转 `status/已验收`，得先补第二层真机抽样。
 
-### 7.3 批 2 的 run / 同步结果
+### 7.3 批 2 的 run 与同步结果（实测）
 
-由 push 触发（路径命中 `.github/workflows/bootstrap-game-library.yml` 与 `reports/audit/**`），待查。
+| 项 | 值 |
+| --- | --- |
+| commit | `3031745`（`[验收-批2] 一搬+一般 16 款判定与看板标签拆分`，parent `a15dafe`） |
+| workflow run | `43618818227`（run_number 4），event=push，head_sha=`3031745` |
+| 结论 | `completed / success` |
+| 步骤 | Checkout ✅ / Ensure milestone and status labels ✅ / Ensure per-game issues ✅ / Sync audit verdicts (optional) ✅ |
+| `Ensure per-game issues` | 117 行 TSV 全部判定「已存在」跳过，未新建、未重复 |
+| `Ensure milestone and status labels` | 新建 `status/待修`（c5def5）成功 |
+| `Sync audit verdicts` | 21 款逐款 JSON 全部同步，聚合文件（`summary.json` / `summary-batch1.json` / `batch-1.json` / `batch-2.json`）按设计 `[skip]` 跳过 |
 
-<!-- BAT2-RUN-RESULT -->
+**线上实测的 5 个状态标签分布（拉全量 117 条 `[游戏] ` issue 计数，与 7.2 的预测完全一致）**：
+
+| 标签 | 实测条数 |
+| --- | --- |
+| `status/已验收` | 6 |
+| `status/待修` | 5 |
+| `status/卡点跳过` | 8 |
+| `status/进行中` | 2 |
+| `status/待处理` | 96 |
+| 合计 | 117 ✅ |
+
+`fail` 与 `skip` 的拆分在线上可核对：`#43 [游戏] 牢/The Blood of Yidhra（牢）` 这次由 `status/卡点跳过` **改成 `status/待修`**（它是 fail / `scan_error`），而同一批里 `#40 [游戏] 很牢/SOTDQ_0.3.5.3v_WINDOWS（很牢）`（skip / `engine_unsupported_in_main`）仍留在 `status/卡点跳过`。拆分前这两条会落成同一个标签，现在能分开推进。
+
+**body 顶格**：抽查 `#20 [游戏] 大雷/女主角（大雷）` 的 `body` 首行为 `## 验收对象`，无行首空格；7 条清单仍是 `- [ ]` 列表而非缩进代码块。本次 workflow 另加了 `sed` 兜底与首行自检，防止后续有人把 heredoc 内容右缩。
+
 
