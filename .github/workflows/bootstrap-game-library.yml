@@ -198,6 +198,12 @@ jobs:
             reason=$(jq -r '.reason // .blocked_reason // ""' "$f" 2>/dev/null || true)
             summary=$(jq -r '.summary // .note // ""' "$f" 2>/dev/null || true)
 
+            # 聚合型 JSON（summary.json / batch-N.json）没有单款标识，跳过。
+            if [ -z "$raw_title" ] && [ -z "$group" ] && [ -z "$game" ]; then
+              echo "[skip] 无 group/game/title（聚合型 JSON）：$f"
+              continue
+            fi
+
             if [ -n "$raw_title" ]; then
               title="$raw_title"
             else
@@ -219,6 +225,7 @@ jobs:
             case "$verdict" in
               pass|passed|ok|verified|已验收)  label='status/已验收' ;;
               fail|failed|blocked|skip|skipped|卡点|卡点跳过) label='status/卡点跳过' ;;
+              partial|partial_pass|部分通过|进行中) label='status/进行中' ;;
               *) label='status/进行中' ;;
             esac
 
