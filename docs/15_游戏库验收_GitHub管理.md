@@ -205,6 +205,8 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 `fail` 与 `skip` 的拆分在线上可核对：`#43 [游戏] 牢/The Blood of Yidhra（牢）` 这次由 `status/卡点跳过` **改成 `status/待修`**（它是 fail / `scan_error`），而同一批里 `#40 [游戏] 很牢/SOTDQ_0.3.5.3v_WINDOWS（很牢）`（skip / `engine_unsupported_in_main`）仍留在 `status/卡点跳过`。拆分前这两条会落成同一个标签，现在能分开推进。
 
+**口径自洽核对（复核澄清后，2026-11-15）**：线上标签分布 **6/5/8/2/96** 与「**21 款已跑、96 款待处理**」自洽（`6+5+8+2+96 = 117`，`21 = 批1 5 + 批2 16`，批 1 的 `total=5` 是款数而非另计口径，不得再与状态和相加）；`fail → status/待修`、`skip → status/卡点跳过` 的拆分**已生效**（拆分前 9 款会挤在同一列）。详见 `reports/游戏库验收_批2报告.md` 第七节「复核澄清」。
+
 **body 顶格**：抽查 `#20 [游戏] 大雷/女主角（大雷）` 的 `body` 首行为 `## 验收对象`，无行首空格；7 条清单仍是 `- [ ]` 列表而非缩进代码块。本次 workflow 另加了 `sed` 兜底与首行自检，防止后续有人把 heredoc 内容右缩。
 
 
