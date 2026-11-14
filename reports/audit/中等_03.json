@@ -1,0 +1,30 @@
+{
+  "group": "中等",
+  "game": "(中等)mindsweeper_ver1.07",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\(中等)mindsweeper_ver1.07",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260812\\其他\\中等\\(中等)mindsweeper_ver1.07",
+  "engine_guess": "NScripter/ONScripter",
+  "engine_detected": "",
+  "engine_resolved": "nscript",
+  "top_entries": 6,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [
+    "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+    "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+  ],
+  "errors": [
+    "没有找到 NScripter 剧本（nscript.dat / 0.txt，E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\(中等)mindsweeper_ver1.07）"
+  ],
+  "verdict": "fail",
+  "reason": "scan_error",
+  "duration_ms": 30
+}

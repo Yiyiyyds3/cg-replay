@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-11-15T01:33:35+08:00",
+  "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价",
+  "tsv": "reports/游戏库验收_任务清单.tsv",
+  "groups_requested": [
+    "未评级"
+  ],
+  "total": 44,
+  "pass": 14,
+  "partial": 3,
+  "fail": 12,
+  "skip": 15,
+  "by_group": {
+    "未评级": {
+      "fail": 12,
+      "skip": 15,
+      "partial": 3,
+      "pass": 14,
+      "total": 44
+    }
+  },
+  "by_engine": {
+    "renpy": {
+      "fail": 0,
+      "pass": 0,
+      "partial": 0,
+      "total": 2,
+      "skip": 2
+    },
+    "cocos": {
+      "fail": 0,
+      "pass": 0,
+      "partial": 0,
+      "total": 1,
+      "skip": 1
+    },
+    "kirikiri": {
+      "fail": 0,
+      "pass": 0,
+      "partial": 3,
+      "total": 3,
+      "skip": 0
+    },
+    "rmmz": {
+      "fail": 2,
+      "pass": 14,
+      "partial": 0,
+      "total": 16,
+      "skip": 0
+    },
+    "unknown": {
+      "fail": 0,
+      "pass": 0,
+      "partial": 0,
+      "total": 11,
+      "skip": 11
+    },
+    "wolfrpg": {
+      "fail": 0,
+      "pass": 0,
+      "partial": 0,
+      "total": 1,
+      "skip": 1
+    },
+    "unity": {
+      "fail": 10,
+      "pass": 0,
+      "partial": 0,
+      "total": 10,
+      "skip": 0
+    }
+  },
+  "duration_sec": 299.5,
+  "batch_file": "reports/audit/batch-3.json",
+  "note": "summary-batch3.json was accidentally overwritten during batch-4 run; rebuilt from reports/audit/未评级_01..44.json (per-game verdicts unchanged, original generated_at lost)"
+}

@@ -1,75 +1,68 @@
 {
-  "generated_at": "2026-11-15T01:17:43+08:00",
+  "generated_at": "2026-11-15T01:32:33+08:00",
   "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价",
   "tsv": "reports/游戏库验收_任务清单.tsv",
   "groups_requested": [
-    "未评级"
+    "中等"
   ],
-  "total": 44,
-  "pass": 14,
-  "partial": 3,
-  "fail": 12,
-  "skip": 15,
+  "total": 16,
+  "pass": 4,
+  "partial": 1,
+  "fail": 6,
+  "skip": 5,
   "by_group": {
-    "未评级": {
-      "total": 44,
-      "pass": 14,
-      "partial": 3,
-      "fail": 12,
-      "skip": 15
+    "中等": {
+      "total": 16,
+      "pass": 4,
+      "partial": 1,
+      "fail": 6,
+      "skip": 5
     }
   },
   "by_engine": {
-    "cocos(guess)": {
+    "kirikiri": {
+      "total": 1,
+      "pass": 0,
+      "partial": 1,
+      "fail": 0,
+      "skip": 0
+    },
+    "nscript(guess)": {
       "total": 1,
       "pass": 0,
       "partial": 0,
-      "fail": 0,
-      "skip": 1
-    },
-    "kirikiri": {
-      "total": 3,
-      "pass": 0,
-      "partial": 3,
-      "fail": 0,
+      "fail": 1,
       "skip": 0
     },
     "renpy(guess)": {
-      "total": 2,
-      "pass": 0,
-      "partial": 0,
-      "fail": 0,
-      "skip": 2
-    },
-    "rmmz(guess)": {
-      "total": 16,
-      "pass": 14,
-      "partial": 0,
-      "fail": 2,
-      "skip": 0
-    },
-    "unity(guess)": {
-      "total": 10,
-      "pass": 0,
-      "partial": 0,
-      "fail": 10,
-      "skip": 0
-    },
-    "unknown": {
-      "total": 11,
-      "pass": 0,
-      "partial": 0,
-      "fail": 0,
-      "skip": 11
-    },
-    "wolfrpg(guess)": {
       "total": 1,
       "pass": 0,
       "partial": 0,
       "fail": 0,
       "skip": 1
+    },
+    "rmmz(guess)": {
+      "total": 4,
+      "pass": 4,
+      "partial": 0,
+      "fail": 0,
+      "skip": 0
+    },
+    "unity(guess)": {
+      "total": 5,
+      "pass": 0,
+      "partial": 0,
+      "fail": 5,
+      "skip": 0
+    },
+    "unknown": {
+      "total": 4,
+      "pass": 0,
+      "partial": 0,
+      "fail": 0,
+      "skip": 4
     }
   },
-  "duration_sec": 299.5640078,
-  "batch_file": "reports/audit/batch-3.json"
+  "duration_sec": 17.6685241,
+  "batch_file": "reports/audit/batch-4.json"
 }

@@ -1,0 +1,29 @@
+{
+  "group": "中等",
+  "game": "无法诉说的关系(中等)",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\无法诉说的关系(中等)",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260612\\RPG\\中等\\无法诉说的关系(中等)",
+  "engine_guess": "KiriKiri",
+  "engine_detected": "kirikiri",
+  "engine_resolved": "kirikiri",
+  "top_entries": 5,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": true,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [
+    "unpack: kind=archive engine=kirikiri archives=2 scenario_files=7 labels=0 refs=0 encrypted=0 unsupported=false"
+  ],
+  "errors": [
+    "读不到剧本目录 E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\无法诉说的关系(中等)\\raw\\data\\scenario（open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\无法诉说的关系(中等)\\raw\\data\\scenario: The system cannot find the path specified.）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎"
+  ],
+  "verdict": "partial",
+  "reason": "scan_error_can_unpack",
+  "duration_ms": 56
+}
