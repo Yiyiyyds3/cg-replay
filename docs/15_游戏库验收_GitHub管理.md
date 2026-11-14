@@ -46,13 +46,23 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 
 | 项 | 值 |
 | --- | --- |
-| commit | `fa8db7b`（`ci: 游戏库全量验收 Issue 批量引导与状态同步`，parent `28b5e15`） |
+| commit（首跑） | `fa8db7b`（`ci: 游戏库全量验收 Issue 批量引导与状态同步`，parent `28b5e15`） |
 | workflow run | `43617084266`，event=push，head_sha=`fa8db7b` |
 | 结论 | `completed / success` |
 | 步骤 | Checkout ✅ / Ensure milestone and status labels ✅ / Ensure per-game issues ✅ / Sync audit verdicts (optional) ✅ |
 | 创建结果 | TSV 行数 117，本次创建 117，已存在跳过 0 |
 
-本地预演（stub `gh`，不碰真实仓库）验证过：首跑建 117 条、预置 2 条已存在时建 115 跳过 2、无 `reports/audit` 时同步步骤直接跳过且 exit 0。
+### 运行历史
+
+| run id | head_sha | 触发原因 | 结论 | 说明 |
+| --- | --- | --- | --- | --- |
+| `43617084266` | `fa8db7b` | 首次 push workflow | success | 建 milestone + 4 标签 + 117 条 issue |
+| `43617554439` | `97655e4` | push（同步段兼容性改进） | success | 二次运行，117 条全部判定「已存在」跳过，无重复 |
+| 之后由 `reports/audit/**` 提交触发的 run | `7044928` | push（审计 JSON） | 运行中即已生效 | 同步段真实生效：`#20 [游戏] 大雷/女主角（大雷）` 由 `status/待处理` 换成 `status/已验收` |
+
+第二次运行的幂等性在 GitHub 上是可验证的：跑完后 `[游戏] ` issue 总数仍为 117、标题去重后仍为 117，milestone `游戏库全量验收` 的 `open_issues` 仍是 117。
+
+本地预演（stub `gh`，不碰真实仓库）另验证过：首跑建 117 条、预置 2 条已存在时建 115 跳过 2、无 `reports/audit` 时同步步骤直接跳过且 exit 0。
 
 ## 4. 验证用 API 端点
 
@@ -105,7 +115,13 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 ```
 
 也可直接用 `title` 字段给完整标题（`[游戏] 分组/游戏名`）；`verdict` 取
-`pass/ok/已验收` → `status/已验收`，`fail/blocked/skip/卡点跳过` → `status/卡点跳过`，其余 → `status/进行中`。
+`pass/ok/已验收` → `status/已验收`，`fail/blocked/skip/卡点/卡点跳过` → `status/卡点跳过`，
+`partial/部分通过` 及其它 → `status/进行中`。
+
+同步段对审计产物做了两点容错：
+
+- `reports/audit/summary.json`、`batch-N.json` 这类**聚合文件**没有单款 `group/game/title`，直接打印 `[skip]` 跳过，不会去找 `[游戏] /` 这种空标题。
+- `reports/audit/<分组>_<序>.json`（`cmd/library-audit` 实际产出的格式）字段为 `group` / `game` / `verdict` / `reason` / `engine_resolved` 等，与本节的字段约定兼容。
 
 ## 6. 分组分布（TSV 117 行）
 
