@@ -260,9 +260,9 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 批 4 = 中等 16（pass 4 / partial 1 / fail 6 / skip 5，17.7s）；批 5 = 中上+不赖 10（pass 2 / fail 6 / skip 2，10.9s）；批 6 = 夯 19（pass 5 / fail 6 / skip 8，57.1s）；批 7 = 创意+上等 7（pass 4 / fail 1 / skip 2，51.5s）。全部 exit 0、无超时。详见 `reports/游戏库验收_批4~7报告.md` 四份。
 
-### 9.1 预计标签分布变化（7 批全跑完）
+### 9.1 实测标签分布（7 批全跑完，与 §1.1 一致，来源：GitHub issues API）
 
-| 标签 | 批 3 后（20/17/23/5/52） | 批 4~7 后（预计） | 变化 |
+| 标签 | 批 3 后（20/17/23/5/52） | 批 4~7 后（实测） | 变化 |
 | --- | --- | --- | --- |
 | `status/已验收`（pass） | 20 | **35** | +15（批4 4 / 批5 2 / 批6 5 / 批7 4，全部 rmmz） |
 | `status/待修`（fail） | 17 | **36** | +19（Unity 缺 cg-index ×11、rmmz 插件驱动 ×2、批4 其余 ×6） |
@@ -273,6 +273,6 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 进度口径同步：**累计 117 已跑（全库）/ 剩余 0**；三项汇报数 = **累计已验收 35 ／ 卡点跳过 40 ／ 剩余 0（共 117）**，另列 **失败待修 36 / 进行中 6**。注意「剩余 0」只表示未跑款数为 0；未验收通过 = partial+fail+skip = **82 款**（70%），后续全部在 `status/待修`、`status/卡点跳过`、`status/进行中` 三条线推进，汇总表见批 7 报告 §6。
 
-> 触发说明：本次提交改动批 5~7 共 36 个逐款 JSON + `batch-5/6/7.json` + `summary.json` → `reports/audit/**` 命中 workflow `paths`，**由 push 自动触发**；线上标签实测分布待查（用 §4 API 端点核对后回填 §9.1 表）。
+> 触发说明：本次提交改动批 5~7 共 36 个逐款 JSON + `batch-5/6/7.json` + `summary.json` → `reports/audit/**` 命中 workflow `paths`，由 push 自动触发；上表「批 4~7 后」列为 GitHub issues API 实测回填值（与 §1.1 的 35/36/40/6/0 一致）。
 
 
