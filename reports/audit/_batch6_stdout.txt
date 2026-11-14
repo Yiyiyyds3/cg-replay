@@ -1,0 +1,28 @@
+fail | 夯 | (夯)克蕾娅 | 0 | - | scan_error
+pass | 夯 | (夯)魔塔 | 31 | - | events>0
+skip | 夯 | (夯)Atis-欲望の塔DemoV2.1 | 0 | - | engine_unsupported_in_main
+fail | 夯 | （夯） 用洗脑APP肆意玩弄狂妄大小姐 洗脳アプリで清楚なお嬢様 V.. 官方中文版 | 0 | - | scan_error
+skip | 夯 | （夯）`[PC.SLG`]ReSister―妹とふたり、ひみつの同棲生活`[官中`]`[10.31发售`] | 0 | - | engine_unsupported_in_main
+skip | 夯 | （夯）克莱尔·斯特拉格尔 +cg存档 | 0 | - | engine_unsupported_in_main
+pass | 夯 | （夯）直到这个魅魔的心灵崩坏 | 50 | - | events>0
+skip | 夯 | （夯）状态异常 | 0 | - | engine_unsupported_in_main
+skip | 夯 | （夯）ASTR | 0 | - | engine_unsupported_in_main
+pass | 夯 | 苍红界域（夯） | 209 | - | events>0
+skip | 夯 | 大赛(夯) | 0 | - | engine_unsupported_in_main
+pass | 夯 | 希尔丝大冒险  1.06（夯） | 101 | - | events>0
+skip | 夯 | 浴火重火（夯） | 0 | - | engine_unsupported_in_main
+fail | 夯 | 呪いの鎧 v3.0.1（夯） | 0 | - | scan_error
+fail | 夯 | 詛咒铠甲2（夯） | 0 | - | scan_error
+pass | 夯 | ayuureiCN（夯） | 132 | - | events>0
+fail | 夯 | KanzenChikan（夯） | 0 | - | scan_error
+skip | 夯 | Supower-Re0.68-pc（夯） | 0 | - | engine_unsupported_in_main
+fail | 夯 | モンスターブラックマーケット（夯） | 0 | - | scan_error
+[汇总] 总数=19 pass=5 partial=0 fail=6 skip=8 用时=57.1s
+  分组 夯: 总数=19 pass=5 partial=0 fail=6 skip=8
+  引擎 gamemaker(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 godot(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 renpy(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 rmmz(guess): 总数=7 pass=5 partial=0 fail=2 skip=0
+  引擎 unity(guess): 总数=4 pass=0 partial=0 fail=4 skip=0
+  引擎 unknown: 总数=4 pass=0 partial=0 fail=0 skip=4
+  引擎 unreal(guess): 总数=1 pass=0 partial=0 fail=0 skip=1

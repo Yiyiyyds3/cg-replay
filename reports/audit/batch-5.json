@@ -1,0 +1,318 @@
+[
+  {
+    "group": "不赖",
+    "game": "（不赖）ideal-eves-room-_1.0.0",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）ideal-eves-room-_1.0.0",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\其他\\不赖\\（不赖）ideal-eves-room-_1.0.0",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 11,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [
+      "bg"
+    ],
+    "asset_dirs": [
+      "ideal -eve's room-_Data/StreamingAssets/Image/Background(19张图)"
+    ],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）ideal-eves-room-_1.0.0\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 72
+  },
+  {
+    "group": "不赖",
+    "game": "（不赖）Succubus Successor Delilah's Juicy Journey",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）Succubus Successor Delilah's Juicy Journey",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260703\\其他\\不赖\\（不赖）Succubus Successor Delilah's Juicy Journey",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 6,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）Succubus Successor Delilah's Juicy Journey\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 57
+  },
+  {
+    "group": "不赖",
+    "game": "芙(不赖)",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\芙(不赖)",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260722\\其他\\不赖\\芙(不赖)",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 1,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\芙(不赖)\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 21
+  },
+  {
+    "group": "不赖",
+    "game": "忍耐色诱的告白游戏 V2.0（不赖）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\忍耐色诱的告白游戏 V2.0（不赖）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260613\\RPG\\不赖\\忍耐色诱的告白游戏 V2.0（不赖）",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 19,
+    "events": 478,
+    "cg": 0,
+    "scenes": 478,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 8572
+  },
+  {
+    "group": "不赖",
+    "game": "GensouBrothel(Ver1.00)（不赖）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\GensouBrothel(Ver1.00)（不赖）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260705\\其他\\不赖\\GensouBrothel(Ver1.00)（不赖）",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 11,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\GensouBrothel(Ver1.00)（不赖）\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 50
+  },
+  {
+    "group": "中上",
+    "game": "(中上)NTR Master",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\(中上)NTR Master",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260825\\其他\\中上\\(中上)NTR Master",
+    "engine_guess": "未知",
+    "engine_detected": "",
+    "top_entries": 2,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "NTR Master/Save/Screenshot(7张图)"
+    ],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=未知（DetectEngine 与 engine_guess 都没认出来）；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 37
+  },
+  {
+    "group": "中上",
+    "game": "（中上）_沉溺于肉欲的姐姐_肉欲に溺れる姉___AI汉化版",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\（中上）_沉溺于肉欲的姐姐_肉欲に溺れる姉___AI汉化版",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\RPG\\中上\\（中上）_沉溺于肉欲的姐姐_肉欲に溺れる姉___AI汉化版",
+    "engine_guess": "未知",
+    "engine_detected": "",
+    "top_entries": 1,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=未知（DetectEngine 与 engine_guess 都没认出来）；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 23
+  },
+  {
+    "group": "中上",
+    "game": "魔法少女木叶  v2.04（中上）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\魔法少女木叶  v2.04（中上）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260519\\RPG\\中上\\魔法少女木叶  v2.04（中上）",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 19,
+    "events": 22,
+    "cg": 0,
+    "scenes": 22,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "www/img/BJ(81张图)",
+      "www/img/animations(627张图)",
+      "www/img/battlebacks1(142张图)",
+      "www/img/characters(404张图)",
+      "www/img/eventindicators(111张图)",
+      "www/img/faces(8张图)",
+      "www/img/menus/actorwindow(6张图)",
+      "www/img/menus/equip(7张图)",
+      "www/img/menus/item(6张图)",
+      "www/img/menus/main(14张图)",
+      "www/img/menus/skill(6张图)",
+      "www/img/parallaxes(197张图)"
+    ],
+    "cover_valid": true,
+    "cover_source": "www/img/system/title_back01.png",
+    "cover_non_black": 0.7512152777777777,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 1996
+  },
+  {
+    "group": "中上",
+    "game": "HO(中上)",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\HO(中上)",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260908\\其他\\中上\\HO(中上)",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 1,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\HO(中上)\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 29
+  },
+  {
+    "group": "中上",
+    "game": "Oshioki Lesson(中上)",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\Oshioki Lesson(中上)",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260904\\其他\\中上\\Oshioki Lesson(中上)",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 9,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\Oshioki Lesson(中上)\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 49
+  }
+]

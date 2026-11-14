@@ -1,0 +1,30 @@
+{
+  "group": "夯",
+  "game": "（夯） 用洗脑APP肆意玩弄狂妄大小姐 洗脳アプリで清楚なお嬢様 V.. 官方中文版",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\（夯） 用洗脑APP肆意玩弄狂妄大小姐 洗脳アプリで清楚なお嬢様 V.. 官方中文版",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\其他\\夯\\（夯） 用洗脑APP肆意玩弄狂妄大小姐 洗脳アプリで清楚なお嬢様 V.. 官方中文版",
+  "engine_guess": "Unity",
+  "engine_detected": "",
+  "engine_resolved": "unity",
+  "top_entries": 1,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [
+    "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+    "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+  ],
+  "errors": [
+    "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\（夯） 用洗脑APP肆意玩弄狂妄大小姐 洗脳アプリで清楚なお嬢様 V.. 官方中文版\\cg-index.json: The system cannot find the file specified.）"
+  ],
+  "verdict": "fail",
+  "reason": "scan_error",
+  "duration_ms": 30
+}

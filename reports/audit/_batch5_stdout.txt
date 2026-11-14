@@ -1,0 +1,16 @@
+fail | 不赖 | （不赖）ideal-eves-room-_1.0.0 | 0 | - | scan_error
+fail | 不赖 | （不赖）Succubus Successor Delilah's Juicy Journey | 0 | - | scan_error
+fail | 不赖 | 芙(不赖) | 0 | - | scan_error
+pass | 不赖 | 忍耐色诱的告白游戏 V2.0（不赖） | 478 | - | events>0
+fail | 不赖 | GensouBrothel(Ver1.00)（不赖） | 0 | - | scan_error
+skip | 中上 | (中上)NTR Master | 0 | - | engine_unsupported_in_main
+skip | 中上 | （中上）_沉溺于肉欲的姐姐_肉欲に溺れる姉___AI汉化版 | 0 | - | engine_unsupported_in_main
+pass | 中上 | 魔法少女木叶  v2.04（中上） | 22 | - | events>0
+fail | 中上 | HO(中上) | 0 | - | scan_error
+fail | 中上 | Oshioki Lesson(中上) | 0 | - | scan_error
+[汇总] 总数=10 pass=2 partial=0 fail=6 skip=2 用时=10.9s
+  分组 不赖: 总数=5 pass=1 partial=0 fail=4 skip=0
+  分组 中上: 总数=5 pass=1 partial=0 fail=2 skip=2
+  引擎 rmmz(guess): 总数=2 pass=2 partial=0 fail=0 skip=0
+  引擎 unity(guess): 总数=6 pass=0 partial=0 fail=6 skip=0
+  引擎 unknown: 总数=2 pass=0 partial=0 fail=0 skip=2

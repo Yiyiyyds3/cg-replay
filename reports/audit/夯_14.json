@@ -1,0 +1,35 @@
+{
+  "group": "夯",
+  "game": "呪いの鎧 v3.0.1（夯）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\呪いの鎧 v3.0.1（夯）",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260629\\RPG\\夯\\呪いの鎧 v3.0.1（夯）",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 19,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "www/img/battlebacks1(50张图)"
+  ],
+  "cover_valid": true,
+  "cover_source": "www/img/titles1/title.jpg",
+  "cover_non_black": 0.8186179577464788,
+  "unpack_notes": [
+    "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+    "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+  ],
+  "errors": [
+    "没有识别到图片演出（扫了 www/data，图片目录 \"www/img\"，警告 849 条）"
+  ],
+  "verdict": "fail",
+  "reason": "scan_error",
+  "duration_ms": 763
+}

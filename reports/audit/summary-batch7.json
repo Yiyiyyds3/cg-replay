@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-11-15T01:39:37+08:00",
+  "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价",
+  "tsv": "reports/游戏库验收_任务清单.tsv",
+  "groups_requested": [
+    "创意",
+    "上等"
+  ],
+  "total": 7,
+  "pass": 4,
+  "partial": 0,
+  "fail": 1,
+  "skip": 2,
+  "by_group": {
+    "上等": {
+      "total": 5,
+      "pass": 3,
+      "partial": 0,
+      "fail": 1,
+      "skip": 1
+    },
+    "创意": {
+      "total": 2,
+      "pass": 1,
+      "partial": 0,
+      "fail": 0,
+      "skip": 1
+    }
+  },
+  "by_engine": {
+    "renpy(guess)": {
+      "total": 1,
+      "pass": 0,
+      "partial": 0,
+      "fail": 0,
+      "skip": 1
+    },
+    "rmmz(guess)": {
+      "total": 4,
+      "pass": 4,
+      "partial": 0,
+      "fail": 0,
+      "skip": 0
+    },
+    "unity(guess)": {
+      "total": 1,
+      "pass": 0,
+      "partial": 0,
+      "fail": 1,
+      "skip": 0
+    },
+    "unreal(guess)": {
+      "total": 1,
+      "pass": 0,
+      "partial": 0,
+      "fail": 0,
+      "skip": 1
+    }
+  },
+  "duration_sec": 51.4755539,
+  "batch_file": "reports/audit/batch-7.json"
+}

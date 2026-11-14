@@ -1,0 +1,14 @@
+pass | 创意 | 人柱阿拉卡 v230216(创意) | 86 | - | events>0
+skip | 创意 | FORTUNE BRIDE - 絶頂開眼の儀式 -（创意） | 0 | - | engine_unsupported_in_main
+pass | 上等 | （上等）哈尔法斯的恶魔 | 68 | - | events>0
+pass | 上等 | （上等）NTRエロトラップダンジョン | 97 | - | events>0
+skip | 上等 | （上等）xxxFiles-0.2.5-win | 0 | - | engine_unsupported_in_main
+fail | 上等 | 夢見る酒場と秘密の調教（上等） | 0 | - | scan_error
+pass | 上等 | 气息（上等） | 348 | - | events>0
+[汇总] 总数=7 pass=4 partial=0 fail=1 skip=2 用时=51.5s
+  分组 上等: 总数=5 pass=3 partial=0 fail=1 skip=1
+  分组 创意: 总数=2 pass=1 partial=0 fail=0 skip=1
+  引擎 renpy(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 rmmz(guess): 总数=4 pass=4 partial=0 fail=0 skip=0
+  引擎 unity(guess): 总数=1 pass=0 partial=0 fail=1 skip=0
+  引擎 unreal(guess): 总数=1 pass=0 partial=0 fail=0 skip=1

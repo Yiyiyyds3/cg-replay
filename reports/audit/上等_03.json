@@ -1,0 +1,45 @@
+{
+  "group": "上等",
+  "game": "（上等）xxxFiles-0.2.5-win",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\上等\\（上等）xxxFiles-0.2.5-win",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260808\\ADV\\上等\\（上等）xxxFiles-0.2.5-win",
+  "engine_guess": "Ren'Py",
+  "engine_detected": "",
+  "engine_resolved": "renpy",
+  "top_entries": 8,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "backup_nav_4k(10张图)",
+    "game/.ucgr-cache/images/akane(7张图)",
+    "game/gui(70张图)",
+    "game/gui/button(19张图)",
+    "game/gui/buttons_navigation(39张图)",
+    "game/gui/cursor(22张图)",
+    "game/gui/scrollbar(10张图)",
+    "game/gui/slider(8张图)",
+    "game/phone/assets(69张图)",
+    "game/phone/assets/emojis(229张图)",
+    "renpy/common(5张图)"
+  ],
+  "cover_valid": false,
+  "cover_source": "game/gui/title.webp",
+  "unpack_notes": [
+    "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+    "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+  ],
+  "errors": [
+    "封面解码失败 game/gui/title.webp: 非 TLG/JPEG/HG3 文件（魔数 \"RIFF\\xfe\\xc7\\x01\\x00WEB\"）",
+    "main 无该引擎 ScanXxx 分派：engine=renpy；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+  ],
+  "verdict": "skip",
+  "reason": "engine_unsupported_in_main",
+  "duration_ms": 213
+}
