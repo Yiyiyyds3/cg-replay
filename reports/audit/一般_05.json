@@ -1,0 +1,30 @@
+{
+  "group": "一般",
+  "game": "（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260730\\SLG\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+  "engine_guess": "KiriKiri",
+  "engine_detected": "kirikiri",
+  "engine_resolved": "kirikiri",
+  "top_entries": 20,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": true,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [
+    "unpack: kind=archive engine=kirikiri archives=11 scenario_files=51 labels=22 refs=1644 encrypted=3028 unsupported=false",
+    "有 3028 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）"
+  ],
+  "errors": [
+    "读不到剧本目录 E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～\\raw\\data\\scenario（open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～\\raw\\data\\scenario: The system cannot find the path specified.）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎"
+  ],
+  "verdict": "partial",
+  "reason": "scan_error_can_unpack",
+  "duration_ms": 501
+}

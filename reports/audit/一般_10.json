@@ -1,0 +1,45 @@
+{
+  "group": "一般",
+  "game": "裏垢JKは露出でバズりたい（一般）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\裏垢JKは露出でバズりたい（一般）",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260501\\RPG\\一般\\裏垢JKは露出でバズりたい（一般）",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 2,
+  "events": 25,
+  "cg": 0,
+  "scenes": 25,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [
+    "stand"
+  ],
+  "asset_dirs": [
+    "内嵌/effects/Texture(48张图)",
+    "内嵌/img/battlebacks1(51张图)",
+    "内嵌/img/battlebacks2(50张图)",
+    "内嵌/img/characters(66张图)",
+    "内嵌/img/parallaxes(21张图)",
+    "内嵌/img/pictures/CGイベント(16张图)",
+    "内嵌/img/pictures/OP_CG(5张图)",
+    "内嵌/img/pictures/Result素材(7张图)",
+    "内嵌/img/pictures/ホーム画面UI達(20张图)",
+    "内嵌/img/pictures/マップイベント用CG(21张图)",
+    "内嵌/img/pictures/立ち絵(63张图)",
+    "内嵌/img/pictures/背景(15张图)"
+  ],
+  "cover_valid": false,
+  "cover_source": "内嵌/img/system/splash title.png",
+  "cover_non_black": 0.03489278752436647,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 9195
+}

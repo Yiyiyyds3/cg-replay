@@ -1,5 +1,5 @@
 # bootstrap-game-library.yml —— 用 GitHub Actions 自带的 gh + GITHUB_TOKEN，
-# 把「游戏库全量验收」的 milestone / 4 个状态标签 / 117 个游戏 Issue 建起来。
+# 把「游戏库全量验收」的 milestone / 5 个状态标签 / 117 个游戏 Issue 建起来。
 #
 # 触发：workflow_dispatch；或 push 且仅改动本文件 / 任务清单 TSV / 审计 JSON 时。
 # 幂等：全部先查再建；重复运行不产生重复 issue、不报错。
@@ -40,7 +40,10 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------------------------------------------
-      # 1. Milestone + 4 个状态标签
+      # 1. Milestone + 5 个状态标签
+      #    status/待修 与 status/卡点跳过 是两件事，不要合并：
+      #      待修   = 扫描报错 / 缺产物（cg-index.json 缺、容器没解包……）→ 需要补代码或先导出
+      #      卡点   = main 无该引擎分派 / 引擎认不出 / 单款超时 → 能力缺口，不死磕（docs/14 ⑥）
       # ---------------------------------------------------------------
       - name: Ensure milestone and status labels
         run: |
@@ -78,6 +81,7 @@ jobs:
           ensure_label 'status/待处理'   'ededed' '还没有开始自测'
           ensure_label 'status/进行中'   '1d76db' '正在跑，未出结论'
           ensure_label 'status/已验收'   '0e8a16' '7 条验收清单全过'
+          ensure_label 'status/待修'     'c5def5' '扫描报错/缺产物，需补代码或先导出'
           ensure_label 'status/卡点跳过' 'b60205' '卡点未解，15 分钟超时跳过'
 
       # ---------------------------------------------------------------
@@ -118,7 +122,10 @@ jobs:
               continue
             fi
 
-            # 无反引号、无 $ 的 heredoc，变量正常展开。
+            # body 的 heredoc 内容一律按 run 块的**最小缩进**书写（不跟着 if/cat
+            # 往右缩），YAML 折叠后即为顶格；紧接着再用 sed 兜底剥一次行首空白。
+            # 原因：body 每行若带缩进，GitHub 会把整段渲染成缩进块（不是标题/列表），
+            # 7 条清单的 `- [ ]` 也会变成纯文本。两道保险，内容一字不改。
             cat > "$tmp" <<EOF
           ## 验收对象
           - 分组：${group}
@@ -143,6 +150,13 @@ jobs:
           ---
           数据来源：reports/游戏库验收_任务清单.tsv（由 workflow 自动生成）
           EOF
+            # 兜底去行首空白（正文没有以空格开头的内容，剥了不改语义）。
+            sed -i 's/^[[:space:]]*//' "$tmp"
+            # 自检：第一行必须是 `## 验收对象`，不是空格。
+            if [ "$(head -n1 "$tmp")" != '## 验收对象' ]; then
+              echo "::error::issue body 首行不是顶格标题：$(head -n1 "$tmp")"
+              exit 1
+            fi
 
             url=$(gh issue create -R "$REPO" \
                   --title "$title" \
@@ -224,12 +238,13 @@ jobs:
 
             case "$verdict" in
               pass|passed|ok|verified|已验收)  label='status/已验收' ;;
-              fail|failed|blocked|skip|skipped|卡点|卡点跳过) label='status/卡点跳过' ;;
+              fail|failed|blocked|待修)        label='status/待修' ;;
+              skip|skipped|卡点|卡点跳过)      label='status/卡点跳过' ;;
               partial|partial_pass|部分通过|进行中) label='status/进行中' ;;
               *) label='status/进行中' ;;
             esac
 
-            for other in 'status/待处理' 'status/进行中' 'status/已验收' 'status/卡点跳过'; do
+            for other in 'status/待处理' 'status/进行中' 'status/已验收' 'status/待修' 'status/卡点跳过'; do
               if [ "$other" != "$label" ]; then
                 gh issue edit "$num" -R "$REPO" --remove-label "$other" >/dev/null 2>&1 || true
               fi

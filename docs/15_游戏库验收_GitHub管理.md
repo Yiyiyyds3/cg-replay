@@ -2,21 +2,21 @@
 
 本文记录「游戏库全量验收」在 GitHub 侧的管理结构、自动化 workflow、实际运行结果与验证方式。
 
-## 1. 管理结构（Milestone + 4 个状态标签）
+## 1. 管理结构（Milestone + 5 个状态标签）
 
 GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `project` scope），
 因此看板**暂以 Milestone + 状态标签代替 Project v2 看板**：
-每条游戏 Issue 用 `status/*` 标签表示验收阶段，用 `gh issue list --label` 就能拉出「待处理 / 进行中 / 已验收 / 卡点跳过」四列视图。
+每条游戏 Issue 用 `status/*` 标签表示验收阶段，用 `gh issue list --label` 就能拉出「待处理 / 进行中 / 已验收 / 待修 / 卡点跳过」五列视图。
 
 | 项目 | 值 |
 | --- | --- |
 | Milestone | `游戏库全量验收`（编号 #2，state=open，description=`按评价低→高全量自测验收`） |
-| 状态标签 | `status/待处理`（ededed）、`status/进行中`（1d76db）、`status/已验收`（0e8a16）、`status/卡点跳过`（b60205） |
+| 状态标签 | `status/待处理`（ededed）、`status/进行中`（1d76db）、`status/已验收`（0e8a16）、`status/待修`（c5def5）、`status/卡点跳过`（b60205） |
 | Issue 标题格式 | `[游戏] {分组}/{游戏名}` |
 | Issue 数量 | 117（与 `reports/游戏库验收_任务清单.tsv` 行数一一对应） |
 | Issue 编号区间 | #13 ~ #129（仓库共 129 条 issue，其中 12 条为 0.4.0 版本 issue 等历史条目） |
 
-状态流转：`待处理` → `进行中` →（7 条清单全过）`已验收`；遇卡点 15 分钟未解 → `卡点跳过`。
+状态流转：`待处理` → `进行中` →（7 条清单全过）`已验收`；审计报错 / 缺产物 → `待修`；遇卡点 15 分钟未解 → `卡点跳过`。
 
 ## 2. 自动化 workflow
 
@@ -27,11 +27,13 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 - 权限：`contents: read` + `issues: write`，用 runner 自带 `gh` 与 `secrets.GITHUB_TOKEN`（`env: GH_TOKEN`）。
 - 幂等：全部「先查再建」，可反复运行：
   1. `Checkout` —— `actions/checkout@v4`。
-  2. `Ensure milestone and status labels` —— 先 `gh api "repos/$REPO/milestones?state=all&per_page=100"` 查 milestone，没有再建；4 个 `status/*` 标签先 `gh label list` 查再建。
+  2. `Ensure milestone and status labels` —— 先 `gh api "repos/$REPO/milestones?state=all&per_page=100"` 查 milestone，没有再建；5 个 `status/*` 标签先 `gh label list` 查再建。
   3. `Ensure per-game issues` —— `while IFS=$'\t' read -r group game rel engine difficulty` 逐行读 TSV，
      标题严格为 `[游戏] ${group}/${game}`；去重靠一次性拉全量标题
      （`gh issue list --state all --limit 1000 --json title`）后 `grep -Fxq -- "$title"` 精确匹配；
-     body 用 heredoc 写临时文件再 `--body-file`，含库内相对路径 / 引擎推断 / 难度预估 / 7 条验收清单 / 卡点处理说明。
+     body 用 heredoc 写临时文件再 `--body-file`（heredoc 内容按 run 块**最小缩进**书写 → YAML 折叠后即顶格，
+     再 `sed -i 's/^[[:space:]]*//'` 兜底，并用 `head -n1` 自检首行必须是 `## 验收对象`），
+     含库内相对路径 / 引擎推断 / 难度预估 / 7 条验收清单 / 卡点处理说明。
   4. `Sync audit verdicts (optional)` —— 若 `reports/audit/*.json` 存在，按 verdict 给对应 issue 换 `status/*` 标签并贴摘要或卡点原因；目录不存在时安静跳过。
 
 ### 踩坑记录
@@ -90,7 +92,7 @@ Invoke-RestMethod 'https://api.github.com/repos/Yiyiyyds3/cg-replay/labels?per_p
 
 - `[游戏] ` 前缀 issue = **117**，标题无重复（unique = 117）。
 - milestone `游戏库全量验收` = #2，open_issues = 117，closed_issues = 0。
-- 4 个 `status/*` 标签全部存在，颜色与描述与设计一致。
+- 批 1 时 4 个 `status/*` 标签全部存在，颜色与描述与设计一致；批 2 起新增第 5 个 `status/待修`（c5def5），见第 7 节。
 
 ## 5. 日常用法
 
@@ -115,8 +117,9 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 ```
 
 也可直接用 `title` 字段给完整标题（`[游戏] 分组/游戏名`）；`verdict` 取
-`pass/ok/已验收` → `status/已验收`，`fail/blocked/skip/卡点/卡点跳过` → `status/卡点跳过`，
-`partial/部分通过` 及其它 → `status/进行中`。
+`pass/ok/已验收` → `status/已验收`，`fail/failed/blocked/待修` → `status/待修`，
+`skip/skipped/卡点/卡点跳过` → `status/卡点跳过`，`partial/部分通过` 及其它 → `status/进行中`。
+换标签时先 `--remove-label` 掉另外 4 个 `status/*`（含 `status/待修`），保证一个 issue 只留一个状态标签。
 
 同步段对审计产物做了两点容错：
 
@@ -141,3 +144,44 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 | 拉 | 1 |
 | 一搬 | 1 |
 | 合计 | 117 |
+
+## 7. 批 2 跑完后的标签分布与 fail/skip 拆分
+
+### 7.1 为什么新增第 5 个标签 `status/待修`
+
+原同步段把 `fail|failed|blocked` 和 `skip|skipped|卡点|卡点跳过` **合并**成 `status/卡点跳过`，看板上分不清「要补代码的」和「引擎还没接的」——两者是完全不同的工作量，却挤在同一列。批 2 实测正好撞上这个坑：4 款 Unity 是**扫描报错**（缺 `cg-index.json`，补个索引生成器就能过），5 款是**引擎无分派 / 认不出**（Ren'Py×2、Cocos×1、未知×2，得等适配器），两类共 9 款，合并后看板上全是红色「卡点跳过」，无法排序推进。
+
+因此新增 `status/待修`（颜色 `c5def5`，说明「扫描报错/缺产物，需补代码或先导出」）并加入 `ensure_label` 列表与 remove-label 循环：
+
+| verdict（JSON 里的值） | 标签 | 语义 |
+|---|---|---|
+| `pass` / `passed` / `ok` / `verified` / `已验收` | `status/已验收` | 7 条清单全过 |
+| `fail` / `failed` / `blocked` / `待修` | **`status/待修`**（新增） | 扫描报错/缺产物，需补代码或先导出 |
+| `skip` / `skipped` / `卡点` / `卡点跳过` | `status/卡点跳过` | 卡点未解，15 分钟超时跳过 |
+| `partial` / `partial_pass` / `部分通过` / `进行中` | `status/进行中` | 正在跑，未出结论 |
+| 其它 / 认不出 | `status/进行中` | 兜底 |
+
+### 7.2 批 2 跑完后的状态标签分布（5 个，共 117 条 issue）
+
+按 `reports/audit/` 现有逐款 JSON 推得（批 1 的 5 款 + 批 2 的 16 款 = 21 款已跑，其余 96 款未跑仍在 `status/待处理`）：
+
+| 标签 | 条数 | 构成 |
+| --- | --- | --- |
+| `status/已验收` | 6 | 批 1 大雷/女主角 1 + 批 2 的 5 款 rmmz pass（莉扎西亚、命に代えてもお守りします!、Shitsuke-ai_dlsite、裏垢JK、栩的人生已经没救了） |
+| **`status/待修`** | 5 | 批 1 牢/The Blood of Yidhra（Unity 缺 cg-index.json）+ 批 2 的 4 款 Unity fail（1692614、Love Confessions、My Lovable Demon、ToxicMarriagePunisher） |
+| `status/卡点跳过` | 8 | 批 1 的 3 款 skip（很牢 SOTDQ/Godot、牢 魔的梦/Unreal、拉 ボクは種付け） + 批 2 的 5 款 skip（porn-shop-princess、CuckoldxCosplayCN/Ren'Py、逃离深渊的少女/Cocos、女王游戏X、Touch Simulation Game/未知） |
+| `status/进行中` | 2 | 批 2 的 2 款 KiriKiri partial（姉妹X催眠、姉妹X催眠2：xp3 未解包，可解包待下一步） |
+| `status/待处理` | 96 | 未跑（批 3 未评级 44 / 批 4 中等 16 / 批 5 中上+不赖 10 / 批 6 夯 19 / 批 7 创意+上等 7） |
+| 合计 | 117 | 6+5+8+2+96 = 117 ✅ |
+
+**注意两件事**：
+
+1. 批 1 的 4 条标签会在本次 push 触发的 run 里**被重新同步一次**：`The Blood of Yidhra` 由 `status/卡点跳过` → `status/待修`（因为 fail 现在有独立标签），其余 4 条不变。这正是拆分生效的可验证点。
+2. 「已验收 = 6」仍是**批量层 pass**，不等于 7 条清单全过（第 4/5/6 条无实机证据，见 `reports/游戏库验收_批2报告.md` 第三节）。要真转 `status/已验收`，得先补第二层真机抽样。
+
+### 7.3 批 2 的 run / 同步结果
+
+由 push 触发（路径命中 `.github/workflows/bootstrap-game-library.yml` 与 `reports/audit/**`），待查。
+
+<!-- BAT2-RUN-RESULT -->
+

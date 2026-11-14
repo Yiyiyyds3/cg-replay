@@ -1,0 +1,559 @@
+[
+  {
+    "group": "一般",
+    "game": "（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\RPG\\一般\\（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 1,
+    "events": 137,
+    "cg": 0,
+    "scenes": 137,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 6024
+  },
+  {
+    "group": "一般",
+    "game": "（一般）1692614",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）1692614",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\其他\\一般\\（一般）1692614",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 10,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）1692614\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 36
+  },
+  {
+    "group": "一般",
+    "game": "（一般）命に代えてもお守りします!",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）命に代えてもお守りします!",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260726\\RPG\\一般\\（一般）命に代えてもお守りします!",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 19,
+    "events": 187,
+    "cg": 0,
+    "scenes": 187,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "www/img/animations(117张图)",
+      "www/img/battlebacks1(50张图)",
+      "www/img/battlebacks2(50张图)",
+      "www/img/characters(32张图)",
+      "www/img/enemies(78张图)",
+      "www/img/faces(10张图)",
+      "www/img/parallaxes(15张图)",
+      "www/img/pictures(143张图)",
+      "www/img/sv_actors(20张图)",
+      "www/img/sv_enemies(70张图)",
+      "www/img/system(14张图)",
+      "www/img/tilesets(31张图)"
+    ],
+    "cover_valid": true,
+    "cover_source": "www/img/pictures/Title.png",
+    "cover_non_black": 0.991113579561233,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 17573
+  },
+  {
+    "group": "一般",
+    "game": "（一般）女王游戏X - 和妖精一起玩卡牌 クイーンズX - 妖精さんとカードであそぼ 存档",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）女王游戏X - 和妖精一起玩卡牌 クイーンズX - 妖精さんとカードであそぼ 存档",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260730\\卡牌\\一般\\（一般）女王游戏X - 和妖精一起玩卡牌 クイーンズX - 妖精さんとカードであそぼ 存档",
+    "engine_guess": "未知",
+    "engine_detected": "",
+    "top_entries": 22,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=未知（DetectEngine 与 engine_guess 都没认出来）；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 53
+  },
+  {
+    "group": "一般",
+    "game": "（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260730\\SLG\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～",
+    "engine_guess": "KiriKiri",
+    "engine_detected": "kirikiri",
+    "engine_resolved": "kirikiri",
+    "top_entries": 20,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": true,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=archive engine=kirikiri archives=11 scenario_files=51 labels=22 refs=1644 encrypted=3028 unsupported=false",
+      "有 3028 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）"
+    ],
+    "errors": [
+      "读不到剧本目录 E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～\\raw\\data\\scenario（open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～\\raw\\data\\scenario: The system cannot find the path specified.）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎"
+    ],
+    "verdict": "partial",
+    "reason": "scan_error_can_unpack",
+    "duration_ms": 501
+  },
+  {
+    "group": "一般",
+    "game": "（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260730\\SLG\\一般\\（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～",
+    "engine_guess": "KiriKiri",
+    "engine_detected": "kirikiri",
+    "engine_resolved": "kirikiri",
+    "top_entries": 21,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": true,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=archive engine=kirikiri archives=11 scenario_files=74 labels=26 refs=1758 encrypted=4123 unsupported=false",
+      "有 4123 个条目带 adlr 校验和（**多半不是加密**，只是校验和；若解出的内容是乱码，可选解密方案重试）"
+    ],
+    "errors": [
+      "读不到剧本目录 E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～\\raw\\data\\scenario（open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～\\raw\\data\\scenario: The system cannot find the path specified.）；自动探测也没找到 .ks 剧本——该目录可能不是 KiriKiri 引擎"
+    ],
+    "verdict": "partial",
+    "reason": "scan_error_can_unpack",
+    "duration_ms": 677
+  },
+  {
+    "group": "一般",
+    "game": "（一般）porn-shop-princess-1.2.0-pc",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）porn-shop-princess-1.2.0-pc",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260722\\模拟经营\\一般\\（一般）porn-shop-princess-1.2.0-pc",
+    "engine_guess": "Ren'Py",
+    "engine_detected": "",
+    "engine_resolved": "renpy",
+    "top_entries": 7,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "renpy/common(5张图)"
+    ],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=renpy；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 155
+  },
+  {
+    "group": "一般",
+    "game": "（一般）Shitsuke-ai_dlsite",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）Shitsuke-ai_dlsite",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260808\\RPG\\一般\\（一般）Shitsuke-ai_dlsite",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 29,
+    "events": 47,
+    "cg": 0,
+    "scenes": 47,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [
+      "cg",
+      "ui"
+    ],
+    "asset_dirs": [
+      "effects/Texture(48张图)",
+      "img/battlebacks1(52张图)",
+      "img/battlebacks2(50张图)",
+      "img/characters(73张图)",
+      "img/enemies(187张图)",
+      "img/faces(26张图)",
+      "img/parallaxes(21张图)",
+      "img/pictures(127张图)",
+      "img/pictures/BackgroundCG(9张图)",
+      "img/pictures/BattleStand(8张图)",
+      "img/pictures/CG/ChelseaH1(34张图)",
+      "img/pictures/CG/ChelseaH2(28张图)"
+    ],
+    "cover_valid": true,
+    "cover_source": "img/system/TitleLogo.png",
+    "cover_non_black": 0.2968060200668896,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 47689
+  },
+  {
+    "group": "一般",
+    "game": "（一般）Touch Simulation Game",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）Touch Simulation Game",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\SLG\\一般\\（一般）Touch Simulation Game",
+    "engine_guess": "未知",
+    "engine_detected": "",
+    "top_entries": 27,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [
+      "movie"
+    ],
+    "asset_dirs": [
+      "dist/assets/images/intro(5张图)",
+      "dist/assets/images/tools(5张图)",
+      "dist/assets/images/ギャラリー用(9张图)"
+    ],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=未知（DetectEngine 与 engine_guess 都没认出来）；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 109
+  },
+  {
+    "group": "一般",
+    "game": "裏垢JKは露出でバズりたい（一般）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\裏垢JKは露出でバズりたい（一般）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260501\\RPG\\一般\\裏垢JKは露出でバズりたい（一般）",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 2,
+    "events": 25,
+    "cg": 0,
+    "scenes": 25,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [
+      "stand"
+    ],
+    "asset_dirs": [
+      "内嵌/effects/Texture(48张图)",
+      "内嵌/img/battlebacks1(51张图)",
+      "内嵌/img/battlebacks2(50张图)",
+      "内嵌/img/characters(66张图)",
+      "内嵌/img/parallaxes(21张图)",
+      "内嵌/img/pictures/CGイベント(16张图)",
+      "内嵌/img/pictures/OP_CG(5张图)",
+      "内嵌/img/pictures/Result素材(7张图)",
+      "内嵌/img/pictures/ホーム画面UI達(20张图)",
+      "内嵌/img/pictures/マップイベント用CG(21张图)",
+      "内嵌/img/pictures/立ち絵(63张图)",
+      "内嵌/img/pictures/背景(15张图)"
+    ],
+    "cover_valid": false,
+    "cover_source": "内嵌/img/system/splash title.png",
+    "cover_non_black": 0.03489278752436647,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 9195
+  },
+  {
+    "group": "一般",
+    "game": "逃离深渊的少女（一般）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\逃离深渊的少女（一般）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260629\\其他\\一般\\逃离深渊的少女（一般）",
+    "engine_guess": "Cocos2d-x",
+    "engine_detected": "",
+    "engine_resolved": "cocos",
+    "top_entries": 26,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "Resources/img(293张图)"
+    ],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=cocos；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 64
+  },
+  {
+    "group": "一般",
+    "game": "栩的人生已经没救了（一般）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\栩的人生已经没救了（一般）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260613\\RPG\\一般\\栩的人生已经没救了（一般）",
+    "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+    "engine_detected": "",
+    "engine_resolved": "rmmz",
+    "top_entries": 19,
+    "events": 95,
+    "cg": 0,
+    "scenes": 95,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "www/img/animations(171张图)",
+      "www/img/battlebacks1(53张图)",
+      "www/img/battlebacks2(35张图)",
+      "www/img/characters(140张图)",
+      "www/img/characters/nona(238张图)",
+      "www/img/characters/未分類(74张图)",
+      "www/img/enemies(43张图)",
+      "www/img/parallaxes(101张图)",
+      "www/img/pictures(581张图)",
+      "www/img/system(39张图)",
+      "www/img/tilesets(172张图)"
+    ],
+    "cover_valid": true,
+    "cover_source": "www/img/titles1/title.png",
+    "cover_non_black": 0.9603365384615384,
+    "unpack_notes": [
+      "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+    ],
+    "errors": [],
+    "verdict": "pass",
+    "reason": "events\u003e0",
+    "duration_ms": 5740
+  },
+  {
+    "group": "一般",
+    "game": "CuckoldxCosplayCN-1.0-pc（一般）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\CuckoldxCosplayCN-1.0-pc（一般）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260712\\其他\\一般\\CuckoldxCosplayCN-1.0-pc（一般）",
+    "engine_guess": "Ren'Py",
+    "engine_detected": "",
+    "engine_resolved": "renpy",
+    "top_entries": 7,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "asset_dirs": [
+      "game/gui(9张图)",
+      "game/gui/button(12张图)",
+      "game/gui/phone/button(10张图)",
+      "game/gui/phone/scrollbar(8张图)",
+      "game/gui/phone/slider(8张图)",
+      "game/gui/scrollbar(8张图)",
+      "game/gui/slider(8张图)",
+      "game/images(164张图)",
+      "renpy/common(5张图)"
+    ],
+    "cover_valid": true,
+    "cover_source": "game/gui/scrollbar/horizontal_hover_thumb.png",
+    "cover_non_black": 1,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "main 无该引擎 ScanXxx 分派：engine=renpy；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+    ],
+    "verdict": "skip",
+    "reason": "engine_unsupported_in_main",
+    "duration_ms": 179
+  },
+  {
+    "group": "一般",
+    "game": "Love Confessions on the Adventure（一般）",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\Love Confessions on the Adventure（一般）",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260703\\其他\\一般\\Love Confessions on the Adventure（一般）",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 7,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\Love Confessions on the Adventure（一般）\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 114
+  },
+  {
+    "group": "一般",
+    "game": "My Lovable Demon(一般)",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\My Lovable Demon(一般)",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260826\\其他\\一般\\My Lovable Demon(一般)",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 6,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\My Lovable Demon(一般)\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 169
+  },
+  {
+    "group": "一搬",
+    "game": "(一搬)ToxicMarriagePunisher",
+    "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一搬\\(一搬)ToxicMarriagePunisher",
+    "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260728\\其他\\一搬\\(一搬)ToxicMarriagePunisher",
+    "engine_guess": "Unity",
+    "engine_detected": "",
+    "engine_resolved": "unity",
+    "top_entries": 7,
+    "events": 0,
+    "cg": 0,
+    "scenes": 0,
+    "chapters": 0,
+    "text_lines": 0,
+    "voices": 0,
+    "ir_probed_events": 0,
+    "can_unpack": false,
+    "category_dirs": [],
+    "cover_valid": false,
+    "unpack_notes": [
+      "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+      "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+    ],
+    "errors": [
+      "这个目录不是导出的 CG 库（读 CG 索引失败：open E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一搬\\(一搬)ToxicMarriagePunisher\\cg-index.json: The system cannot find the file specified.）"
+    ],
+    "verdict": "fail",
+    "reason": "scan_error",
+    "duration_ms": 42
+  }
+]

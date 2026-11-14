@@ -1,85 +1,76 @@
 {
-  "generated_at": "2026-11-15T00:49:12+08:00",
+  "generated_at": "2026-11-15T00:59:38+08:00",
   "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价",
   "tsv": "reports/游戏库验收_任务清单.tsv",
   "groups_requested": [
-    "大雷",
-    "很牢",
-    "牢",
-    "拉"
+    "一搬",
+    "一般"
   ],
-  "total": 5,
-  "pass": 1,
-  "partial": 0,
-  "fail": 1,
-  "skip": 3,
+  "total": 16,
+  "pass": 5,
+  "partial": 2,
+  "fail": 4,
+  "skip": 5,
   "by_group": {
-    "大雷": {
+    "一搬": {
       "total": 1,
-      "pass": 1,
-      "partial": 0,
-      "fail": 0,
-      "skip": 0
-    },
-    "很牢": {
-      "total": 1,
-      "pass": 0,
-      "partial": 0,
-      "fail": 0,
-      "skip": 1
-    },
-    "拉": {
-      "total": 1,
-      "pass": 0,
-      "partial": 0,
-      "fail": 0,
-      "skip": 1
-    },
-    "牢": {
-      "total": 2,
       "pass": 0,
       "partial": 0,
       "fail": 1,
-      "skip": 1
+      "skip": 0
+    },
+    "一般": {
+      "total": 15,
+      "pass": 5,
+      "partial": 2,
+      "fail": 3,
+      "skip": 5
     }
   },
   "by_engine": {
-    "godot(guess)": {
+    "cocos(guess)": {
       "total": 1,
       "pass": 0,
       "partial": 0,
       "fail": 0,
       "skip": 1
     },
+    "kirikiri": {
+      "total": 2,
+      "pass": 0,
+      "partial": 2,
+      "fail": 0,
+      "skip": 0
+    },
+    "renpy(guess)": {
+      "total": 2,
+      "pass": 0,
+      "partial": 0,
+      "fail": 0,
+      "skip": 2
+    },
     "rmmz(guess)": {
-      "total": 1,
-      "pass": 1,
+      "total": 5,
+      "pass": 5,
       "partial": 0,
       "fail": 0,
       "skip": 0
     },
     "unity(guess)": {
-      "total": 1,
+      "total": 4,
       "pass": 0,
       "partial": 0,
-      "fail": 1,
+      "fail": 4,
       "skip": 0
     },
     "unknown": {
-      "total": 1,
+      "total": 2,
       "pass": 0,
       "partial": 0,
       "fail": 0,
-      "skip": 1
-    },
-    "unreal(guess)": {
-      "total": 1,
-      "pass": 0,
-      "partial": 0,
-      "fail": 0,
-      "skip": 1
+      "skip": 2
     }
   },
-  "duration_sec": 7.0354402,
-  "batch_file": "reports/audit/batch-1.json"
+  "duration_sec": 88.3488162,
+  "batch_file": "reports/audit/batch-2.json"
 }

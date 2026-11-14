@@ -1,0 +1,25 @@
+pass | 一般 | （一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間- | 137 | - | events>0
+fail | 一般 | （一般）1692614 | 0 | - | scan_error
+pass | 一般 | （一般）命に代えてもお守りします! | 187 | - | events>0
+skip | 一般 | （一般）女王游戏X - 和妖精一起玩卡牌 クイーンズX - 妖精さんとカードであそぼ 存档 | 0 | - | engine_unsupported_in_main
+partial | 一般 | （一般）姉妹X催眠 ～絶対服従、俺がずっと王様～ | 0 | kirikiri | scan_error_can_unpack
+partial | 一般 | （一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～ | 0 | kirikiri | scan_error_can_unpack
+skip | 一般 | （一般）porn-shop-princess-1.2.0-pc | 0 | - | engine_unsupported_in_main
+pass | 一般 | （一般）Shitsuke-ai_dlsite | 47 | - | events>0
+skip | 一般 | （一般）Touch Simulation Game | 0 | - | engine_unsupported_in_main
+pass | 一般 | 裏垢JKは露出でバズりたい（一般） | 25 | - | events>0
+skip | 一般 | 逃离深渊的少女（一般） | 0 | - | engine_unsupported_in_main
+pass | 一般 | 栩的人生已经没救了（一般） | 95 | - | events>0
+skip | 一般 | CuckoldxCosplayCN-1.0-pc（一般） | 0 | - | engine_unsupported_in_main
+fail | 一般 | Love Confessions on the Adventure（一般） | 0 | - | scan_error
+fail | 一般 | My Lovable Demon(一般) | 0 | - | scan_error
+fail | 一搬 | (一搬)ToxicMarriagePunisher | 0 | - | scan_error
+[汇总] 总数=16 pass=5 partial=2 fail=4 skip=5 用时=88.3s
+  分组 一搬: 总数=1 pass=0 partial=0 fail=1 skip=0
+  分组 一般: 总数=15 pass=5 partial=2 fail=3 skip=5
+  引擎 cocos(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 kirikiri: 总数=2 pass=0 partial=2 fail=0 skip=0
+  引擎 renpy(guess): 总数=2 pass=0 partial=0 fail=0 skip=2
+  引擎 rmmz(guess): 总数=5 pass=5 partial=0 fail=0 skip=0
+  引擎 unity(guess): 总数=4 pass=0 partial=0 fail=4 skip=0
+  引擎 unknown: 总数=2 pass=0 partial=0 fail=0 skip=2
