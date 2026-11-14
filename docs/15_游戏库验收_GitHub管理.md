@@ -18,6 +18,21 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 
 状态流转：`待处理` → `进行中` →（7 条清单全过）`已验收`；审计报错 / 缺产物 → `待修`；遇卡点 15 分钟未解 → `卡点跳过`。
 
+## 1.1 全库收尾（2026-11，7 批全部跑完）
+
+7 批（共 117 款）审计全部出判定后，标签分布收敛为（GitHub issues API 实测，milestone #2 全量翻页取回 117 条）：
+
+| 标签 | 条数 | 对应判定 |
+| --- | --- | --- |
+| `status/已验收` | 35 | 扫描层 pass（全部 rmmz） |
+| `status/待修` | 36 | fail（31 款 Unity 缺 cg-index.json + 4 款 rmmz 扫描错误 + 1 款 nscript） |
+| `status/卡点跳过` | 40 | skip（引擎无分派/无入口） |
+| `status/进行中` | 6 | partial（6 款 KiriKiri xp3 未解包） |
+| `status/待处理` | 0 | 未跑款数为 0（**不等于全部搞定**：未通过 = 82 款 = 70%） |
+
+- 汇总产物：`reports/游戏库验收_总报告.md`（7 批次表 / 36 失败 4 类聚类 / 40 跳过引擎缺口 / A/B/C 待搞定清单）。
+- 优先级：**A 档先行**——31 款 Unity 跑 `tools/unity_cg_export.py` 生成 cg-index.json、6 款 KiriKiri 用 `internal/unpack.ExtractWith` 解包 xp3 后重扫，预期 pass 从 35 大幅上升；随后合并 feat/spine-skins-cover 的 ScanRenpy（解 7 款 Ren'Py skip）。
+
 ## 2. 自动化 workflow
 
 路径：`.github/workflows/bootstrap-game-library.yml`
