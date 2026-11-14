@@ -1,30 +1,22 @@
 {
-  "generated_at": "2026-11-15T00:59:38+08:00",
+  "generated_at": "2026-11-15T01:17:43+08:00",
   "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价",
   "tsv": "reports/游戏库验收_任务清单.tsv",
   "groups_requested": [
-    "一搬",
-    "一般"
+    "未评级"
   ],
-  "total": 16,
-  "pass": 5,
-  "partial": 2,
-  "fail": 4,
-  "skip": 5,
+  "total": 44,
+  "pass": 14,
+  "partial": 3,
+  "fail": 12,
+  "skip": 15,
   "by_group": {
-    "一搬": {
-      "total": 1,
-      "pass": 0,
-      "partial": 0,
-      "fail": 1,
-      "skip": 0
-    },
-    "一般": {
-      "total": 15,
-      "pass": 5,
-      "partial": 2,
-      "fail": 3,
-      "skip": 5
+    "未评级": {
+      "total": 44,
+      "pass": 14,
+      "partial": 3,
+      "fail": 12,
+      "skip": 15
     }
   },
   "by_engine": {
@@ -36,9 +28,9 @@
       "skip": 1
     },
     "kirikiri": {
-      "total": 2,
+      "total": 3,
       "pass": 0,
-      "partial": 2,
+      "partial": 3,
       "fail": 0,
       "skip": 0
     },
@@ -50,27 +42,34 @@
       "skip": 2
     },
     "rmmz(guess)": {
-      "total": 5,
-      "pass": 5,
+      "total": 16,
+      "pass": 14,
       "partial": 0,
-      "fail": 0,
+      "fail": 2,
       "skip": 0
     },
     "unity(guess)": {
-      "total": 4,
+      "total": 10,
       "pass": 0,
       "partial": 0,
-      "fail": 4,
+      "fail": 10,
       "skip": 0
     },
     "unknown": {
-      "total": 2,
+      "total": 11,
       "pass": 0,
       "partial": 0,
       "fail": 0,
-      "skip": 2
+      "skip": 11
+    },
+    "wolfrpg(guess)": {
+      "total": 1,
+      "pass": 0,
+      "partial": 0,
+      "fail": 0,
+      "skip": 1
     }
   },
-  "duration_sec": 88.3488162,
-  "batch_file": "reports/audit/batch-2.json"
+  "duration_sec": 299.5640078,
+  "batch_file": "reports/audit/batch-3.json"
 }

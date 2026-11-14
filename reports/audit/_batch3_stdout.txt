@@ -1,0 +1,53 @@
+partial | 未评级 | (牛)完堕ちX兄嫁 ～アンタのせいよ！ 私、この浮気チ●ポじゃなきゃダメなのっ！～ | 0 | kirikiri | scan_error_can_unpack
+pass | 未评级 | (牛)RJ01618221 | 203 | - | events>0
+pass | 未评级 | (牛)RJ01680223 | 1025 | - | events>0
+pass | 未评级 | （牛）间谍任务 | 716 | - | events>0
+fail | 未评级 | （牛）NTRaholic | 0 | - | scan_error
+skip | 未评级 | 【电脑】 Life with the tribe | 0 | - | engine_unsupported_in_main
+skip | 未评级 | `[PCNTRSLG动态官中`]『异世界NTR旅馆 ～恋人和妹妹在不知不觉间被夺走～ 【异世宿】』『異世界NTR旅館 ～恋人と妹が知らない間に奪われていく～ 【イセヤド】』v1.47 | 0 | - | engine_unsupported_in_main
+fail | 未评级 | 84865 | 0 | - | scan_error
+fail | 未评级 | 不谙( | 0 | - | scan_error
+pass | 未评级 | 对魔战士美月( | 129 | - | events>0
+skip | 未评级 | 兑现（牛） | 0 | - | engine_unsupported_in_main
+partial | 未评级 | 共妻之村 (牛) | 0 | kirikiri | scan_error_can_unpack
+skip | 未评级 | 光辉的少女们 | 0 | - | engine_unsupported_in_main
+fail | 未评级 | 棘罪最新版 | 0 | - | scan_error
+fail | 未评级 | 解密 | 0 | - | scan_error
+skip | 未评级 | 莱特娜 | 0 | - | engine_unsupported_in_main
+pass | 未评级 | 妹神官（牛） | 211 | - | events>0
+pass | 未评级 | 魔法学園見聞録 | 523 | - | events>0
+partial | 未评级 | 魔剣士レーヴェ | 0 | kirikiri | scan_error_can_unpack
+fail | 未评级 | 魔性少女的诱惑同居～禁忌缠绵每一天～ | 0 | - | scan_error
+pass | 未评级 | 女大学生 DX(8) | 70 | - | events>0
+skip | 未评级 | 千千阙歌（牛） | 0 | - | engine_unsupported_in_main
+skip | 未评级 | 世界乐观1.20 | 0 | - | engine_unsupported_in_main
+fail | 未评级 | 斯塔WIN(9) | 0 | - | scan_error
+pass | 未评级 | 星天之魔女（Arpg） | 238 | - | events>0
+skip | 未评级 | 异世界旅馆 | 0 | - | engine_unsupported_in_main
+skip | 未评级 | 影子赛季（妹神官全cg） | 0 | - | engine_unsupported_in_main
+skip | 未评级 | 重生酒馆 | 0 | - | engine_unsupported_in_main
+skip | 未评级 | Arena of Sacrifice（ACT） | 0 | - | engine_unsupported_in_main
+pass | 未评级 | Chronicles of Clams Island | 161 | - | events>0
+fail | 未评级 | fallen_1.0.5b | 0 | - | scan_error
+fail | 未评级 | Idol_Forging_V1.0.1.23 | 0 | - | scan_error
+skip | 未评级 | Lulumachi | 0 | - | engine_unsupported_in_main
+pass | 未评级 | RA26037409( | 198 | - | events>0
+pass | 未评级 | Restore( | 338 | - | events>0
+pass | 未评级 | Risty and the Village of Bocchino v1.0.0 | 25 | - | events>0
+pass | 未评级 | Scars of Summer After v1.01（牛） | 1350 | - | events>0
+fail | 未评级 | Swarm Bunker Lust Defense | 0 | - | scan_error
+skip | 未评级 | TempPC | 0 | - | engine_unsupported_in_main
+pass | 未评级 | Unholy_maiden_Ver.1.0.10 | 843 | - | events>0
+fail | 未评级 | wuxian | 0 | - | scan_error
+skip | 未评级 | yorutina_ver1.0.9_signed | 0 | - | engine_unsupported_in_main
+skip | 未评级 | アルミオシオンの医術師 | 0 | - | engine_unsupported_in_main
+fail | 未评级 | ゴブリン＆ソード -深き碧き森の城の女王- | 0 | - | scan_error
+[汇总] 总数=44 pass=14 partial=3 fail=12 skip=15 用时=299.6s
+  分组 未评级: 总数=44 pass=14 partial=3 fail=12 skip=15
+  引擎 cocos(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 kirikiri: 总数=3 pass=0 partial=3 fail=0 skip=0
+  引擎 renpy(guess): 总数=2 pass=0 partial=0 fail=0 skip=2
+  引擎 rmmz(guess): 总数=16 pass=14 partial=0 fail=2 skip=0
+  引擎 unity(guess): 总数=10 pass=0 partial=0 fail=10 skip=0
+  引擎 unknown: 总数=11 pass=0 partial=0 fail=0 skip=11
+  引擎 wolfrpg(guess): 总数=1 pass=0 partial=0 fail=0 skip=1

@@ -1,0 +1,41 @@
+{
+  "group": "未评级",
+  "game": "Restore(",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Restore(",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\Restore(",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 37,
+  "events": 338,
+  "cg": 0,
+  "scenes": 338,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "effects/Texture(76张图)",
+    "img/actorhud(20张图)",
+    "img/battlebacks1(64张图)",
+    "img/battlebacks2(50张图)",
+    "img/battlehud(31张图)",
+    "img/characters(251张图)",
+    "img/enemies(133张图)",
+    "img/faces(16张图)",
+    "img/parallaxes(22张图)",
+    "img/pictures(1020张图)",
+    "img/sv_actors(40张图)",
+    "img/sv_enemies(105张图)"
+  ],
+  "cover_valid": false,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 18852
+}

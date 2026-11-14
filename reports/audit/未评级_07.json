@@ -1,0 +1,32 @@
+{
+  "group": "未评级",
+  "game": "`[PCNTRSLG动态官中`]『异世界NTR旅馆 ～恋人和妹妹在不知不觉间被夺走～ 【异世宿】』『異世界NTR旅館 ～恋人と妹が知らない間に奪われていく～ 【イセヤド】』v1.47",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\`[PCNTRSLG动态官中`]『异世界NTR旅馆 ～恋人和妹妹在不知不觉间被夺走～ 【异世宿】』『異世界NTR旅館 ～恋人と妹が知らない間に奪われていく～ 【イセヤド】』v1.47",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260822\\其他\\未评级\\[PCNTRSLG动态官中]『异世界NTR旅馆 ～恋人和妹妹在不知不觉间被夺走～ 【异世宿】』『異世界NTR旅館 ～恋人と妹が知らない間に奪われていく～ 【イセヤド】』v1.47",
+  "engine_guess": "未知",
+  "engine_detected": "",
+  "top_entries": 12,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [
+    "bg",
+    "ui"
+  ],
+  "cover_valid": false,
+  "unpack_notes": [
+    "unpack: kind=unknown engine= archives=0 scenario_files=0 labels=0 refs=0 encrypted=0 unsupported=true",
+    "unpack.reason: 这个目录里没找到可识别的归档（也没找到已解包结构 raw/data/scenario）"
+  ],
+  "errors": [
+    "main 无该引擎 ScanXxx 分派：engine=未知（DetectEngine 与 engine_guess 都没认出来）；library.ScanWith 当前只分派 kirikiri/artemis/bgi/catsystem2/scn/nscript/unity/rmmz/nexas/nitro —— 该款不进入扫描，判 skip（docs/14 ⑥：不死磕）"
+  ],
+  "verdict": "skip",
+  "reason": "engine_unsupported_in_main",
+  "duration_ms": 179
+}

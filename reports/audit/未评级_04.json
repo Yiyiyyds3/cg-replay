@@ -1,0 +1,41 @@
+{
+  "group": "未评级",
+  "game": "（牛）间谍任务",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\（牛）间谍任务",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\未评级\\（牛）间谍任务",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 22,
+  "events": 716,
+  "cg": 0,
+  "scenes": 716,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "www/img/animations(118张图)",
+    "www/img/battlebacks1(50张图)",
+    "www/img/battlebacks2(50张图)",
+    "www/img/characters(188张图)",
+    "www/img/enemies(72张图)",
+    "www/img/faces(10张图)",
+    "www/img/parallaxes(15张图)",
+    "www/img/pictures(3076张图)",
+    "www/img/sv_actors(20张图)",
+    "www/img/sv_enemies(70张图)",
+    "www/img/system(14张图)",
+    "www/img/tilesets(215张图)"
+  ],
+  "cover_valid": false,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 16658
+}

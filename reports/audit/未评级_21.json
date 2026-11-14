@@ -1,0 +1,43 @@
+{
+  "group": "未评级",
+  "game": "女大学生 DX(8)",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\女大学生 DX(8)",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\女大学生 DX(8)",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 32,
+  "events": 70,
+  "cg": 0,
+  "scenes": 70,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "effects/Texture(48张图)",
+    "img/characters(11张图)",
+    "img/pictures/BackView(21张图)",
+    "img/pictures/ero_status(45张图)",
+    "img/pictures/event scene/01_OP(12张图)",
+    "img/pictures/event scene/Pick UP Picture(12张图)",
+    "img/pictures/event scene/standing_picture(7张图)",
+    "img/pictures/thumbnail/11_General_exposure(6张图)",
+    "img/pictures/thumbnail/12_General_masturbation(5张图)",
+    "img/pictures/thumbnail/13_General_sex(6张图)",
+    "img/spines(13张图)",
+    "img/system(14张图)"
+  ],
+  "cover_valid": false,
+  "cover_source": "img/system/splash title.png",
+  "cover_non_black": 0.02642361111111111,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 3273
+}

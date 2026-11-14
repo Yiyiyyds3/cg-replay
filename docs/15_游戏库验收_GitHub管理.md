@@ -209,4 +209,36 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 **body 顶格**：抽查 `#20 [游戏] 大雷/女主角（大雷）` 的 `body` 首行为 `## 验收对象`，无行首空格；7 条清单仍是 `- [ ]` 列表而非缩进代码块。本次 workflow 另加了 `sed` 兜底与首行自检，防止后续有人把 heredoc 内容右缩。
 
+## 8. 批 3 跑完后的标签分布与 A/B/C 三档待办
+
+批 3 = `未评级` 44 款，`go run ./cmd/library-audit -group "未评级" -batch batch-3 -out reports/audit`，`pass 14 / partial 3 / fail 12 / skip 15`，用时 299.6s，exit 0，**无一款超时**。详见 `reports/游戏库验收_批3报告.md`。
+
+### 8.1 预计标签分布变化（按本批 verdict 推算）
+
+批 3 的 44 条 issue 会离开 `status/待处理`，按 verdict 落到 4 个状态标签；批 1/2 的 21 条会被重新同步一次（verdict 不变 → 标签不变）：
+
+| 标签 | 批 3 前（6/5/8/2/96） | 批 3 后（预计） | 变化 |
+| --- | --- | --- | --- |
+| `status/已验收`（pass） | 6 | **20** | +14（rmmz 14 款） |
+| `status/待修`（fail） | 5 | **17** | +12（Unity 缺 cg-index ×10、`不谙(` 缺 data、`wuxian` 插件驱动） |
+| `status/卡点跳过`（skip） | 8 | **23** | +15（未知 11 / renpy 2 / cocos 1 / wolfrpg 1） |
+| `status/进行中`（partial） | 2 | **5** | +3（KiriKiri xp3 未解包） |
+| `status/待处理`（未跑） | 96 | **52** | −44（批 4~7：中等 16 / 中上+不赖 10 / 夯 19 / 创意+上等 7） |
+| 合计 | 117 | **117** | `20+17+23+5+52 = 117` ✅ |
+
+进度口径同步：**累计 65 已跑（批1 5 + 批2 16 + 批3 44）/ 52 待处理**；三项汇报数 = **累计已验收 20 ／ 卡点跳过 23 ／ 剩余 52（共 117）**，另列 **失败待修 17 / 进行中 5**。
+
+> 触发说明：`.github/workflows/bootstrap-game-library.yml` 的 `paths` 含 `reports/audit/**`，本次提交改动 44 个逐款 JSON + `batch-3.json` + `summary.json` → **由 push 自动触发**。run 结果与线上标签实测分布**待查**（提交后用 §4 的 API 端点核对，再回填本表）。
+
+### 8.2 A/B/C 三档待办（范围 = 批 1+2+3 的 17 fail + 5 partial + 23 skip = 45 款）
+
+| 档 | 款数 | 内容 | 下一轮 |
+| --- | --- | --- | --- |
+| **A 有现成工具、可直接搞定** | **25** | ① KiriKiri xp3 未解包 5 款（库层 `unpack.ExtractWith` 已支持且有单测，只差 `cmd/ucgr unpack` 补 xp3 分派）；② Unity 缺 `cg-index.json` 17 款（`tools/unity_cg_export.py` 现成）；③ 引擎已确认且有现成 `ScanRmmz`、只缺 `DetectEngine` 识别/层级 3 款（Lulumachi / 影子赛季 / アルミオシオン） | **优先做** |
+| **B 引擎已确认、适配器待补** | **16** | Ren'Py 明文 `.rpy` 5（合入分支态适配器 + `ScanWith` 加 `case "renpy"`）／Electron asar 2／Cocos2d-x 散 `project.json` 2／Godot `.pck` 2／PyInstaller 自研 3／Unreal 1（detect-only）／rmmz 插件驱动 1 | 按类型逐个立 Issue |
+| **C 真卡点、建议跳过** | **4** | System4(`data.dts`/`.evs`) 光辉的少女们／WolfRPG(`Data.wolf`) 莱特娜／残缺包（`www` 仅 `save/`）不谙(／完全未知引擎 ボクは種付け | 建 Issue 贴原始报错，标 `status/卡点跳过`，不死磕（docs/14 ⑥） |
+| 合计 | **45** | = fail 17 + partial 5 + skip 23 ✅ | |
+
+**下一轮优先做 A 档**：其中 A1（xp3 CLI 分派）与 A3（DetectEngine 两条特征）是几十行代码级改动，A2 是跑现成导出器；三块做完预计能把 `已验收` 从 20 推到 40+，再把 `待修/卡点跳过` 压到个位数。B 档按引擎分批合入，C 档维持跳过不动。
+
 

@@ -1,0 +1,43 @@
+{
+  "group": "未评级",
+  "game": "Chronicles of Clams Island",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Chronicles of Clams Island",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260820\\RPG\\未评级\\Chronicles of Clams Island",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 19,
+  "events": 161,
+  "cg": 0,
+  "scenes": 161,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "www/img/animations(117张图)",
+    "www/img/battlebacks1(79张图)",
+    "www/img/battlebacks2(50张图)",
+    "www/img/bosshp(13张图)",
+    "www/img/characters(366张图)",
+    "www/img/enemies(101张图)",
+    "www/img/faces(11张图)",
+    "www/img/parallaxes(23张图)",
+    "www/img/pictures(829张图)",
+    "www/img/sv_actors(20张图)",
+    "www/img/sv_enemies(70张图)",
+    "www/img/system(22张图)"
+  ],
+  "cover_valid": true,
+  "cover_source": "www/img/titles1/title3.png",
+  "cover_non_black": 0.9602481617647058,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 6911
+}
