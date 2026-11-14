@@ -1,0 +1,15 @@
+pass | 大雷 | 女主角（大雷） | 44 | - | events>0
+skip | 很牢 | SOTDQ_0.3.5.3v_WINDOWS（很牢） | 0 | - | engine_unsupported_in_main
+skip | 拉 | （拉）ボクは種付けアプリを手に入れた！製品版 | 0 | - | engine_unsupported_in_main
+skip | 牢 | （牢）魔的梦 | 0 | - | engine_unsupported_in_main
+fail | 牢 | The Blood of Yidhra（牢） | 0 | - | scan_error
+[汇总] 总数=5 pass=1 partial=0 fail=1 skip=3 用时=7.0s
+  分组 大雷: 总数=1 pass=1 partial=0 fail=0 skip=0
+  分组 很牢: 总数=1 pass=0 partial=0 fail=0 skip=1
+  分组 拉: 总数=1 pass=0 partial=0 fail=0 skip=1
+  分组 牢: 总数=2 pass=0 partial=0 fail=1 skip=1
+  引擎 godot(guess): 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 rmmz(guess): 总数=1 pass=1 partial=0 fail=0 skip=0
+  引擎 unity(guess): 总数=1 pass=0 partial=0 fail=1 skip=0
+  引擎 unknown: 总数=1 pass=0 partial=0 fail=0 skip=1
+  引擎 unreal(guess): 总数=1 pass=0 partial=0 fail=0 skip=1

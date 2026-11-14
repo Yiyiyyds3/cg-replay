@@ -1,0 +1,36 @@
+{
+  "group": "大雷",
+  "game": "女主角（大雷）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\大雷\\女主角（大雷）",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260424\\RPG\\大雷\\女主角（大雷）",
+  "engine_guess": "NW.js / RPG Maker(MV/MZ)",
+  "engine_detected": "",
+  "engine_resolved": "rmmz",
+  "top_entries": 22,
+  "events": 44,
+  "cg": 0,
+  "scenes": 44,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "asset_dirs": [
+    "www/img/animations(117张图)",
+    "www/img/pictures(715张图)",
+    "www/img/system(18张图)",
+    "www/img/tilesets(31张图)",
+    "www/img/titles2(5张图)"
+  ],
+  "cover_valid": true,
+  "cover_source": "www/img/titles1/title.png",
+  "cover_non_black": 0.9983854166666667,
+  "unpack_notes": [
+    "IR 探测只对 kirikiri 实现（本款 engine=rmmz）：text_lines/voices 记 0 = 未探测，不代表「无台词/无语音」"
+  ],
+  "errors": [],
+  "verdict": "pass",
+  "reason": "events\u003e0",
+  "duration_ms": 6887
+}
