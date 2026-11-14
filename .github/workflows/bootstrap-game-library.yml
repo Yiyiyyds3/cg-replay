@@ -1,0 +1,251 @@
+# bootstrap-game-library.yml —— 用 GitHub Actions 自带的 gh + GITHUB_TOKEN，
+# 把「游戏库全量验收」的 milestone / 4 个状态标签 / 117 个游戏 Issue 建起来。
+#
+# 触发：workflow_dispatch；或 push 且仅改动本文件 / 任务清单 TSV / 审计 JSON 时。
+# 幂等：全部先查再建；重复运行不产生重复 issue、不报错。
+# 权限：GITHUB_TOKEN 无 project 权限，看板暂以 Milestone + 状态标签代替 Project v2。
+#
+# 踩坑备忘：
+# - gh issue create --milestone 必须传 milestone 标题字符串，不能传编号（run 43450435061）。
+# - 标题含中文 / 方括号 / 单引号（Delilah's），去重必须全量拉标题后 grep -Fxq，
+#   不要用 gh --search 限定符。
+name: bootstrap-game-library
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-game-library.yml"
+      - "reports/游戏库验收_任务清单.tsv"
+      - "reports/audit/**"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: bootstrap-game-library
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # 1. Milestone + 4 个状态标签
+      # ---------------------------------------------------------------
+      - name: Ensure milestone and status labels
+        run: |
+          set -euo pipefail
+
+          MS_NAME='游戏库全量验收'
+          MS=$(gh api "repos/$REPO/milestones?state=all&per_page=100" \
+               --jq '.[] | select(.title=="游戏库全量验收") | .number' | head -n1 || true)
+          if [ -z "${MS:-}" ]; then
+            MS=$(gh api "repos/$REPO/milestones" \
+                 -f title='游戏库全量验收' \
+                 -f state='open' \
+                 -f description='按评价低→高全量自测验收' \
+                 --jq '.number' || true)
+            echo "created milestone $MS_NAME = #${MS:-?}"
+          else
+            echo "milestone $MS_NAME exists = #$MS"
+          fi
+          # 提醒：后面 gh issue create --milestone 传的是标题字符串 "$MS_NAME"。
+          if [ -z "${MS:-}" ]; then
+            echo "::error::milestone $MS_NAME 未创建成功"
+            exit 1
+          fi
+
+          ensure_label() {
+            name="$1"; color="$2"; desc="$3"
+            if gh label list -R "$REPO" --limit 200 --json name --jq '.[].name' \
+                 | grep -Fxq -- "$name"; then
+              echo "label exists: $name"
+            else
+              gh label create "$name" -R "$REPO" --color "$color" --description "$desc" || true
+              echo "label created: $name"
+            fi
+          }
+          ensure_label 'status/待处理'   'ededed' '还没有开始自测'
+          ensure_label 'status/进行中'   '1d76db' '正在跑，未出结论'
+          ensure_label 'status/已验收'   '0e8a16' '7 条验收清单全过'
+          ensure_label 'status/卡点跳过' 'b60205' '卡点未解，15 分钟超时跳过'
+
+      # ---------------------------------------------------------------
+      # 2. 117 个游戏 Issue（逐行读 TSV，先查再建）
+      # ---------------------------------------------------------------
+      - name: Ensure per-game issues
+        run: |
+          set -euo pipefail
+
+          LIST='reports/游戏库验收_任务清单.tsv'
+          if [ ! -f "$LIST" ]; then
+            echo "::error::缺少 $LIST"
+            exit 1
+          fi
+
+          # 一次性拉全量标题：标题含中文/方括号/单引号，用 --search 会误判。
+          TITLES=$(gh issue list -R "$REPO" --state all --limit 1000 \
+                   --json title --jq '.[].title' 2>/dev/null || true)
+          echo "existing issues: $(printf '%s\n' "$TITLES" | grep -c . || true)"
+
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
+          total=0
+          created=0
+          skipped=0
+
+          while IFS=$'\t' read -r group game rel engine difficulty; do
+            if [ -z "${group:-}" ]; then
+              continue
+            fi
+            difficulty="${difficulty%$'\r'}"
+            total=$((total + 1))
+            title="[游戏] ${group}/${game}"
+
+            if printf '%s\n' "$TITLES" | grep -Fxq -- "$title"; then
+              skipped=$((skipped + 1))
+              echo "[skip $total] $title"
+              continue
+            fi
+
+            # 无反引号、无 $ 的 heredoc，变量正常展开。
+            cat > "$tmp" <<EOF
+          ## 验收对象
+          - 分组：${group}
+          - 游戏名：${game}
+          - 库内相对路径：${rel}
+          - 引擎推断：${engine}
+          - 难度预估：${difficulty}
+
+          ## 验收清单（逐条勾选，全过才算已验收）
+          - [ ] 台本非 0：能解出事件台本，条目数 > 0
+          - [ ] CG 分目录：解包产物按 cg/ bg/ stand/ movie/ ui/ 分目录，同名不覆盖
+          - [ ] 预览非黑屏：封面 / CG 预览是有效画面，不是纯黑卡片
+          - [ ] 点击推进：舞台点击可推进，按钮 / 进度条 / 抽屉不误触
+          - [ ] 台词文本：台词与旁白正确显示，无乱码、无空缺
+          - [ ] 语音链路：语音能播、能切、与文本对齐
+          - [ ] 无静默失败：出错有明确提示，不吞异常
+
+          ## 卡点处理
+          遇卡点请贴原始报错全文（完整栈 / 完整命令输出），15 分钟超时即跳过：
+          本 issue 改标 status/卡点跳过 并写明原因，不阻塞后续批次。
+
+          ---
+          数据来源：reports/游戏库验收_任务清单.tsv（由 workflow 自动生成）
+          EOF
+
+            url=$(gh issue create -R "$REPO" \
+                  --title "$title" \
+                  --body-file "$tmp" \
+                  --label 'status/待处理' \
+                  --milestone '游戏库全量验收')
+            created=$((created + 1))
+            TITLES=$(printf '%s\n%s\n' "$TITLES" "$title")
+            echo "[create $total] $title -> $url"
+          done < "$LIST"
+
+          echo "-----"
+          echo "TSV 行数: $total ; 本次创建: $created ; 已存在跳过: $skipped"
+
+      # ---------------------------------------------------------------
+      # 3. 可选：同步 reports/audit/*.json 的验收结论
+      #    目录不存在 / 没有 JSON / JSON 非法时安静跳过，绝不让 workflow 失败。
+      # ---------------------------------------------------------------
+      - name: Sync audit verdicts (optional)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          verdicts=(reports/audit/*.json)
+          if [ ${#verdicts[@]} -eq 0 ]; then
+            echo "reports/audit 下没有 JSON，跳过同步"
+            exit 0
+          fi
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "没有 jq，跳过同步"
+            exit 0
+          fi
+
+          ISSUES=$(gh issue list -R "$REPO" --state all --limit 1000 \
+                   --json number,title 2>/dev/null || echo '[]')
+          if [ -z "${ISSUES:-}" ]; then
+            ISSUES='[]'
+          fi
+
+          cmt=$(mktemp)
+          trap 'rm -f "$cmt"' EXIT
+
+          for f in "${verdicts[@]}"; do
+            if ! jq -e . "$f" >/dev/null 2>&1; then
+              echo "[warn] 非法 JSON，跳过: $f"
+              continue
+            fi
+
+            group=$(jq -r '.group // ""' "$f" 2>/dev/null || true)
+            game=$(jq -r '.game // ""' "$f" 2>/dev/null || true)
+            raw_title=$(jq -r '.title // ""' "$f" 2>/dev/null || true)
+            verdict=$(jq -r '.verdict // .status // ""' "$f" 2>/dev/null || true)
+            reason=$(jq -r '.reason // .blocked_reason // ""' "$f" 2>/dev/null || true)
+            summary=$(jq -r '.summary // .note // ""' "$f" 2>/dev/null || true)
+
+            if [ -n "$raw_title" ]; then
+              title="$raw_title"
+            else
+              title="[游戏] ${group}/${game}"
+            fi
+            case "$title" in
+              "[游戏] "*) ;;
+              *) title="[游戏] $title" ;;
+            esac
+
+            num=$(printf '%s' "$ISSUES" \
+                  | jq -r --arg t "$title" '.[] | select(.title==$t) | .number' \
+                  | head -n1 || true)
+            if [ -z "${num:-}" ]; then
+              echo "[miss] 找不到对应 issue: $title"
+              continue
+            fi
+
+            case "$verdict" in
+              pass|passed|ok|verified|已验收)  label='status/已验收' ;;
+              fail|failed|blocked|skip|skipped|卡点|卡点跳过) label='status/卡点跳过' ;;
+              *) label='status/进行中' ;;
+            esac
+
+            for other in 'status/待处理' 'status/进行中' 'status/已验收' 'status/卡点跳过'; do
+              if [ "$other" != "$label" ]; then
+                gh issue edit "$num" -R "$REPO" --remove-label "$other" >/dev/null 2>&1 || true
+              fi
+            done
+            gh issue edit "$num" -R "$REPO" --add-label "$label" >/dev/null 2>&1 || true
+
+            {
+              echo "### 验收同步：${verdict:-unknown}"
+              echo
+              echo "来源：${f}"
+              if [ -n "$summary" ]; then
+                echo
+                echo "$summary"
+              fi
+              if [ -n "$reason" ]; then
+                echo
+                echo "卡点原因：${reason}"
+              fi
+            } > "$cmt"
+            gh issue comment "$num" -R "$REPO" --body-file "$cmt" >/dev/null 2>&1 || true
+
+            echo "[sync] #$num $title -> $label"
+          done
+
+          echo "同步完成"
+          exit 0
