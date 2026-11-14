@@ -24,14 +24,14 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 
 | 标签 | 条数 | 对应判定 |
 | --- | --- | --- |
-| `status/已验收` | 35 | 扫描层 pass（全部 rmmz） |
-| `status/待修` | 36 | fail（31 款 Unity 缺 cg-index.json + 4 款 rmmz 扫描错误 + 1 款 nscript） |
+| `status/已验收` | 37 | 扫描层 pass（全部 rmmz） |
+| `status/待修` | 34 | fail（31 款 Unity 缺 cg-index.json + 2 款 rmmz 扫描错误 + 1 款 nscript） |
 | `status/卡点跳过` | 40 | skip（引擎无分派/无入口） |
 | `status/进行中` | 6 | partial（6 款 KiriKiri xp3 未解包） |
 | `status/待处理` | 0 | 未跑款数为 0（**不等于全部搞定**：未通过 = 82 款 = 70%） |
 
-- 汇总产物：`reports/游戏库验收_总报告.md`（7 批次表 / 36 失败 4 类聚类 / 40 跳过引擎缺口 / A/B/C 待搞定清单）。
-- 优先级：**A 档先行**——31 款 Unity 跑 `tools/unity_cg_export.py` 生成 cg-index.json、6 款 KiriKiri 用 `internal/unpack.ExtractWith` 解包 xp3 后重扫，预期 pass 从 35 大幅上升；随后合并 feat/spine-skins-cover 的 ScanRenpy（解 7 款 Ren'Py skip）。
+- 汇总产物：`reports/游戏库验收_总报告.md`（7 批次表 / 34 失败 4 类聚类 / 40 跳过引擎缺口 / A/B/C 待搞定清单）。
+- 优先级：**A 档先行**——31 款 Unity 跑 `tools/unity_cg_export.py` 生成 cg-index.json、6 款 KiriKiri 用 `internal/unpack.ExtractWith` 解包 xp3 后重扫，预期 pass 从 37 大幅上升；随后合并 feat/spine-skins-cover 的 ScanRenpy（解 7 款 Ren'Py skip）。
 
 ## 2. 自动化 workflow
 
@@ -269,10 +269,12 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 | `status/卡点跳过`（skip） | 23 | **40** | +17（未知 7 / renpy 2 / unreal 2 / gamemaker 1 / godot 1 / 批4 其余 4） |
 | `status/进行中`（partial） | 5 | **6** | +1（批4 1 款） |
 | `status/待处理`（未跑） | 52 | **0** | −52（全部跑完） |
-| 合计 | 117 | **117** | `35+36+40+6+0 = 117` ✅ |
+| 合计 | 117 | **117** | `35+36+40+6+0 = 117` ✅（2026-11-15 rmmz 复扫后线上预计变更为 37/34/40/6/0，见下） |
 
-进度口径同步：**累计 117 已跑（全库）/ 剩余 0**；三项汇报数 = **累计已验收 35 ／ 卡点跳过 40 ／ 剩余 0（共 117）**，另列 **失败待修 36 / 进行中 6**。注意「剩余 0」只表示未跑款数为 0；未验收通过 = partial+fail+skip = **82 款**（70%），后续全部在 `status/待修`、`status/卡点跳过`、`status/进行中` 三条线推进，汇总表见批 7 报告 §6。
+进度口径同步：**累计 117 已跑（全库）/ 剩余 0**；三项汇报数 = **累计已验收 37 ／ 卡点跳过 40 ／ 剩余 0（共 117）**，另列 **失败待修 34 / 进行中 6**。注意「剩余 0」只表示未跑款数为 0；未验收通过 = partial+fail+skip = **80 款**（68%），后续全部在 `status/待修`、`status/卡点跳过`、`status/进行中` 三条线推进，汇总表见批 7 报告 §6。
 
 > 触发说明：本次提交改动批 5~7 共 36 个逐款 JSON + `batch-5/6/7.json` + `summary.json` → `reports/audit/**` 命中 workflow `paths`，由 push 自动触发；上表「批 4~7 后」列为 GitHub issues API 实测回填值（与 §1.1 的 35/36/40/6/0 一致）。
+
+**复扫更新（2026-11-15）**：commit 489f126 的 rmmz 脚本 CG 修复复扫后，呪いの鎧 v3.0.1 与 詛咒铠甲2 由 fail→pass，预计线上标签分布推算为 已验收 37 / 待修 34 / 卡点跳过 40 / 进行中 6 / 待处理 0（37+34+40+6+0 = 117 ✅），来源 eports/audit/batch-rmmz-recheck.json 与 eports/游戏库验收_rmmz复扫报告.md；**以 Actions 同步后的 GitHub issues API 实测为准**。
 
 
