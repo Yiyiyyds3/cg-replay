@@ -446,12 +446,21 @@ func (r *ScanResult) addSegments(key, file, group, name string, cmds []Command, 
 		pics, texts := 0, 0
 		preview := ""
 		for _, c := range seg {
-			switch c.Code {
-			case 231:
+			switch {
+			case c.Code == 231:
 				if rel, ok := LocatePicture(root, imgDirs, c.str(1)); ok && r.pictureLarge(root, rel) {
 					pics++
 				}
-			case 401:
+			case scriptCGName(c) != "":
+				// Wolfzq 系 CG 插件：脚本指令整组加载差分套图，
+				// 素材在 pictures/<组名>/ 子目录，按组记 1 张、组名当预览。
+				if rel, ok := locateCGSet(root, imgDirs, scriptCGName(c)); ok && r.pictureLarge(root, rel) {
+					pics++
+					if preview == "" {
+						preview = scriptCGName(c)
+					}
+				}
+			case c.Code == 401:
 				text := r.cleaner.clean(c.str(0))
 				if t := Flatten(text); t != "" {
 					// 首行常常只是人名；太短就继续往后找一句完整的当标题。
@@ -533,6 +542,41 @@ func MapGroup(file, displayName string) string {
 	return "地图" + strings.TrimPrefix(base, "Map")
 }
 
+// scriptCGRe 匹配 Wolfzq 系 CG 插件的脚本调用：this.cgLoad('pic001', 0)。
+// 这类游戏不走事件指令 231，而是用脚本指令（code 355/655）整组加载差分套图，
+// 套图素材在 pictures/<组名>/ 子目录下（如 pictures/pic001/1_1.rpgmvp）。
+var scriptCGRe = regexp.MustCompile(`cgLoad\(\s*['"]([^'"]+)['"]`)
+
+// scriptCGName 提取脚本指令里的 CG 组名；非脚本指令或不含 cgLoad 返回空。
+func scriptCGName(c Command) string {
+	if c.Code != 355 && c.Code != 655 {
+		return ""
+	}
+	if m := scriptCGRe.FindStringSubmatch(c.str(0)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// locateCGSet 定位脚本 CG 组的样本图（相对 root）：组名是 pictures/ 下的子目录，
+// 取目录里第一个文件判断量级即可——同组差分图尺寸一致。
+func locateCGSet(root string, imageDirs []string, name string) (string, bool) {
+	for _, dir := range imageDirs {
+		sub := filepath.ToSlash(filepath.Join(dir, "pictures", name))
+		ents, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(sub)))
+		if err != nil {
+			continue
+		}
+		for _, e := range ents {
+			if e.IsDir() {
+				continue
+			}
+			return filepath.ToSlash(filepath.Join(sub, e.Name())), true
+		}
+	}
+	return "", false
+}
+
 // Segments 把 page 的指令切成演出段落：
 // 一段 = 从第一次「显示图片」起，到「全部消除图片」或列表结束。
 func Segments(cmds []Command) [][]Command {
@@ -541,7 +585,7 @@ func Segments(cmds []Command) [][]Command {
 	visible := map[int]bool{}
 	active := false
 	for _, c := range cmds {
-		if c.Code == 231 {
+		if c.Code == 231 || scriptCGName(c) != "" {
 			id := int(c.num(0))
 			if !active {
 				active = true

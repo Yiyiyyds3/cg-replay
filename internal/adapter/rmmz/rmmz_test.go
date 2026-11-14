@@ -216,3 +216,63 @@ func TestLocatePictureJPFallback(t *testing.T) {
 		t.Fatalf("原名优先 = %q,%v，want img/pictures/CG/ChelseaH7_01.png,true", rel, ok)
 	}
 }
+
+func TestScriptCGName(t *testing.T) {
+	cases := []struct {
+		code int
+		str  string
+		want string
+	}{
+		{355, `this.cgLoad('pic001', 0);`, "pic001"},
+		{655, `this.cgLoad("pic018", 2);`, "pic018"},
+		{355, `this.picsOut(30);`, ""},
+		{231, `this.cgLoad('pic001', 0);`, ""}, // 231 不走脚本 CG
+		{401, `this.cgLoad('pic001', 0);`, ""},
+	}
+	for _, tc := range cases {
+		c := Command{Code: tc.code, Params: []any{tc.str}}
+		if got := scriptCGName(c); got != tc.want {
+			t.Errorf("scriptCGName(code=%d) = %q, want %q", tc.code, got, tc.want)
+		}
+	}
+}
+
+func TestLocateCGSet(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "www", "img", "pictures", "pic001"), 0o755)
+	os.WriteFile(filepath.Join(root, "www", "img", "pictures", "pic001", "1_1.rpgmvp"), []byte("x"), 0o644)
+
+	rel, ok := locateCGSet(root, []string{"www/img"}, "pic001")
+	if !ok || rel != "www/img/pictures/pic001/1_1.rpgmvp" {
+		t.Errorf("locateCGSet = %q,%v", rel, ok)
+	}
+	if _, ok := locateCGSet(root, []string{"www/img"}, "pic999"); ok {
+		t.Error("不存在的组不应命中")
+	}
+}
+
+func TestSegmentsScriptCG(t *testing.T) {
+	// Wolfzq 风格：脚本 cgLoad 开段，picsChange2 中段，picsOut 清空结束。
+	cmds := []Command{
+		{Code: 101, Params: []any{"", 0}},
+		{Code: 401, Params: []any{"这是对话"}},
+		{Code: 355, Params: []any{`this.cgLoad('pic001', 0);`}},
+		{Code: 655, Params: []any{`this.picsChange2();`}},
+		{Code: 401, Params: []any{"差分切换后的对话"}},
+		{Code: 355, Params: []any{`this.picsOut(30);`}},
+		{Code: 401, Params: []any{"收尾"}},
+	}
+	segs := Segments(cmds)
+	if len(segs) != 1 {
+		t.Fatalf("Segments = %d 段, want 1", len(segs))
+	}
+	hasCG := false
+	for _, c := range segs[0] {
+		if scriptCGName(c) == "pic001" {
+			hasCG = true
+		}
+	}
+	if !hasCG {
+		t.Error("段落里应包含 cgLoad('pic001') 指令")
+	}
+}

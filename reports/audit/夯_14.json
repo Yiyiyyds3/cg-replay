@@ -31,5 +31,16 @@
   ],
   "verdict": "fail",
   "reason": "scan_error",
-  "duration_ms": 763
+  "duration_ms": 763,
+  "spike_retest": {
+    "date": "2026-11-15",
+    "commit_base": "3e6d527",
+    "tool": "cmd/spike-a -mode scan",
+    "events": 222,
+    "scenes": 222,
+    "cgs": 0,
+    "warn": 0,
+    "verdict": "pass",
+    "note": "rmmz 适配器新增 Wolfzq cgLoad 脚本 CG 识别（355/655）后通过；原判定 fail 保留作对照"
+  }
 }
