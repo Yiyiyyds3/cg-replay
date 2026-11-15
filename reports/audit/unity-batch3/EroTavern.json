@@ -1,0 +1,27 @@
+{
+  "group": "上等",
+  "game": "夢見る酒場と秘密の調教（上等）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\上等\\夢見る酒場と秘密の調教（上等）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 125,
+  "cg": 125,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\EroTavern",
+    "container": "EroTavern_Data\\resources.assets + sharedassets0..11.assets（13 容器全量传参，.resS 齐全，顶层 2538 MB）",
+    "still_regex": "^mt_",
+    "cg": 125,
+    "png": 125,
+    "orphan_png": 1398,
+    "orphan_text": 334,
+    "exported_mb": 31.8,
+    "duration_s": 4.1,
+    "scan_events": 125,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "mt_chloe_0001..0023 / mt_lily_ / mt_misha_ / mt_suzune_ / mt_tina_ 各 23 张（5 女主）+ mt_other_0001..0010 共 125 张 H 静图（位于 sharedassets9.assets，resS 112MB）全部可解码导出；t_image_*、1-1_ero_effect、maid_*_image 等命名族未锚定计入（保守口径）"
+  }
+}

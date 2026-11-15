@@ -1,0 +1,20 @@
+{
+  "batch": "unity-batch3",
+  "date": "2026-11-15",
+  "base_commit": "441b196",
+  "tool": "tools/unity_cg_export.py（main 版，--assets/--still-regex，rx=search 锚定 ^）+ cmd/spike-a -mode unity（ScanUnity）",
+  "selection": "reports/audit/batch-1..7.json 中 Unity fail 31 款，剔除批1 已做 7 款 + 批2 已做 6 款后剩 18 款；E 形态 5 款（84865、HO、斯塔WIN(9)、棘罪最新版、洗脑APP大小姐）本批跳过；剩余 13 款 B 形态（批2 已实探 12 款 + 芙(不赖) 本批补探确认 B 形态）。按体积升序取前 6 款：芙(不赖) 1010MB（实测，此前未探）、GensouBrothel 1421MB、Oshioki Lesson 2533MB、夢見る酒場 2538MB、ゴブリン＆ソード 2753MB、Swarm Bunker 3567MB",
+  "games": [
+    { "short": "FallenElfFreya", "group": "不赖", "game": "芙(不赖)（Fallen Elf Freya）", "size_mb": 1010, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "GensouBrothel", "group": "不赖", "game": "GensouBrothel(Ver1.00)（不赖）", "size_mb": 1421, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "OshiokiLesson", "group": "中上", "game": "Oshioki Lesson(中上)", "size_mb": 2533, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "EroTavern", "group": "上等", "game": "夢見る酒場と秘密の調教（上等）", "size_mb": 2538, "export": "ok", "cg": 125, "events": 125, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "GoblinSword", "group": "未评级", "game": "ゴブリン＆ソード -深き碧き森の城の女王-", "size_mb": 2753, "export": "ok", "cg": 50, "events": 50, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "SwarmBunker", "group": "未评级", "game": "Swarm Bunker Lust Defense", "size_mb": 3567, "export": "ok", "cg": 544, "events": 544, "verdict": "pass", "reason": "unity_export_rescan" }
+  ],
+  "pass": 3,
+  "fail": 3,
+  "timeout": 0,
+  "progress_delta": { "pass": "43→46", "fail": "28→25", "A档": "34→31" },
+  "note": "判定口径与批1/批2 一致：events>0 → pass（扫描层）；导出成功但 0 CG → fail + 原始报错（spike-a：索引里没有可回放的 CG，exit 1），无编造通过。无一款超时（最长 16.0s，均在 4 分钟红线内）。regex 全部 ^ 锚定（^mt_ / ^EventCG\\d+_Atlas0$|^CGSample\\d+$ / ^(WomanA_H|WomanB_H|GirlB_H)）；0 CG 三款实测命名后确认无 CG 命名族可锚定（纹理全为 UI/材质/贴花/背景/播放器控件）。算式闭合：46+6+25+40=117，A 31+B 9+C 31=71=partial 6+fail 25+skip 40。"
+}

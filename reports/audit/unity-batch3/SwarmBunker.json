@@ -1,0 +1,27 @@
+{
+  "group": "未评级",
+  "game": "Swarm Bunker Lust Defense",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Swarm Bunker Lust Defense",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 544,
+  "cg": 544,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\SwarmBunker",
+    "container": "Swarm Bunker_ Lust Defense_Data\\resources.assets（单容器 3834 tex，resS 2680 MB，顶层 3567 MB）",
+    "still_regex": "^(WomanA_H|WomanB_H|GirlB_H)",
+    "cg": 544,
+    "png": 544,
+    "orphan_png": 2888,
+    "orphan_text": 11,
+    "exported_mb": 7.9,
+    "duration_s": 8.3,
+    "scan_events": 544,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "WomanA_H ×432 + WomanB_H ×43 + GirlB_H ×68 等 H 姿势帧共 544 张全部可解码导出；单张为低分辨率变体（合计仅 7.9MB），量级大但单张小，口径如实记录；01_BeforeStart/02_Start/03_Slow 等 OP 动画帧与 BOSS_*/Soldier_* 敌方帧未锚定计入（保守口径）"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "group": "中上",
+  "game": "Oshioki Lesson(中上)",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\Oshioki Lesson(中上)",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 0,
+  "cg": 0,
+  "errors": ["spike-a -mode unity: 索引里没有可回放的 CG（exit 1）"],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\OshiokiLesson",
+    "container": "Oshioki Lesson_Data\\resources.assets(349 tex)+sharedassets0.assets(16 tex)+sharedassets1.assets(553 tex)（内嵌 assets，.resS 齐全约 1.8GB，顶层 2533 MB）",
+    "still_regex": null,
+    "cg": 0,
+    "png": 0,
+    "orphan_png": 877,
+    "orphan_text": 9,
+    "exported_mb": 0.0,
+    "duration_s": 0.2,
+    "scan_events": 0,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "918 张纹理实测命名全为 3D 角色材质/贴花/UI（Milltina_* 材质、BusinessMan_* PBR 贴图、Cum汚れ_*・ゲロ汚れ_*・ビンタ・殴る 等贴花与图标、T_VFX_* 特效），无独立 CG 静图命名族；本作为 3D 引擎内摆拍型，CG 由渲染产出而非贴图载体 → 无 regex 可锚定，全量导出 0 CG。归 --auto/3D 渲染批"
+  }
+}

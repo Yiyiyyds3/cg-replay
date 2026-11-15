@@ -1,0 +1,27 @@
+{
+  "group": "不赖",
+  "game": "GensouBrothel(Ver1.00)（不赖）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\GensouBrothel(Ver1.00)（不赖）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 0,
+  "cg": 0,
+  "errors": ["spike-a -mode unity: 索引里没有可回放的 CG（exit 1）"],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\GensouBrothel",
+    "container": "GensouBrothel_Data\\resources.assets + sharedassets0.assets + sharedassets1.assets（内嵌 assets，含 .resS，顶层 1421 MB）",
+    "still_regex": null,
+    "cg": 0,
+    "png": 0,
+    "orphan_png": 57,
+    "orphan_text": 153,
+    "exported_mb": 0.0,
+    "duration_s": 0.1,
+    "scan_events": 0,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "78 张纹理实测命名全为 UI/字体图集/标题立绘/场景背景（BT_/UI_ 图集、Title_Aya/Hatate/Momiji/Megumu/Tukasa、Izakaya/Shop/BedroomNight 等背景、texture_00），无独立 CG 命名族；sharedassets1.resS 632MB 大纹理即场景背景本体 → 无 regex 可锚定，全量导出 0 CG。CG 疑在图集 Sprite 内部或外部 bundle，归 --auto/图集切分批"
+  }
+}

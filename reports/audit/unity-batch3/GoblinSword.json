@@ -1,0 +1,27 @@
+{
+  "group": "未评级",
+  "game": "ゴブリン＆ソード -深き碧き森の城の女王-",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\ゴブリン＆ソード -深き碧き森の城の女王-",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 50,
+  "cg": 50,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\GoblinSword",
+    "container": "Goblin＆Sword-深き碧き森の城の女王-_Data\\resources.assets(606 tex)+sharedassets0.assets(411 tex)（内嵌 assets，.resS 齐全，顶层 2753 MB）",
+    "still_regex": "^EventCG\\d+_Atlas0$|^CGSample\\d+$",
+    "cg": 50,
+    "png": 50,
+    "orphan_png": 890,
+    "orphan_text": 12,
+    "exported_mb": 202.8,
+    "duration_s": 16.0,
+    "scan_events": 50,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "EventCG01..30_Atlas0 ×30（事件 CG 图集页）+ CGSample01..20 ×20（CG 样图）全部可解码导出（202.8MB）；bg_*/icon_*/stand_*/portrait_* 等背景与立绘未锚定计入（保守口径）"
+  }
+}
