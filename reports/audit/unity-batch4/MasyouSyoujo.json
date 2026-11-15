@@ -1,0 +1,27 @@
+{
+  "group": "未评级",
+  "game": "魔性少女的诱惑同居～禁忌缠绵每一天～（MasyouSyoujo）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\魔性少女的诱惑同居～禁忌缠绵每一天～",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20261004\\其他\\未评级\\魔性少女的诱惑同居～禁忌缠绵每一天～",
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 425,
+  "cg": 425,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\MasyouSyoujo",
+    "container": "MasyouSyoujo_Data\\resources.assets(256.9MB,2672 tex,7912 text)+sharedassets0.assets(2 tex)+sharedassets1.assets(110 tex)+sharedassets2.assets(0)，4 容器全量传参，.resS 齐全（resources.assets.resS 8454.5MB，本批最大），顶层 11371MB，Mono+Live2D",
+    "still_regex": "^(gallery[0-9]+|erobana_|img_[0-9]+g$)",
+    "cg": 425,
+    "png": 425,
+    "orphan_png": 2311,
+    "orphan_text": 7765,
+    "exported_mb": 37.1,
+    "duration_s": 22.1,
+    "scan_events": 425,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "导出器口径：spine 0 + frames 0 + still 425 部（该作无 Spine .atlas 文本对，全 Live2D 场景：Face_#_#.motion#/up_Dakisime_Love#_/Furo#_/Kiss_Love#_ 等文本 7765 段未被 Spine 路径捕获）。still 命中 = gallery01..06（CG 鉴赏缩略）+ erobana_6..14（H 解锁标记）+ img_Ng 族 409 张（PNG 合计 37.1MB，单张约 91KB，量级属正常贴图层）。img_Ng 的『g』后缀语义未逐一人工验图，判定按命名族+可解码事实如实记录（同 KanzenChikan 保守口径）；Live2D 交互 H 场景本体（.model/.motion）导出器暂不接 → 归 --auto/Live2D 批。spike-a 重扫 {\"cgs\":0,\"events\":425,\"scenes\":425}。probes 证据：D:\\UCGR_Work\\probe\\MasyouSyoujo.txt"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "batch": "unity-batch4",
+  "date": "2026-11-15",
+  "base_commit": "2e73cc1",
+  "tool": "tools/unity_cg_export.py（main 版，--assets/--still-regex，rx=search 锚定 ^）+ cmd/spike-a -mode unity（ScanUnity 数 events）+ UnityPy 只读 m_Name 探针（D:\\UCGR_Work\\probe\\probe_names.py，命名族先探后锚定）",
+  "selection": "批3 留下的 4 款 B 形态大款（批2 已实探 3 款 + 解密/魔性少女 本批补探确认）：解密→内层 Lifeguard Holic 5261MB（IL2CPP）、（牛）NTRaholic 5618MB（Mono+Live2D）、Love Confessions on the Adventure 5669MB（Mono）、魔性少女的诱惑同居 11371MB（Mono+Live2D）。批3 按 4 分钟红线留下批，本批单款预算放宽到 10 分钟后 4 款全部实跑",
+  "games": [
+    { "short": "LifeguardHolic", "group": "未评级", "game": "解密 → 内层 Lifeguard Holic", "size_mb": 5261, "export": "ok(38.2s,spine100+still8)", "cg": 108, "events": 100, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "NTRaholic", "group": "未评级", "game": "（牛）NTRaholic", "size_mb": 5618, "export": "ok(2.6s,spine6+still80)", "cg": 86, "events": 86, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "LoveConfessions", "group": "一般", "game": "Love Confessions on the Adventure（一般）", "size_mb": 5669, "export": "ok(67.2s,spine98+still5)", "cg": 103, "events": 100, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "MasyouSyoujo", "group": "未评级", "game": "魔性少女的诱惑同居～禁忌缠绵每一天～", "size_mb": 11371, "export": "ok(22.1s,still425)", "cg": 425, "events": 425, "verdict": "pass", "reason": "unity_export_rescan" }
+  ],
+  "pass": 4,
+  "fail": 0,
+  "timeout": 0,
+  "progress_delta": { "pass": "49→53", "fail": "22→18", "A档": "28→24" },
+  "note": "判定口径与批1/批2/批3 一致：events>0 → pass（扫描层）；本批无 0 CG、无超时、无导出中断，磁盘充足。regex 全部 ^ 锚定：^Screenshot_ / ^(nakadashi |ossan[0-9]+ deru |main dashi |mob dash ) / ^state_girls_photo / ^(gallery[0-9]+|erobana_|img_[0-9]+g$)；两款的主力载体是导出器 Spine 骨架∩图集自动配对（LifeguardHolic 100 部、LoveConfessions 98 部），--still-regex 只补静图。NTRaholic/MasyouSyoujo 为 Live2D 形态（.model/.motion/.cdi/.physics），导出器只吃贴图层，Live2D 场景本体归 --auto/Live2D 批；NTRaholic PNG 合计 1.0MB 量级存疑已如实记录（KanzenChikan 先例）。算式闭合：53+6+18+40=117 ✅，A 24+B 9+C 31=64=partial 6+fail 18+skip 40 ✅。类①（Unity 缺 cg-index.json，31 款）现状：pass 16（批1 3+批2 3+批3 6+批4 4）+ fail 10（待 --auto/图集切分/3D 渲染/视频批复试）+ 未动 5（E 形态）。实测推翻体积直觉：5.3~11.4GB 全量内嵌导出仅 2.6~67.2s（元数据扫描+按需解码 resS），批2/批3 的『超红线留下批』在本机 NVMe 上不成立。红线遵守：游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\（本批 4 款合计约 855MB）。"
+}
