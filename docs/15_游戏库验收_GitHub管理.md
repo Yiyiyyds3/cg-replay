@@ -31,6 +31,7 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 | `status/待处理` | 0 | 未跑款数为 0（**不等于全部搞定**：未通过 = 78 款 = 67%，Unity 导出批1 后） |
 
 - 汇总产物：`reports/游戏库验收_总报告.md`（7 批次表 / 34 失败 4 类聚类 / 40 跳过引擎缺口 / A/B/C 待搞定清单）。
+- **Unity 导出批4 更新（2026-11-15，基线 2e73cc1，逐款提交 e2ec523/0a4cb9c/8dfb018/6459a28）**：批3 留下的 4 款 B 形态大款导出重扫（`reports/audit/unity-batch4/`，逐款 JSON ×4 + summary）——LifeguardHolic（解密→内层）events=100、NTRaholic events=86、LoveConfessions events=100、MasyouSyoujo events=425 由 fail→**pass**（合计 events=711，本批无维持 fail 款）。`status/已验收` 推算 **53**、`status/待修` 推算 **18**（A 档 24 = fail 18 + partial 6），未通过收敛为 64 款/55%。
 - 优先级：**A 档先行**——31 款 Unity 跑 `tools/unity_cg_export.py` 生成 cg-index.json、6 款 KiriKiri 用 `internal/unpack.ExtractWith` 解包 xp3 后重扫，预期 pass 从 37 大幅上升；随后合并 feat/spine-skins-cover 的 ScanRenpy（解 7 款 Ren'Py skip）。
 
 ## 2. 自动化 workflow
@@ -282,5 +283,7 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 **Unity 导出批2 + 1692614 补账更新（2026-11-15，基线 a4410c4→441b196）**：批2 6 款同形态导出重扫——IdealEvesRoom events=17、ElvenNinja events=117、MyLovableDemon events=131 由 fail→**pass**，ElectronicStore、ToxicMarriagePunisher、Fallen 0 events 维持 fail（推算 42/29）；随后 1692614 spike pass 判定 JSON 补入 unity-batch1/OneSixNine.json（events=60，commit 441b196，推算 43/28）。**以 Actions 同步后的 GitHub issues API 实测为准**。
 
 **Unity 导出批3 更新（2026-11-15，基线 441b196，两段提交：3a `c6ed545` + 3b）**：9 款 B 形态 Unity fail 导出重扫（`reports/audit/unity-batch3/`，逐款 JSON ×9 + summary；E 形态 5 款 84865/HO/斯塔WIN(9)/棘罪最新版/洗脑APP 跳过，B 形态大款 4 款 解密/NTRaholic/Love Confessions/魔性少女 留下批）——EroTavern(夢見る酒場) events=125、GoblinSword events=50、SwarmBunker events=544、KanzenChikan events=17（17 部 PNG 合计 0.0MB 量级存疑，如实备注）、BloodOfYidhra events=257（spine 220 + still 45）、SuccubusSuccessor events=34 由 fail→**pass**；FallenElfFreya(芙)、GensouBrothel、OshiokiLesson 0 events **维持 fail**（实测纹理命名无 CG 命名族）。推算标签分布：已验收 **49** / 待修 **22** / 卡点跳过 40 / 进行中 6 / 待处理 0（49+22+40+6+0 = 117 ✅；未通过 = 6+22+40 = 68 款/58%），**以 Actions 同步后的 GitHub issues API 实测为准**。
+
+**Unity 导出批4 更新（2026-11-15，基线 2e73cc1，逐款提交 e2ec523 / 0a4cb9c / 8dfb018 / 6459a28，收尾提交另记）**：批3 留下的 4 款 B 形态大款导出重扫（`reports/audit/unity-batch4/`，逐款 JSON ×4 + summary；流程=命名族探针 D:\UCGR_Work\probe\ 先探后锚定 `^`regex，单款预算放宽 10 分钟）——LifeguardHolic（解密→内层 Lifeguard Holic，IL2CPP）spine 100 + still 8 → events=**100**；NTRaholic（Mono+Live2D）still 80 + spine 6 → events=**86**（PNG 合计 1.0MB 量级存疑如实备注，Live2D 场景本体归 --auto/Live2D 批）；LoveConfessions（Mono）spine 98 + still 5 → events=**100**；MasyouSyoujo（Mono+Live2D）still 425（gallery+erobana+img_*g）→ events=**425**。4 款全 pass、无维持 fail、无超时，实测导出仅 2.6~67.2s（推翻批2/批3「超 4 分钟红线」的体积直觉——元数据扫描+按需解码 resS 不搬全量像素）。推算标签分布：已验收 **53** / 待修 **18** / 卡点跳过 40 / 进行中 6 / 待处理 0（53+18+40+6+0 = 117 ✅；未通过 = 6+18+40 = 64 款/55%；A 24 + B 9 + C 31 = 64 ✅），**以 Actions 同步后的 GitHub issues API 实测为准**。
 
 
