@@ -1,0 +1,27 @@
+{
+  "group": "未评级",
+  "game": "（牛）NTRaholic",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\（牛）NTRaholic",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260303\\其他\\未评级\\（牛）NTRaholic",
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 86,
+  "cg": 86,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\NTRaholic",
+    "container": "Ntraholic_Data\\resources.assets(71.6MB,3359 tex)+sharedassets0..7.assets 共 9 容器全量传参，.resS 齐全（resources.assets.resS 4881.3MB），顶层 5618MB，Mono+Live2D(.model/.motion/.cdi/.physics)",
+    "still_regex": "^(nakadashi |ossan[0-9]+ deru |main dashi |mob dash )",
+    "cg": 86,
+    "png": 86,
+    "orphan_png": 1471,
+    "orphan_text": 301,
+    "exported_mb": 1.9,
+    "duration_s": 2.6,
+    "scan_events": 86,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "导出器口径：spine 6 部 + frames 0 + still 80 部 = 86 部（PNG 86 张合计 1.0MB，单张约 12KB）。still 命中 = nakadashi #（中出し场景族）/ossan# deru #/main dashi /mob dash 四族（探针族计数 70+27+13+11=121，跨容器同名纹理 setdefault 去重后实导 80，如实记录）。⚠ 量级存疑：PNG 合计仅 1.0MB，单张 12KB 上下，疑为 H 场景部件帧/低分辨率纹理（KanzenChikan 17 部 0.0MB 同类先例），判定 events>0 → pass 属扫描层事实，量级备注不掩盖。Live2D 场景本体（Spring_CG# model/motion 族、replay_#）导出器暂不接 → 归 --auto/Live2D 批。spike-a 重扫 {\"cgs\":0,\"events\":86,\"scenes\":86}。probes 证据：D:\\UCGR_Work\\probe\\NTRaholic.txt"
+  }
+}
