@@ -1,0 +1,27 @@
+{
+  "group": "一般",
+  "game": "Love Confessions on the Adventure（一般）／冒險途中全員告白",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\Love Confessions on the Adventure（一般）",
+  "real_path": "E:\\Personal_entertainment\\game\\ero\\egame\\20260703\\其他\\一般\\Love Confessions on the Adventure（一般）",
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 100,
+  "cg": 103,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\LoveConfessions",
+    "container": "冒險途中全員告白_Data\\resources.assets(83.1MB,1647 tex)+sharedassets0.assets(21.9MB,259 tex)，2 容器传参；sharedassets1..62 实测 0 tex/0 text（探针逐容器核实）不传；.resS 齐全（resources.assets.resS 4490.2MB），顶层 5669MB，Mono",
+    "still_regex": "^state_girls_photo",
+    "cg": 103,
+    "png": 138,
+    "orphan_png": 1693,
+    "orphan_text": 315,
+    "exported_mb": 579.9,
+    "duration_s": 67.2,
+    "scan_events": 100,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "导出器口径：spine 98 部 + frames 0 + still 5 部 = 103 部（PNG 138 张 526.6MB + 骨架/图集 text 196 段 53.3MB）；spike-a 重扫 events=100/scenes=100（扫描层合并，与索引 103 部差额如实记录）。Spine 骨架+图集自动配对：BH1..5/MH1..5/GH1..5/WH1..5/IH1..5（5 女主 H 场景）+ BCG/GCG/MCG/ICG/WCG 族 + battle/wander/train 等小游戏 Spine 共 98 组；still 5 = state_girls_photo1..5（少女相册）。批2 预估『超 4 分钟红线概率高』实测 67.2s——本机 NVMe+元数据-only 扫描远快于体积直觉，全量实探推翻保守预估。probes 证据：D:\\UCGR_Work\\probe\\LoveConfessions.txt"
+  }
+}
