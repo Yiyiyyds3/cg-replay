@@ -1,0 +1,27 @@
+{
+  "group": "中等",
+  "game": "ElectronicStore（中等）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\ElectronicStore（中等）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 0,
+  "cg": 0,
+  "errors": ["spike-a -mode unity: 索引里没有可回放的 CG（exit 1）"],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\ElectronicStore",
+    "container": "ElectronicsThriftStore_Data\\resources.assets + sharedassets0.assets（内嵌 assets，含 .resS 像素流，顶层约 203 MB）",
+    "still_regex": null,
+    "cg": 0,
+    "png": 0,
+    "orphan_png": 49,
+    "orphan_text": 11,
+    "exported_mb": 0.0,
+    "duration_s": 0.1,
+    "scan_events": 0,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "resources.assets 62 张 + sharedassets0 6 张纹理全部为 UI/字体/Logo（实测命名），无 CG 命名；CG 本体在 StreamingAssets/aa Addressables bundle 内（catalog.bin），main 版导出器不解析，归 --auto 批"
+  }
+}

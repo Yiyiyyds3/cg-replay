@@ -1,0 +1,31 @@
+{
+  "group": "一般",
+  "game": "My Lovable Demon(一般)",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\My Lovable Demon(一般)",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 131,
+  "cg": 131,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\MyLovableDemon",
+    "container": "My Lovable Demon_Data\\resources.assets + sharedassets0..94.assets（共 96 容器，内嵌 assets + .resS，顶层约 1092 MB）",
+    "still_regex": "^(doggy|demon bj|missionary|impreg|bj grab|double bj|Delph Gang BJ|delph gang|J BJ|J DT|J gold|J lick|J Spank|J horse|J H |J Pillory|J A |Jess fu|Jess f Del|Jess Fallen|Del imprisoned|Thug H|Akumi H|Akumi behind|Vaerynth H|Vae tj|Callisto fk|Callisto tj|Liora Fk|Shayde fk|Shayde tent|Shayde bj|D FJ|D 3p|Min J P|Min J An|knee spank|first time|beach blow|bath hj|hj bed|outdoor hj|pan BJ|ball kick|milk |sleep bear|sleep together|loyal slut|cock whore|dildo)",
+    "cg": 131,
+    "png": 135,
+    "exported_mb": 244.7,
+    "text": 134,
+    "spine": 67,
+    "still": 64,
+    "orphan_png": 469,
+    "orphan_text": 9,
+    "duration_s": 40.1,
+    "scan_events": 131,
+    "scan_raw": {"cgs": 0, "events": 131, "scenes": 131},
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "96 容器全量传参（未超命令行上限）；131 张 H 场景 still CG 按 50 个场景名前缀族锚定匹配（doggy/missionary/Jess Fallen/Delph Gang BJ/knee spank 等，实测纹理命名），部分场景为纯数字命名（1/2/3/5）或 bg/chibi 无法锚定未计入（孤儿 png 469 张，保守口径）；附带导出 text 134 段 + spine 67 个"
+  }
+}

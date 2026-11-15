@@ -1,0 +1,20 @@
+{
+  "batch": "unity-batch2",
+  "date": "2026-11-15",
+  "base_commit": "a4410c4",
+  "tool": "tools/unity_cg_export.py（main 版，--assets/--still-regex，rx=search 锚定 ^）+ cmd/spike-a -mode unity（ScanUnity）",
+  "selection": "reports/audit/batch-1..7.json 中 verdict=fail 且 error 含 cg-index 的 Unity 款共 31 款，剔除批1已做 7 款后剩 24 款（芙(不赖) 按点名排除，实探 23 款顶层容器 ≤3 层非递归）：18 款 B 形态（内嵌 resources.assets/sharedassets*.assets + .resS 齐全）为候选，5 款 E 形态（84865、HO、斯塔WIN(9)、棘罪最新版、洗脑APP大小姐——顶层无 *_Data/resources.assets）暂缓。取 B 形态 6 款：点名 4（ElectronicStore、fallen、My Lovable Demon、Flee My Elven Ninja）+ 体积最小 2（ToxicMarriagePunisher 382MB、ideal-eves-room 670MB）；Love Confessions 5.7GB 超 4 分钟红线概率高，留下批",
+  "games": [
+    { "short": "ElectronicStore", "group": "中等", "game": "ElectronicStore（中等）", "size_mb": 203, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "ToxicMarriagePunisher", "group": "一搬", "game": "(一搬)ToxicMarriagePunisher", "size_mb": 382, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "IdealEvesRoom", "group": "不赖", "game": "（不赖）ideal-eves-room-_1.0.0", "size_mb": 670, "export": "ok", "cg": 17, "events": 17, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "Fallen", "group": "未评级", "game": "fallen_1.0.5b", "size_mb": 765, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "ElvenNinja", "group": "中等", "game": "Flee My Elven Ninja（中等）", "size_mb": 793, "export": "ok", "cg": 117, "events": 117, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "MyLovableDemon", "group": "一般", "game": "My Lovable Demon(一般)", "size_mb": 1092, "export": "ok(96容器,text134+spine67)", "cg": 131, "events": 131, "verdict": "pass", "reason": "unity_export_rescan" }
+  ],
+  "pass": 3,
+  "fail": 3,
+  "timeout": 0,
+  "progress_delta": { "pass": "39→42", "fail": "32→29", "A档": "38→35" },
+  "note": "判定口径与批1一致：events>0 → pass（扫描层）；导出成功但 0 CG → fail + 原始报错。无编造通过。无一款超时（最长 40.1s，均在 4 分钟红线内）。6 款导出+重扫并行执行。"
+}

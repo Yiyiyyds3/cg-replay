@@ -1,0 +1,28 @@
+{
+  "group": "不赖",
+  "game": "（不赖）ideal-eves-room-_1.0.0",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）ideal-eves-room-_1.0.0",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 17,
+  "cg": 17,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\IdealEvesRoom",
+    "container": "ideal -eve's room-_Data\\resources.assets + sharedassets0..5.assets（内嵌 assets，含 .resS，顶层约 670 MB）",
+    "still_regex": "^(pose_|saliva_exchange|pet_play|eye_socket_sex|footjob|anal|age_play|wetting|fake_moaning|aphrodisiac|deprivation_release|love_lock|vt\\d)",
+    "cg": 17,
+    "png": 17,
+    "exported_mb": 0.1,
+    "orphan_png": 493,
+    "orphan_text": 14,
+    "duration_s": 0.8,
+    "scan_events": 17,
+    "scan_raw": {"cgs": 0, "events": 17, "scenes": 17},
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "resources.assets 254 张纹理中按 H 行为命名（footjob/anal/eye_socket_sex/pet_play/saliva_exchange/pose_* 等）保守锚定匹配出 17 张 still CG；量级小（孤儿 png 493 张未计 CG，多为 UI/表情/状态图标），CG 是否有更高清原图待 --auto 批复核"
+  }
+}

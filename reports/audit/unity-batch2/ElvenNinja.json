@@ -1,0 +1,28 @@
+{
+  "group": "中等",
+  "game": "Flee My Elven Ninja（中等）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\Flee My Elven Ninja（中等）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 117,
+  "cg": 117,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\ElvenNinja",
+    "container": "ELFxNINJA_Data\\resources.assets + sharedassets0.assets（内嵌 assets，含 .resS，顶层约 793 MB）",
+    "still_regex": "^(CG\\d+|Recap_)",
+    "cg": 117,
+    "png": 117,
+    "exported_mb": 83.7,
+    "orphan_png": 267,
+    "orphan_text": 74,
+    "duration_s": 13.6,
+    "scan_events": 117,
+    "scan_raw": {"cgs": 0, "events": 117, "scenes": 117},
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "resources.assets 329 张纹理中 CG02a..CG23a 系列 + Recap_* 事件回顾图按 ^CG\\d+|^Recap_ 锚定匹配 117 张，全部可解码导出（83.7 MB）；SKILL_/IN_/CB_/ET_ 等技能/图标类未计入 CG（保守口径）"
+  }
+}

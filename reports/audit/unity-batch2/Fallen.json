@@ -1,0 +1,27 @@
+{
+  "group": "未评级",
+  "game": "fallen_1.0.5b",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\fallen_1.0.5b",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 0,
+  "cg": 0,
+  "errors": ["spike-a -mode unity: 索引里没有可回放的 CG（exit 1）"],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\Fallen",
+    "container": "fallen_Data\\resources.assets + sharedassets0.assets（内嵌 assets，含 .resS，顶层约 765 MB）",
+    "still_regex": null,
+    "cg": 0,
+    "png": 0,
+    "orphan_png": 365,
+    "orphan_text": 15,
+    "exported_mb": 0.0,
+    "duration_s": 0.2,
+    "scan_events": 0,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "resources.assets 171 张（UI 图标）+ sharedassets0 214 张全为 sactx-* SpriteAtlas 图集页（ViewTutorial/CookingEntryItemData/ViewSexualRecord_UI 等 UI 系统），无独立 CG 命名；CG 疑在 aa/Addressables 或图集内部，归 --auto/图集切分批"
+  }
+}
