@@ -1,0 +1,27 @@
+{
+  "group": "夯",
+  "game": "KanzenChikan（夯）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\KanzenChikan（夯）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 17,
+  "cg": 17,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\KanzenChikan",
+    "container": "KanzenChikan_Data\\sharedassets0.assets(789 tex)+resources.assets（内嵌 assets，.resS/.resource 齐全，顶层 3912 MB）",
+    "still_regex": "^\\d+$",
+    "cg": 17,
+    "png": 17,
+    "orphan_png": 807,
+    "orphan_text": 5,
+    "exported_mb": 0.0,
+    "duration_s": 0.5,
+    "scan_events": 17,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "sharedassets0 中纯数字名 0..16 共 17 张（疑 CG gallery 本体），锚定导出后 PNG 合计仅 0.0MB（低分辨率/小占位纹理），events=17 属实但量级存疑，如实记录；容器内其余 476 个非 ASCII 命名全为 ←/→触摸互动图标（乳首つまみ、胸もみ等），非 CG 载体。判定口径 events>0 → pass，量级备注不粉饰"
+  }
+}

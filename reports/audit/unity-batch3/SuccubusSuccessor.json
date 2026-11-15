@@ -1,0 +1,27 @@
+{
+  "group": "不赖",
+  "game": "（不赖）Succubus Successor Delilah's Juicy Journey",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\（不赖）Succubus Successor Delilah's Juicy Journey",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 34,
+  "cg": 34,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\SuccubusSuccessor",
+    "container": "SuccubusSuccessor_Data\\resources.assets + sharedassets0/1/2.assets（内嵌 assets，.resS 齐全，顶层 4437 MB）",
+    "still_regex": "^CG\\d+$|^HCutin_",
+    "cg": 34,
+    "png": 34,
+    "orphan_png": 584,
+    "orphan_text": 39,
+    "exported_mb": 19.9,
+    "duration_s": 4.2,
+    "scan_events": 34,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "CG01/02/03 ×3 + HCutin_Delilah_ ×17 + HCutin_XRay_ ×6 等 34 张 H Cutin/CG 全部可解码导出（19.9MB）；CG0x_BG 背景、CG_04..07、Title_SavePic_* 存档缩略与 Castle_*/Enemy_* 图集未锚定计入（保守口径）"
+  }
+}

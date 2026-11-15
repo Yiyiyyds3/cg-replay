@@ -279,4 +279,8 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 **Unity 导出批1 更新（2026-11-15，基线 6438f48）**：6 款体积最小的 Unity fail 导出重扫（`reports/audit/unity-batch1/`，逐款 JSON + summary）——LastTownFelixia events=1、MUNIANGTIAOJIAO events=524 由 fail→**pass**；MonsterBlackMarket、TavernInnHalberd、IdolForging、Kureya 导出后 0 events **维持 fail**。推算标签分布：已验收 **39** / 待修 **32** / 卡点跳过 40 / 进行中 6 / 待处理 0（39+32+40+6+0 = 117 ✅），**以 Actions 同步后的 GitHub issues API 实测为准**。
 
+**Unity 导出批2 + 1692614 补账更新（2026-11-15，基线 a4410c4→441b196）**：批2 6 款同形态导出重扫——IdealEvesRoom events=17、ElvenNinja events=117、MyLovableDemon events=131 由 fail→**pass**，ElectronicStore、ToxicMarriagePunisher、Fallen 0 events 维持 fail（推算 42/29）；随后 1692614 spike pass 判定 JSON 补入 unity-batch1/OneSixNine.json（events=60，commit 441b196，推算 43/28）。**以 Actions 同步后的 GitHub issues API 实测为准**。
+
+**Unity 导出批3 更新（2026-11-15，基线 441b196，两段提交：3a `c6ed545` + 3b）**：9 款 B 形态 Unity fail 导出重扫（`reports/audit/unity-batch3/`，逐款 JSON ×9 + summary；E 形态 5 款 84865/HO/斯塔WIN(9)/棘罪最新版/洗脑APP 跳过，B 形态大款 4 款 解密/NTRaholic/Love Confessions/魔性少女 留下批）——EroTavern(夢見る酒場) events=125、GoblinSword events=50、SwarmBunker events=544、KanzenChikan events=17（17 部 PNG 合计 0.0MB 量级存疑，如实备注）、BloodOfYidhra events=257（spine 220 + still 45）、SuccubusSuccessor events=34 由 fail→**pass**；FallenElfFreya(芙)、GensouBrothel、OshiokiLesson 0 events **维持 fail**（实测纹理命名无 CG 命名族）。推算标签分布：已验收 **49** / 待修 **22** / 卡点跳过 40 / 进行中 6 / 待处理 0（49+22+40+6+0 = 117 ✅；未通过 = 6+22+40 = 68 款/58%），**以 Actions 同步后的 GitHub issues API 实测为准**。
+
 

@@ -1,0 +1,27 @@
+{
+  "group": "牢",
+  "game": "The Blood of Yidhra（牢）",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\牢\\The Blood of Yidhra（牢）",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_resolved": "unity",
+  "events": 257,
+  "cg": 265,
+  "errors": [],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\BloodOfYidhra",
+    "container": "The Blood of Yidhra_Data\\resources.assets + sharedassets0..19.assets（29 容器全量传参，.resS 齐全约 3.4GB，顶层 4353 MB）",
+    "still_regex": "^CGPreview_",
+    "cg": 265,
+    "png": 266,
+    "orphan_png": 1468,
+    "orphan_text": 6,
+    "exported_mb": 216.5,
+    "duration_s": 25.8,
+    "scan_events": 257,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "^CGPreview_ 锚定命中图鉴/回放 CG 资源族：CG 265 部（spine 220 + still 45），PNG 266 张 181.1MB + text 440 段 35.4MB，落盘 216.5MB；spike-a 重扫 events=257（扫描口径，与索引 265 部的差额为扫描层合并，如实记录）。CGPreview_Enemy_*/Delta/End_Explode/Policewoman/TransportYidhra 等全部可回放；NPCGraphic_*/2_*/Blood* 等场景与特效纹理未锚定计入（保守口径）"
+  }
+}
