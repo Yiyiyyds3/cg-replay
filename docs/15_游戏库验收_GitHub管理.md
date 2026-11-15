@@ -24,11 +24,11 @@ GITHUB_TOKEN 没有 Project v2 权限（`gh project` 相关 API 需要 PAT 的 `
 
 | 标签 | 条数 | 对应判定 |
 | --- | --- | --- |
-| `status/已验收` | 37 | 扫描层 pass（全部 rmmz） |
-| `status/待修` | 34 | fail（31 款 Unity 缺 cg-index.json + 2 款 rmmz 扫描错误 + 1 款 nscript） |
+| `status/已验收` | 37 | 扫描层 pass（全部 rmmz）→ Unity 导出批1 后推算 **39**（+2：LastTownFelixia、MUNIANGTIAOJIAO） |
+| `status/待修` | 34 | fail（31 款 Unity 缺 cg-index.json + 2 款 rmmz 扫描错误 + 1 款 nscript）→ 导出批1 后推算 **32**（−2，4 款导出后仍 0 events 维持 fail） |
 | `status/卡点跳过` | 40 | skip（引擎无分派/无入口） |
 | `status/进行中` | 6 | partial（6 款 KiriKiri xp3 未解包） |
-| `status/待处理` | 0 | 未跑款数为 0（**不等于全部搞定**：未通过 = 82 款 = 70%） |
+| `status/待处理` | 0 | 未跑款数为 0（**不等于全部搞定**：未通过 = 78 款 = 67%，Unity 导出批1 后） |
 
 - 汇总产物：`reports/游戏库验收_总报告.md`（7 批次表 / 34 失败 4 类聚类 / 40 跳过引擎缺口 / A/B/C 待搞定清单）。
 - 优先级：**A 档先行**——31 款 Unity 跑 `tools/unity_cg_export.py` 生成 cg-index.json、6 款 KiriKiri 用 `internal/unpack.ExtractWith` 解包 xp3 后重扫，预期 pass 从 37 大幅上升；随后合并 feat/spine-skins-cover 的 ScanRenpy（解 7 款 Ren'Py skip）。
@@ -276,5 +276,7 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 > 触发说明：本次提交改动批 5~7 共 36 个逐款 JSON + `batch-5/6/7.json` + `summary.json` → `reports/audit/**` 命中 workflow `paths`，由 push 自动触发；上表「批 4~7 后」列为 GitHub issues API 实测回填值（与 §1.1 的 35/36/40/6/0 一致）。
 
 **复扫更新（2026-11-15）**：commit 489f126 的 rmmz 脚本 CG 修复复扫后，呪いの鎧 v3.0.1 与 詛咒铠甲2 由 fail→pass，预计线上标签分布推算为 已验收 37 / 待修 34 / 卡点跳过 40 / 进行中 6 / 待处理 0（37+34+40+6+0 = 117 ✅），来源 eports/audit/batch-rmmz-recheck.json 与 eports/游戏库验收_rmmz复扫报告.md；**以 Actions 同步后的 GitHub issues API 实测为准**。
+
+**Unity 导出批1 更新（2026-11-15，基线 6438f48）**：6 款体积最小的 Unity fail 导出重扫（`reports/audit/unity-batch1/`，逐款 JSON + summary）——LastTownFelixia events=1、MUNIANGTIAOJIAO events=524 由 fail→**pass**；MonsterBlackMarket、TavernInnHalberd、IdolForging、Kureya 导出后 0 events **维持 fail**。推算标签分布：已验收 **39** / 待修 **32** / 卡点跳过 40 / 进行中 6 / 待处理 0（39+32+40+6+0 = 117 ✅），**以 Actions 同步后的 GitHub issues API 实测为准**。
 
 

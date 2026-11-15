@@ -1,0 +1,41 @@
+{
+  "group": "夯",
+  "game": "(夯)克蕾娅",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\(夯)克蕾娅",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_detected": "",
+  "engine_resolved": "unity",
+  "top_entries": 5,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [],
+  "errors": [
+    "导出成功但 0 CG：data.unity3d（224,445,231 B）+ 69 个 aa bundle 共读出 588 png / 178 text 全部为孤儿（CG 本体是自定义 HIDC 分块 TextAsset，导出器无法解析，见 reports/第2批_Unity_泛化spike_2026-11-04.md §1）",
+    "ScanUnity: 索引里没有可回放的 CG"
+  ],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "duration_ms": 6900,
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\Kureya",
+    "containers": 70,
+    "container_bytes": 330000000,
+    "cg": 0,
+    "png": 0,
+    "text": 0,
+    "exported_bytes": 7010,
+    "duration_s": 6.9,
+    "scan_events": 0,
+    "game_dir_size_bytes": 805480618,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\"
+  }
+}

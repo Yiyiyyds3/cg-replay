@@ -1,0 +1,20 @@
+{
+  "batch": "unity-batch1",
+  "date": "2026-11-15",
+  "base_commit": "6438f48",
+  "tool": "tools/unity_cg_export.py（main 版，--assets/--still-regex）+ cmd/spike-a -mode unity（ScanUnity）",
+  "selection": "reports/audit/batch-1..7.json 中 verdict=fail 且 error 含 cg-index 的 Unity 款共 31 款，剔除 spike 已做的（一般）1692614 后剩 30 款，按游戏目录体积（Get-ChildItem -Recurse 只读测量）升序取最小 6 款",
+  "games": [
+    { "short": "MonsterBlackMarket", "group": "夯", "game": "モンスターブラックマーケット（夯）", "size_bytes": 429341720, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "TavernInnHalberd", "group": "中等", "game": "Tavern, Inn, and the Halberd（中等）", "size_bytes": 597402175, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "IdolForging", "group": "未评级", "game": "Idol_Forging_V1.0.1.23", "size_bytes": 668295113, "export": "partial(60/2791 bundle)", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "Kureya", "group": "夯", "game": "(夯)克蕾娅", "size_bytes": 805480618, "export": "ok", "cg": 0, "events": 0, "verdict": "fail", "reason": "export_zero_cg" },
+    { "short": "LastTownFelixia", "group": "中等", "game": "（中等）`[ACT`]ラストタウン フェリクシアの滅亡   Last Town - Fall of Felixia【密码是四夜】", "size_bytes": 899550630, "export": "ok(1/29 张，.resS 缺流)", "cg": 1, "events": 1, "verdict": "pass", "reason": "unity_export_rescan" },
+    { "short": "MuniangTiaojiao", "group": "中等", "game": "MUNIANGTIAOJIAO（中等）", "size_bytes": 902856999, "export": "ok", "cg": 524, "events": 524, "verdict": "pass", "reason": "unity_export_rescan" }
+  ],
+  "pass": 2,
+  "fail": 4,
+  "timeout": 0,
+  "progress_delta": { "pass": "37→39", "fail": "34→32", "A档": "40→38" },
+  "note": "判定口径：events>0 → pass（扫描层）；导出成功但 0 CG / 无法传参 → fail（如实记录）。无一款超时（最长 89.3s，均在 4 分钟红线内）。"
+}

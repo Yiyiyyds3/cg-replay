@@ -1,0 +1,43 @@
+{
+  "group": "未评级",
+  "game": "Idol_Forging_V1.0.1.23",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Idol_Forging_V1.0.1.23",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_detected": "",
+  "engine_resolved": "unity",
+  "top_entries": 5,
+  "events": 0,
+  "cg": 0,
+  "scenes": 0,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [],
+  "errors": [
+    "全量导出无法执行：2791 个 Addressables 哈希命名 bundle，逐个 --assets 传参在 180 个时即超 Windows CreateProcess 命令行上限（python.exe 启动失败：文件名或扩展名太长）",
+    "缩样重试：按体积取最大 60 个 bundle 导出成功但 cg=0（无 JSON 骨架/.atlas 配对）",
+    "ScanUnity: 索引里没有可回放的 CG"
+  ],
+  "verdict": "fail",
+  "reason": "export_zero_cg",
+  "duration_ms": 1200,
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\IdolForging",
+    "containers": 60,
+    "container_bytes": 0,
+    "cg": 0,
+    "png": 0,
+    "text": 0,
+    "exported_bytes": 2984,
+    "duration_s": 1.2,
+    "scan_events": 0,
+    "game_dir_size_bytes": 668295113,
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\",
+    "note": "该款有 StreamingAssets/aa/catalog.json，但 bundle 为哈希命名，main 版脚本 --game 模式只认 cg_assets_all.bundle；需 feat/spine-skins-cover 的 --auto/清单解析版才能全量导出"
+  }
+}

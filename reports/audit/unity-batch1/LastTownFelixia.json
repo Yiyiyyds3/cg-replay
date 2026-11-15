@@ -1,0 +1,42 @@
+{
+  "group": "中等",
+  "game": "（中等）`[ACT`]ラストタウン フェリクシアの滅亡   Last Town - Fall of Felixia【密码是四夜】",
+  "path": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\（中等）`[ACT`]ラストタウン フェリクシアの滅亡   Last Town - Fall of Felixia【密码是四夜】",
+  "real_path": null,
+  "engine_guess": "Unity",
+  "engine_detected": "",
+  "engine_resolved": "unity",
+  "top_entries": 2,
+  "events": 1,
+  "cg": 1,
+  "scenes": 1,
+  "chapters": 0,
+  "text_lines": 0,
+  "voices": 0,
+  "ir_probed_events": 0,
+  "can_unpack": false,
+  "category_dirs": [],
+  "cover_valid": false,
+  "unpack_notes": [],
+  "errors": [
+    "诚实记录：29 张 H 场景纹理（Overlay_Sex_*、Blowjob、Creampie、inner vag 系列等）导出失败 —— 贴图导出失败：Resource file resources.assets.resS not found（重打包缺外部像素流，仅 sharedassets1.assets 的 1 张可解码）",
+    "导出 warning：29 张纹理解码失败（.resS 缺失），cg=1 / png=1 导出成功"
+  ],
+  "verdict": "pass",
+  "reason": "unity_export_rescan",
+  "duration_ms": 2900,
+  "export": {
+    "out_dir": "D:\\UCGR_Work\\unitycg\\LastTownFelixia",
+    "containers": 3,
+    "container_bytes": 45900000,
+    "cg": 1,
+    "png": 1,
+    "text": 0,
+    "exported_bytes": 331759,
+    "duration_s": 2.9,
+    "scan_events": 1,
+    "game_dir_size_bytes": 899550630,
+    "still_regex": "(?i)^(overlay_(sex|blowjob|standing|sitting)|blowjob|creampie|orgasm|boob_lick|boob_suck|female_clit_lick|grope_|thwop|inner vag)",
+    "readonly_redline": "游戏目录只读，产物仅写 D:\\UCGR_Work\\unitycg\\"
+  }
+}
