@@ -30,19 +30,22 @@
 | (夯)克蕾娅 | 768 MB | `data.unity3d`（224 MB）+ 69 bundle，`--assets`×70 | 导出成功 6.9s，cg=0（孤儿 png 588 / text 178） | 0 | **fail**（export_zero_cg） | CG 本体是自定义 HIDC 分块 TextAsset（spike §1），导出器无法解析 |
 | Last Town - Fall of Felixia | 858 MB | 内嵌 `resources.assets + sharedassets0/1.assets` + `--still-regex`（H 场景纹理名） | 导出 2.9s，cg=1 / png=1（332 KB） | **1** | **pass**（unity_export_rescan） | 29 张 `Overlay_Sex_*` 纹理因**缺 `resources.assets.resS`** 解码失败（重打包缺外部像素流），仅 1 张可解码；events=1 属实但量级极小 |
 | MUNIANGTIAOJIAO | 861 MB | `Mother's Conditioning_Data\StreamingAssets\windows.ab`（756 MB）+ `--still-regex a[1-4]-\d+$` | 导出 89.3s，cg=524 / png=524（736 MB），索引自检通过 | **524** | **pass**（unity_export_rescan） | 524 部静图变体 CG 全部可播（still 类型） |
+| （一般）1692614（2026-11-15 补账） | 3.6 GB | `resources.assets`（60,387,604 B），spine 60 组（骨架 .json/.atlas + png 各 60）；2026-11-04 spike 489f126 已导出 `D:\UCGR_Work\unitycg\1692614` | 导出闭环 cg=60 / png=60 / text=120 / spine=60（49,831,111 B），cg-index.json counts.cg=60 | **60** | **pass**（unity_export_rescan） | 判定 JSON 补账 `OneSixNine.json`；本次 spike-a 重扫实测 events=60（cgs=0 / scenes=60），与 spike 记录一致；游戏目录零写入 |
 
 **本轮 pass 数：2**（LastTownFelixia、MuniangTiaojiao）；**fail：4**；**timeout：0**（最长 89.3s，均在 4 分钟红线内）。判定口径：events>0 → pass（扫描层）；导出成功但 0 CG / 无法传参 → fail + 原始报错，**无编造通过**。
 
+**补账（2026-11-15）**：（一般）1692614（events=60，spine 60 组，2026-11-04 spike 489f126 已验证导出）判定 JSON 补入本批为第 7 款：`reports/audit/unity-batch1/OneSixNine.json`（verdict=pass / reason=unity_export_rescan / note=spike 489f126 验证后本次补账）。本次以 `go run ./cmd/spike-a -mode unity D:\UCGR_Work\unitycg\1692614` 重扫实测 **events=60（cgs=0 / scenes=60）**，与 spike 记录及 cg-index.json（counts.cg=60）一致。本批合计 **pass 3 / fail 4 / timeout 0**。
+
 ## 三、对总进度的影响（算式闭合）
 
-- pass：37 + 2 = **39**
-- fail：34 − 2 = **32**
-- A 档（现成工具可推）：40 − 2 = **38**
-- 核对：39 + 6（partial）+ 32（fail）+ 40（skip）= **117** ✅；A 38 + B 9 + C 31 = **78** = partial 6 + fail 32 + skip 40 ✅
+- pass：37 + 2（本批）+ 1（1692614 补账）= **40**
+- fail：34 − 2（本批）− 1（1692614 补账）= **31**
+- A 档（现成工具可推）：40 − 2 − 1 = **37**
+- 核对：40 + 6（partial）+ 31（fail）+ 40（skip）= **117** ✅；A 37 + B 9 + C 31 = **77** = partial 6 + fail 31 + skip 40 ✅（1692614 判定 JSON 2026-11-15 补账，spike 489f126 验证 events=60，见 §二补账）
 
 ## 四、下批继续（诚实清单）
 
-类① 31 款现状：**pass 2**（本批）+ spike 已验证 pass 1（1692614，判定 JSON 待补）+ **fail 4**（本批，需 `--auto` 版导出器 / 专用解析器复试：MonsterBlackMarket 二进制骨架、克蕾娅 HIDC、IdolForging 哈希 bundle 清单解析、Tavern 无配对纹理）+ **未动 24 款**。下一批建议：
+类① 31 款现状：**pass 3**（本批 2：LastTownFelixia 1 + MUNIANGTIAOJIAO 524；spike 已验证 pass 1：1692614 events=60，判定 JSON 已补 `reports/audit/unity-batch1/OneSixNine.json`，spike-a 重扫实测 events=60）+ **fail 4**（本批，需 `--auto` 版导出器 / 专用解析器复试：MonsterBlackMarket 二进制骨架、克蕾娅 HIDC、IdolForging 哈希 bundle 清单解析、Tavern 无配对纹理）+ **未动 24 款**。下一批建议：
 
 1. 优先跑与 MUNIANG 同形态的「windows.ab / 内嵌 assets + `--still-regex`」款（中等/ElectronicStore、未评级/fallen、一般/My Lovable Demon 等先探容器）；
 2. `--auto`（feat/spine-skins-cover 分支已验证）合入 main 后重试 4 款 fail 与哈希 bundle 型；
@@ -50,6 +53,6 @@
 
 ## 五、产物
 
-- 判定 JSON：`reports/audit/unity-batch1/<短名>.json` × 6 + `summary.json`
-- 导出库：`D:\UCGR_Work\unitycg\{MonsterBlackMarket, TavernInnHalberd, IdolForging, Kureya, LastTownFelixia, MuniangTiaojiao}`（合计约 736 MB，全在仓库外）
+- 判定 JSON：`reports/audit/unity-batch1/<短名>.json` × 6 + `OneSixNine.json`（1692614 补账）+ `summary.json`
+- 导出库：`D:\UCGR_Work\unitycg\{MonsterBlackMarket, TavernInnHalberd, IdolForging, Kureya, LastTownFelixia, MuniangTiaojiao}`（6 款合计约 736 MB）+ `D:\UCGR_Work\unitycg\1692614`（补账款，spike 导出 49.8 MB），全部在仓库外
 - 游戏目录零写入。
