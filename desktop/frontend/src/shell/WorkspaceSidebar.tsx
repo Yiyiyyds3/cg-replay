@@ -249,8 +249,28 @@ export function WorkspaceSidebar({
               )}
               <div className="sidebar-game-list">
                 {filteredGames.map(renderGameRow)}
-                {filteredGames.length === 0 && (
-                  <p className="sidebar-empty">没有匹配的游戏</p>
+                {games.length === 0 ? (
+                  // 空态引导卡片：显眼、可点，别让新用户对着「没有匹配的游戏」发呆。
+                  <div className="sidebar-empty-games">
+                    <p className="sidebar-empty-games-title">还没有游戏库</p>
+                    <p className="sidebar-empty-games-hint">
+                      点击下方按钮导入游戏：游戏目录（含 www/data 或 *.xp3）或
+                      导出 CG 库（含 cg-index.json 的目录也可以）。
+                    </p>
+                    <Button
+                      size="sm"
+                      className="w-full justify-center gap-2"
+                      onClick={onAddGame}
+                      disabled={busy}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      导入游戏
+                    </Button>
+                  </div>
+                ) : (
+                  filteredGames.length === 0 && (
+                    <p className="sidebar-empty">没有匹配的游戏</p>
+                  )
                 )}
               </div>
             </section>

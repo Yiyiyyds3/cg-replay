@@ -540,7 +540,15 @@ export default function EventGrid({
       setStatus({ state: "ready" });
       void refreshCatalog();
     } catch (e: any) {
-      setStatus({ state: "error", message: e?.message ?? String(e) });
+      // 保留后端报错原文，并追加一行支持范围说明（添加失败最常见的疑问
+      // 就是「我该选什么目录」），横幅与错误卡都展示这段完整文案。
+      const raw = e?.message ?? String(e);
+      setStatus({
+        state: "error",
+        message:
+          raw +
+          "\n支持：游戏目录（含 www/data 或 *.xp3）或导出 CG 库（含 cg-index.json）。",
+      });
     } finally {
       setBusy(false);
     }
@@ -728,14 +736,15 @@ export default function EventGrid({
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex w-[460px] flex-col items-center gap-4 rounded-lg border border-border bg-card px-10 py-10 text-center">
           <FolderOpen className="h-9 w-9 text-primary" />
-          <h1 className="text-lg font-semibold">先选游戏解包目录</h1>
+          <h1 className="text-lg font-semibold">还没有游戏库</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            选「包含 raw\data\scenario 的那一层」。选择后会自动建立事件库。
-            之后可随时从左侧游戏栏底部的「添加游戏」登记更多游戏，配置与 CLI 版
+            点击下方按钮选择目录导入游戏：游戏目录（含 www/data 或 *.xp3 等
+            原作/解包文件），或导出 CG 库（含 cg-index.json 的目录也可以）。
+            之后可随时从左侧底部的「添加」登记更多游戏，配置与 CLI 版
             cgreplay.exe 共用同一份 cgreplay.conf。
           </p>
           <Button onClick={pickAndAdd} disabled={busy} className="mt-2">
-            {busy ? "建立中…" : "选择目录"}
+            {busy ? "建立中…" : "导入游戏"}
           </Button>
         </div>
       </div>
@@ -755,7 +764,7 @@ export default function EventGrid({
       <div className="flex min-h-screen items-center justify-center">
         <div className="w-[520px] rounded-lg border border-red-900 bg-card px-8 py-7 text-center">
           <h1 className="text-base font-semibold text-red-400">出错了</h1>
-          <p className="mt-3 break-all text-sm text-muted-foreground">{status.message}</p>
+          <p className="mt-3 whitespace-pre-line break-all text-sm text-muted-foreground">{status.message}</p>
           <div className="mt-5 flex justify-center gap-3">
             <Button size="sm" variant="outline" onClick={pickAndAdd}>换个目录</Button>
             <Button size="sm" variant="outline" onClick={() => void reload(true)}>重试</Button>

@@ -977,6 +977,33 @@
   color: #7d7d7d;
 }
 
+/* 无游戏空态引导卡片（游戏库 section）：显眼、可点、说明支持哪些目录。 */
+.sidebar-empty-games {
+  margin: 8px 4px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  border: 1px dashed #4b4b4b;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-empty-games-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.sidebar-empty-games-hint {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #7d7d7d;
+}
+
 /* ---------- 编辑器与标签栏 ---------- */
 .editor-region {
   display: flex;
@@ -1305,6 +1332,8 @@
   color: #fff;
   background: #5a1d1d;
   border-bottom: 1px solid #6f2424;
+  /* 报错原文后追加的「支持：…」说明行要独立成行。 */
+  white-space: pre-line;
 }
 
 .editor-warning-list {
