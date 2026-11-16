@@ -142,6 +142,15 @@ func DefaultNScripter() Convention {
 	return Convention{EngineID: "nscript"}
 }
 
+// DefaultUnity 导出 CG 库（tools/unity_cg_export.py 产物）的默认约定。
+//
+// 它没有剧本：cg-index.json + cg/ 就是全部，ScanUnity 自己找索引
+// （与 cmd/library-audit 的 conventionForEngine 特例同口径），所以
+// 约定里只有 EngineID，scenario_dir 留空是正常形态。
+func DefaultUnity() Convention {
+	return Convention{EngineID: "unity"}
+}
+
 // DefaultNeXAS 戏画 NeXAS 的默认约定。
 //
 // 剧本在 Script.pac（.bin 编译脚本）里，资源在 Bmp/Stand/System 等同目录
@@ -170,6 +179,8 @@ var autoScenarioEngines = map[string]bool{
 	"nscript":    true,
 	"nexas":      true,
 	"nitro":      true,
+	// unity：导出 CG 库没有剧本目录，ScanUnity 自己按 cg-index.json 找素材。
+	"unity": true,
 }
 
 // ConventionByEngine 按引擎 id 取默认约定。未知引擎返回空约定 + false
@@ -194,6 +205,8 @@ func ConventionByEngine(engineID string) (Convention, bool) {
 		return DefaultNeXAS(), true
 	case "nitro":
 		return DefaultNitro(), true
+	case "unity":
+		return DefaultUnity(), true
 	default:
 		return Convention{}, false
 	}

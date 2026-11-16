@@ -14,7 +14,9 @@ import (
 	"strings"
 
 	"ucgr/internal/adapter"
+	"ucgr/internal/adapter/rmmz"
 	_ "ucgr/internal/adapter/scn" // 注册 scn 适配器（Identify 探测 .scn 需要）
+	"ucgr/internal/adapter/unitycg"
 )
 
 // kirikiriScenarioDirs KiriKiri 解包树的脚本目录候选（相对 root，按常见度）。
@@ -30,6 +32,12 @@ var kirikiriScenarioDirs = []string{
 // （nscript.dat / 0.txt）→ 通用竞聘（bgi/artemis…）。
 // 都不匹配返回 ""（调用方应报错，不要瞎猜）。
 func DetectEngine(root string) string {
+	// 导出 CG 库（unity）：根下是导出器整理的 cg/<CG名>/ + cg-index.json，
+	// 没有任何剧本。这个信号最专属也最便宜，放在最前面——落到后面的
+	// 通用竞聘只会报「识别不出」，UI 端就永远加不进导出库。
+	if _, err := os.Stat(filepath.Join(root, unitycg.IndexFile)); err == nil {
+		return "unity"
+	}
 	if a, ok := adapter.Get("scn"); ok {
 		if id, err := a.Identify(root); err == nil && id != "" {
 			return id
@@ -39,6 +47,12 @@ func DetectEngine(root string) string {
 		if hasAnyFile(filepath.Join(root, filepath.FromSlash(rel)), ".ks") {
 			return "kirikiri"
 		}
+	}
+	// RPG Maker MV/MZ：「剧本」是编辑器序列化的 data/*.json，既不在
+	// replayableScriptExts 里，也没注册 adapter.Identify——按 data 目录
+	// 特征判定（www/data、data、内嵌/data 任一含 System.json，含 junction）。
+	if _, ok := rmmz.FindDataDir(root); ok {
+		return "rmmz"
 	}
 	if _, err := os.Stat(filepath.Join(root, "nscript.dat")); err == nil {
 		return "nscript"
@@ -166,7 +180,12 @@ func DetectConvention(root string) (string, adapter.Convention, error) {
 	// 整棵树一个剧本都没有、却有原作打包签名（.int / .pfs / .xp3…）时，
 	// 不猜引擎，直接说「还没解包」——把「没解包」错报成「不是 KiriKiri 引擎」
 	// 会让人去改引擎代码，方向完全错了。用户写了约定文件就尊重用户的判断。
-	if !exists && !anyScriptFile(root) {
+	//
+	// 例外：rmmz / unity 本来就没有 replayableScriptExts 意义上的剧本文件
+	// （rmmz 的事件是编辑器序列化的 data/*.json；unity 导出库只有
+	// cg-index.json + cg/）。DetectEngine 已按各自目录特征认出它们，
+	// 这里再按「没有剧本」拒掉就会把能扫的目录报成「还没解包」。
+	if !exists && !anyScriptFile(root) && engineID != "rmmz" && engineID != "unity" {
 		if packed, evidence := PackedEngineOf(root); packed != "" {
 			return "", adapter.Convention{}, fmt.Errorf(
 				"这层只有打包文件（%s，属 %s 引擎），还没解包：先解包成可读剧本再扫（解包产物在别的目录时，直接对那个目录扫）",

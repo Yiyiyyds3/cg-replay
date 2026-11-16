@@ -95,6 +95,75 @@ func TestSCN整理布局(t *testing.T) {
 	}
 }
 
+// TestDetectEngineUnityExported 导出 CG 库（cg-index.json + cg/）要认成 unity，
+// 约定文件 engine_id=unity 也不能再报「未知引擎」——UI 添加导出库就死在这两步。
+func TestDetectEngineUnityExported(t *testing.T) {
+	write := func(root, name, content string) {
+		p := filepath.Join(root, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 真实导出布局：cg/ + cg-index.json + ucgr-convention.json(engine_id=unity)。
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "cg", "cg001"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(root, "cg-index.json", `{"schema":1,"engine":"unity","game":"x","cgs":[]}`)
+	write(root, "ucgr-convention.json", `{"engine_id":"unity","scenario_dir":"cg"}`)
+
+	if got := DetectEngine(root); got != "unity" {
+		t.Fatalf("DetectEngine = %q, want unity", got)
+	}
+	engineID, conv, err := DetectConvention(root)
+	if err != nil {
+		t.Fatalf("DetectConvention（约定文件 engine_id=unity 的导出库）：%v", err)
+	}
+	if engineID != "unity" || conv.EngineID != "unity" {
+		t.Fatalf("引擎 = %q/%q, want unity", engineID, conv.EngineID)
+	}
+	if conv.ScenarioDir != "cg" {
+		t.Fatalf("剧本目录 = %q, want cg（约定文件指定）", conv.ScenarioDir)
+	}
+
+	// 没有约定文件的裸导出库也要过（ScanUnity 自己找索引，scenario_dir 留空合法）。
+	bare := t.TempDir()
+	write(bare, "cg-index.json", `{"schema":1,"engine":"unity","game":"x","cgs":[]}`)
+	if got := DetectEngine(bare); got != "unity" {
+		t.Fatalf("裸导出库 DetectEngine = %q, want unity", got)
+	}
+	if _, conv, err := DetectConvention(bare); err != nil {
+		t.Fatalf("裸导出库 DetectConvention：%v", err)
+	} else if err := conv.Validate(); err != nil {
+		t.Fatalf("裸导出库约定 Validate：%v", err)
+	}
+}
+
+// TestDetectEngineRMMZ 原生 RPG Maker MV/MZ 目录（www/data、data、内嵌/data）
+// 不能再被当成「没解包的陌生目录」——junction 登记的 rmmz 游戏就死在这里。
+func TestDetectEngineRMMZ(t *testing.T) {
+	for _, layout := range []string{"www/data", "data", "内嵌/data"} {
+		root := t.TempDir()
+		dataDir := filepath.Join(root, filepath.FromSlash(layout))
+		if err := os.MkdirAll(dataDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dataDir, "System.json"), []byte(`{"gameTitle":"t"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := DetectEngine(root); got != "rmmz" {
+			t.Errorf("%s 布局 DetectEngine = %q, want rmmz", layout, got)
+		}
+		_, conv, err := DetectConvention(root)
+		if err != nil {
+			t.Fatalf("%s 布局 DetectConvention：%v", layout, err)
+		}
+		if conv.EngineID != "rmmz" {
+			t.Errorf("%s 布局引擎 = %q, want rmmz", layout, conv.EngineID)
+		}
+	}
+}
+
 // TestStageSkipsExtraAssets 壁纸/特典目录不参与舞台推断。
 func TestStageSkipsExtraAssets(t *testing.T) {
 	root := t.TempDir()

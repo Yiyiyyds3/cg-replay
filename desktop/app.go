@@ -91,6 +91,13 @@ func gameConvention(root, engineID string) (adapter.Convention, error) {
 	return conv, nil
 }
 
+// isExportedCGLibrary 报告 root 是否是导出器产出的 CG 库
+// （tools/unity_cg_export.py：根下有 cg-index.json + cg/，没有剧本）。
+func isExportedCGLibrary(root string) bool {
+	st, err := os.Stat(filepath.Join(root, unitycg.IndexFile))
+	return err == nil && !st.IsDir()
+}
+
 // detectConvention 按目录特征猜引擎约定（只认确定的结构，不乱猜）。
 func detectConvention(root string) adapter.Convention {
 	if dataDir, ok := rmmz.FindDataDir(root); ok {
@@ -98,7 +105,7 @@ func detectConvention(root string) adapter.Convention {
 		conv.ScenarioDir = dataDir
 		return conv
 	}
-	if st, err := os.Stat(filepath.Join(root, unitycg.IndexFile)); err == nil && !st.IsDir() {
+	if isExportedCGLibrary(root) {
 		return adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
 	}
 	return adapter.DefaultKiriKiri()
@@ -377,14 +384,25 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 基线修复：resolveGameConvention 的 engineID 在这里没用（引擎号以
-	// conv.EngineID 为准），main 上遗留的未使用变量会让整个 desktop 包编译不过。
-	_, conv, cerr := resolveGameConvention(clean)
-	if cerr != nil {
-		return nil, cerr
-	}
-	if _, err := library.ResolveScenarioDir(clean, conv); err != nil {
-		return nil, fmt.Errorf("%w（在其根目录放 %s 可指定自定义路径）", err, adapter.ConventionFileName)
+	// 导出 CG 库特例：根下有 cg-index.json 就是导出器产物（engine=unity），
+	// ScanUnity 自己按索引找 cg/ 素材，不需要剧本目录探测——直接 ScanWith。
+	// 必须放在 resolveGameConvention 之前：DetectConvention 会对这种目录
+	// 报「未知引擎 unity / 没找到剧本」，导出库就永远加不进来
+	// （与 cmd/library-audit 的 conventionForEngine 特例同口径）。
+	var conv adapter.Convention
+	if isExportedCGLibrary(clean) {
+		conv = adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
+	} else {
+		_, detected, cerr := resolveGameConvention(clean)
+		if cerr != nil {
+			return nil, fmt.Errorf(
+				"%w（这不是可识别的游戏目录：需要含引擎特征——RPG Maker 的 www\\data 或 data、解包出的剧本树 raw\\data、*.xp3 等原作打包件，或含 cg-index.json 的导出 CG 库；也可以在根目录放 %s 手动指定）",
+				cerr, adapter.ConventionFileName)
+		}
+		conv = detected
+		if _, err := library.ResolveScenarioDir(clean, conv); err != nil {
+			return nil, fmt.Errorf("%w（在其根目录放 %s 可指定自定义路径）", err, adapter.ConventionFileName)
+		}
 	}
 	lib, err := library.ScanWith(clean, conv)
 	if err != nil {

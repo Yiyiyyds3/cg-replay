@@ -25,6 +25,13 @@ func TestConventionDefaults(t *testing.T) {
 	if _, ok := ConventionByEngine("nosuchengine"); ok {
 		t.Fatal("未知引擎应返回 false")
 	}
+	// unity（导出 CG 库）：只有 EngineID 的自动探测约定，scenario_dir
+	// 留空是正常形态（ScanUnity 自己找 cg-index.json）。
+	if conv, ok := ConventionByEngine("unity"); !ok {
+		t.Fatal("unity 应有默认约定（导出 CG 库）")
+	} else if err := conv.Validate(); err != nil {
+		t.Fatalf("unity 默认约定应合法：%v", err)
+	}
 }
 
 func TestConventionFileRoundTrip(t *testing.T) {
