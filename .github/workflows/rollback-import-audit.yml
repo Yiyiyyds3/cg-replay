@@ -1,0 +1,172 @@
+# rollback-import-audit.yml —— 导入链路断裂善后（照 bootstrap-game-library.yml 的成功模式）：
+#   1) 建 Epic issue，记录「扫描层 pass 不能替代 UI 端到端验收」这次 Bug（标题精确查重，幂等）；
+#   2) 把所有 labels 含 status/已验收 的 [游戏] open issue 回滚为 status/进行中，并留固定评论；
+#   3) 输出统计（Epic 编号 / 回滚数）。第二次运行已无已验收标签 → 0 回滚直接结束。
+#
+# 触发：workflow_dispatch；或 push 且 paths 仅本文件。
+# 权限：GITHUB_TOKEN 只需 contents:read + issues:write。
+#
+# 踩坑备忘（沿用 bootstrap 的教训）：
+# - 标题含中文 / 方括号，查重全量拉标题后 grep -Fx，不用 --search 限定符。
+# - heredoc 内容按 run 块最小缩进书写（折叠后顶格），紧跟 sed 兜底剥行首空白。
+name: rollback-import-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rollback-import-audit.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: rollback-import-audit
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # 1. 拉全量 open issue（number/title/labels），统计待回滚数；
+      #    顺带兜底确认 status/进行中 标签存在（已验收标签必存在才会被筛出）。
+      # ---------------------------------------------------------------
+      - name: Pull open issues and count rollback candidates
+        id: prep
+        run: |
+          set -euo pipefail
+
+          gh issue list -R "$REPO" --state open --limit 500 \
+            --json number,title,labels > /tmp/issues.json
+          echo "open issues: $(jq 'length' /tmp/issues.json)"
+
+          COUNT=$(jq '[.[] | select(.title | startswith("[游戏] ")) | select(any(.labels[]; .name == "status/已验收"))] | length' /tmp/issues.json)
+          echo "rollback candidates: $COUNT"
+          echo "rollback_count=$COUNT" >> "$GITHUB_OUTPUT"
+
+          if gh label list -R "$REPO" --limit 200 --json name --jq '.[].name' | grep -Fxq -- 'status/进行中'; then
+            echo "label exists: status/进行中"
+          else
+            gh label create 'status/进行中' -R "$REPO" --color 1d76db --description '正在跑，未出结论' || true
+            echo "label created: status/进行中"
+          fi
+
+      # ---------------------------------------------------------------
+      # 2. Epic issue：标题全量拉回 grep -Fx 精确查重，不存在才建。
+      # ---------------------------------------------------------------
+      - name: Ensure Epic issue (exact-title dedup)
+        id: epic
+        run: |
+          set -euo pipefail
+
+          EPIC_TITLE='[Epic] 导入游戏链路断裂——审计「扫描层 pass」不能替代 UI 端到端验收'
+          ROLLBACK_COUNT='${{ steps.prep.outputs.rollback_count }}'
+
+          TITLES=$(gh issue list -R "$REPO" --state all --limit 1000 \
+                   --json title --jq '.[].title' 2>/dev/null || true)
+
+          if printf '%s\n' "$TITLES" | grep -Fxq -- "$EPIC_TITLE"; then
+            EPIC_NUM=$(gh issue list -R "$REPO" --state all --limit 1000 --json number,title \
+                       | jq -r --arg t "$EPIC_TITLE" '.[] | select(.title==$t) | .number' \
+                       | head -n1 || true)
+            echo "Epic exists: #${EPIC_NUM:-?}"
+          else
+            tmp=$(mktemp)
+          cat > "$tmp" <<EOF
+          ## 现象
+          导出 CG 库在 UI 加不进去：标记已验收的游戏无法通过 UI 导入（导入链路断裂）。
+
+          ## 根因
+          导入链路 AddGame → resolveGameConvention → ResolveScenarioDir 不认 cg-index.json 目录（导出 CG 库的目录结构）：扫描层审计 pass，UI 导入却直接失败。
+
+          ## 修复
+          - commit f32859b：AddGame 增加 isExportedCGLibrary 特例 + 引擎识别兜底
+          - commit 4031215：添加游戏入口与空态引导补强
+
+          ## UI 实测证据
+          - docs/assets/ui-import-exported.png（导出 CG 库 UI 导入成功）
+          - docs/assets/ui-import-native.png（原生目录 UI 导入成功）
+
+          ## 流程教训
+          今后「搞定」必须包含 UI 端到端证据：UI 导入成功 + 列表显示 + 预览正常（点击推进 / 文本 / 语音）。审计层 pass 仅算「扫描层通过」，不等于完全验收。
+
+          ## 影响面
+          ${ROLLBACK_COUNT} 个已验收 issue 全部回滚为 status/进行中，待逐款人工 UI 复验后再升级为已验收。
+          EOF
+            # 兜底去行首空白（正文没有以空格开头的内容，剥了不改语义）。
+            sed -i 's/^[[:space:]]*//' "$tmp"
+            if [ "$(head -n1 "$tmp")" != '## 现象' ]; then
+              echo "::error::Epic body 首行不是顶格标题：$(head -n1 "$tmp")"
+              exit 1
+            fi
+            URL=$(gh issue create -R "$REPO" --title "$EPIC_TITLE" --body-file "$tmp")
+            EPIC_NUM="${URL##*/}"
+            rm -f "$tmp"
+            echo "Epic created: #$EPIC_NUM ($URL)"
+          fi
+
+          if [ -z "${EPIC_NUM:-}" ]; then
+            echo "::error::Epic issue 编号未取得"
+            exit 1
+          fi
+          echo "epic_num=$EPIC_NUM" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------
+      # 3. 回滚循环：status/已验收 → status/进行中 + 固定评论。
+      #    gh issue edit / comment 全部 || true 兜底，单款失败不阻塞其余。
+      # ---------------------------------------------------------------
+      - name: Rollback status/已验收 -> status/进行中 + comment
+        id: rollback
+        env:
+          EPIC_NUM: ${{ steps.epic.outputs.epic_num }}
+        run: |
+          set -euo pipefail
+
+          cmt=$(mktemp)
+          cat > "$cmt" <<EOF
+          回滚说明：该款此前仅有扫描层 pass 证据；导入链路 Bug（见 Epic #${EPIC_NUM}）修复后需逐款人工 UI 复验（导入成功/列表显示/预览正常/点击推进/文本）后才重新升级为已验收。
+          EOF
+          sed -i 's/^[[:space:]]*//' "$cmt"
+
+          COUNT=0
+          for num in $(jq -r '.[] | select(.title | startswith("[游戏] ")) | select(any(.labels[]; .name == "status/已验收")) | .number' /tmp/issues.json); do
+            gh issue edit "$num" -R "$REPO" --remove-label 'status/已验收' >/dev/null 2>&1 || true
+            gh issue edit "$num" -R "$REPO" --add-label 'status/进行中' >/dev/null 2>&1 || true
+            gh issue comment "$num" -R "$REPO" --body-file "$cmt" >/dev/null 2>&1 || true
+            COUNT=$((COUNT + 1))
+            echo "[rollback] #$num"
+          done
+          rm -f "$cmt"
+
+          echo "rolled back: $COUNT"
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------
+      # 4. 统计输出到 job summary。
+      # ---------------------------------------------------------------
+      - name: Write job summary
+        if: always()
+        env:
+          EPIC_NUM: ${{ steps.epic.outputs.epic_num }}
+          CANDIDATES: ${{ steps.prep.outputs.rollback_count }}
+          ROLLED: ${{ steps.rollback.outputs.count }}
+        run: |
+          {
+            echo "## 导入链路回滚（rollback-import-audit）"
+            echo
+            echo "- Epic issue: #${EPIC_NUM:-?}"
+            echo "- 执行前 status/已验收 计数: ${CANDIDATES:-0}"
+            echo "- 本次完成回滚（→ status/进行中）: ${ROLLED:-0}"
+            echo "- 复验口径: UI 导入成功 + 列表显示 + 预览正常（点击推进 / 文本 / 语音）"
+            echo "- 幂等: 再次运行时已无 status/已验收 标签 → 0 回滚直接结束"
+          } >> "$GITHUB_STEP_SUMMARY"
