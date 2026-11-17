@@ -286,4 +286,40 @@ gh issue comment <num> -R Yiyiyyds3/cg-replay -F ./reports/audit/xxx.json
 
 **Unity 导出批4 更新（2026-11-15，基线 2e73cc1，逐款提交 e2ec523 / 0a4cb9c / 8dfb018 / 6459a28，收尾提交另记）**：批3 留下的 4 款 B 形态大款导出重扫（`reports/audit/unity-batch4/`，逐款 JSON ×4 + summary；流程=命名族探针 D:\UCGR_Work\probe\ 先探后锚定 `^`regex，单款预算放宽 10 分钟）——LifeguardHolic（解密→内层 Lifeguard Holic，IL2CPP）spine 100 + still 8 → events=**100**；NTRaholic（Mono+Live2D）still 80 + spine 6 → events=**86**（PNG 合计 1.0MB 量级存疑如实备注，Live2D 场景本体归 --auto/Live2D 批）；LoveConfessions（Mono）spine 98 + still 5 → events=**100**；MasyouSyoujo（Mono+Live2D）still 425（gallery+erobana+img_*g）→ events=**425**。4 款全 pass、无维持 fail、无超时，实测导出仅 2.6~67.2s（推翻批2/批3「超 4 分钟红线」的体积直觉——元数据扫描+按需解码 resS 不搬全量像素）。推算标签分布：已验收 **53** / 待修 **18** / 卡点跳过 40 / 进行中 6 / 待处理 0（53+18+40+6+0 = 117 ✅；未通过 = 6+18+40 = 64 款/55%；A 24 + B 9 + C 31 = 64 ✅），**以 Actions 同步后的 GitHub issues API 实测为准**。
 
+## 10. 导入链路回滚与复验口径（2026-11-17）
+
+> 背景：2026-11-17 实测发现**导入链路 Bug**——此前所有 pass 都是扫描层判定，导出的 CG 库在桌面端 UI 里**加不进去**，也就是说 53 个 `status/已验收` 没有一款做过真实 UI 导入验收。经确认后用 Actions workflow `rollback-import-audit.yml` 把全部 `status/已验收` 批量回滚，并建 Epic 跟踪逐款复验。
+
+### 10.1 Bug 与修复
+
+| 项 | 内容 |
+| --- | --- |
+| Bug 现象 | 桌面端「添加游戏」选择导出的 CG 库目录（含 `cg-index.json`）**加不进去**，UI 加载失败且无有效报错引导 |
+| 根因 | `AddGame → resolveGameConvention → ResolveScenarioDir` 只认游戏原始目录形态，**不认 cg-index.json 导出库目录**，添加时判定失败 |
+| 修复 commit | `f32859b`（AddGame 支持 cg-index.json 导出库）+ `4031215`（UI 添加游戏入口、空态引导与报错文案补强） |
+| UI 实测①（导出库） | `docs/assets/ui-import-exported.png` —— MUNIANGTIAOJIAO 导入成功，524 事件，封面非黑 |
+| UI 实测②（原生目录） | `docs/assets/ui-import-native.png` —— 呪いの鎧 junction 目录导入成功 |
+
+### 10.2 回滚结果（Actions workflow 实测）
+
+- `.github/workflows/rollback-import-audit.yml` 已跑完：Epic issue **[#130](https://github.com/Yiyiyyds3/cg-replay/issues/130)** 已建，GitHub 上全部 `status/已验收` 标签已回滚。
+- GitHub API 实测（2026-11-17）：`status/已验收` = **0**，`status/进行中` = **41**。
+- 复核端点（注意：`label:` 参数必须带 `status/` 前缀再 URL 编码，否则匹配不到）：
+
+```text
+https://api.github.com/search/issues?q=repo:Yiyiyyds3/cg-replay+is:issue+label:%22status/%E5%B7%B2%E9%AA%8C%E6%94%B6%22&per_page=1
+```
+
+取返回 JSON 的 `total_count` 即当前已验收条数（回滚后实测为 0）。
+
+### 10.3 复验口径（升级已验收的唯一通道）
+
+每款需**三条证据齐全**才能从 `status/进行中` 重新升级 `status/已验收`，缺一不升级：
+
+1. **UI 导入成功**：桌面端 exe「添加游戏」无报错；
+2. **列表已显示**：游戏列表出现该款条目；
+3. **预览正常**：封面/事件预览可正常打开。
+
+复验方式：桌面端 exe 添加 `D:\UCGR_Work\unitycg\<短名>`（导出批 1~4 的导出库）或原游戏目录；对对应 issue 勾 checklist 并评论复验证据。复验通过后在 issue 评论「UI 导入成功，列表已显示，预览正常」，换 `status/已验收`；任一条不满足则留在 `status/进行中`（报错类按情况转 `status/待修`）。
+
 
