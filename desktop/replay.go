@@ -31,7 +31,9 @@ import (
 	"ucgr/internal/adapter/bgi"
 	"ucgr/internal/adapter/catsystem2"
 	"ucgr/internal/adapter/kirikiri"
+	"ucgr/internal/adapter/media"
 	"ucgr/internal/adapter/rmmz"
+	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/audio"
 	"ucgr/internal/catalog"
@@ -506,6 +508,17 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	case engine == "rmmz":
 		// RPG Maker：Script 是 data 目录下的 JSON，dataDir 从它反推。
 		ev, err = rmmz.BuildShow(root, filepath.ToSlash(filepath.Dir(script)), id)
+	case engine == "media":
+		// 视频/图片为主：无剧本，媒体文件即事件。
+		ev, err = media.BuildShow(root, id)
+	case engine == "renpy":
+		// Ren'Py：脚本可能嵌在 game 的子目录里，gameDir 用探测的
+		// （不能从 Script 反推 Dir，嵌套路径会推出 game/characters/events）。
+		gameDir, ok := renpy.FindGameDir(root)
+		if !ok {
+			return SessionMeta{}, fmt.Errorf("找不到 Ren'Py 的 game 目录")
+		}
+		ev, err = renpy.BuildShow(root, gameDir, id)
 	case chapterPos >= 0 && chEvent != nil:
 		// 走 library 入口：章跨文件时自动补演下一场景的章前段（KiriKiri 专有）。
 		ev, err = library.BuildChapterEvent(root, chEvent)
@@ -545,7 +558,7 @@ func (a *App) OpenEvent(kind, id string) (SessionMeta, error) {
 	// Spine 的素材必须在开会话前读齐：缺 skeleton/atlas/贴图时明确报错，
 	// 不能开一个只有黑屏的会话。
 	var spine *SpineDTO
-	if unityCG != nil && unityCG.Kind == "spine" {
+	if unityCG != nil && unitycg.IsSpine(unityCG.Kind) {
 		spine, err = loadSpineAssets(root, *unityCG)
 		if err != nil {
 			return SessionMeta{}, fmt.Errorf("加载 Spine 素材失败：%w", err)

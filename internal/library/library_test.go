@@ -102,3 +102,43 @@ func TestScanGenericKAG(t *testing.T) {
 		t.Errorf("标题 = %q, want 首句台词 %q", s.Title, want)
 	}
 }
+
+// TestScanHonorsConventionFile：游戏根目录的 ucgr-convention.json 要覆盖引擎默认约定。
+//
+// 默认 SceneRe 是 `^\d{2}[A-Za-z_0-9]*\.ks$`，`main_01.ks` 不收（01a 收）；
+// 放一个放宽的 scene_re 后只收 main_01。写坏了要报错，不能静默忽略。
+// 注：合并后 Scan 对「0 个可解析脚本」会报错（main 行为），所以场景里
+// 始终留一个默认约定能收的 01a.ks，避免空库报错干扰本测试关注点。
+func TestScanHonorsConventionFile(t *testing.T) {
+	root := t.TempDir()
+	body := "@novel\r\n@show\r\n*page1|\r\n　本文。[l][wvl]\r\n"
+	writeScript(t, root, "01a.ks", body)
+	writeScript(t, root, "main_01.ks", body)
+
+	lib, err := Scan(root)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(lib.Scenes) != 1 || lib.Scenes[0].ID != "01a" {
+		t.Fatalf("默认约定下场景 = %+v，期望只有 01a（main_01 不收）", lib.Scenes)
+	}
+
+	conv := `{"scene_re": "^main_.*\\.ks$"}`
+	if err := os.WriteFile(filepath.Join(root, "ucgr-convention.json"), []byte(conv), 0o644); err != nil {
+		t.Fatalf("写约定文件: %v", err)
+	}
+	lib, err = Scan(root)
+	if err != nil {
+		t.Fatalf("带约定文件 Scan: %v", err)
+	}
+	if len(lib.Scenes) != 1 || lib.Scenes[0].ID != "main_01" {
+		t.Fatalf("场景 = %+v，期望只有 main_01", lib.Scenes)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "ucgr-convention.json"), []byte("{"), 0o644); err != nil {
+		t.Fatalf("写坏约定文件: %v", err)
+	}
+	if _, err := Scan(root); err == nil {
+		t.Fatal("约定文件写坏了必须报错")
+	}
+}

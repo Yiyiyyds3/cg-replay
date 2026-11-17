@@ -234,6 +234,9 @@ export const api = {
     bridge().CatalogSpeakers(gameID) as Promise<SpeakerDTO[]>,
   getCoverForGame: (gameID: string, kind: string, id: string) =>
     bridge().GetCoverForGame(gameID, kind, id) as Promise<string>,
+  // Spine 首帧缩略图：前端 WebGL 渲染后存回（后端已存在则幂等跳过）
+  saveSpineThumb: (gameID: string, id: string, dataURL: string) =>
+    bridge().SaveSpineThumb(gameID, id, dataURL) as Promise<void>,
   // 兼容旧绑定；等价于 addGame
   setRoot: (root: string) => bridge().SetRoot(root) as Promise<LibraryDTO>,
   getLibrary: () => bridge().GetLibrary() as Promise<LibraryDTO>,
@@ -286,12 +289,21 @@ export interface SpineAnimationDTO {
 
 /** Spine 会话素材（Go 侧一次性下发，前端 WebGL 渲染）。 */
 export interface SpineDTO {
+  /** skeleton 原文；binary=true 时是 .skel 二进制的 base64 */
   skeleton: string;
+  /** true = skeleton 是二进制 .skel 的 base64，用 SkeletonBinary 加载 */
+  binary?: boolean;
   atlas: string;
   textures: SpineTextureDTO[];
   animations: SpineAnimationDTO[];
   animation: string; // 默认动画；空 = 取 skeleton 第一段
   loop: boolean;
+  /** 皮肤（服装/配件/状态）：换装面板据此列出 */
+  skins?: string[];
+  /** 背景层：不属于 atlas 页的独立 PNG（游戏里垫在角色底下），先于骨架绘制 */
+  backgrounds?: SpineTextureDTO[];
+  /** atlas 是否预乘 alpha（pma:true）：绘制时按预乘处理，否则边缘发黑 */
+  pma?: boolean;
   warnings?: string[];
 }
 

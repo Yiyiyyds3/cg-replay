@@ -60,7 +60,9 @@ type CG struct {
 	} `json:"files"`
 	Spine  *SpineInfo `json:"spine"`
 	Frames []string   `json:"frames"`
-	Bytes  int64      `json:"bytes"`
+	// FPS 逐帧播放帧率；0 = 用默认 12。觉得快了/慢了直接改索引里的这个数字。
+	FPS   int   `json:"fps,omitempty"`
+	Bytes int64 `json:"bytes"`
 }
 
 // SpineInfo 骨架统计（渲染器接入后要用）。
@@ -129,13 +131,17 @@ func validSegment(s string) bool {
 	return true
 }
 
+// IsSpine 这部 CG 是骨骼动画：JSON 骨架（spine）或二进制骨架（binary-skel，
+// 导出器从 .skel 原样导出）。两者都由前端 WebGL 组件渲染，加载分支不同。
+func IsSpine(kind string) bool { return kind == "spine" || kind == "binary-skel" }
+
 // Playable 这部 CG 现在能不能放（spine 由前端 WebGL 组件渲染）。
 // spine 必须同时有 skeleton/atlas 文本和贴图，否则列出来点开只会报错。
 func Playable(cg CG) bool {
-	switch cg.Kind {
-	case "frames", "still":
+	switch {
+	case cg.Kind == "frames" || cg.Kind == "still":
 		return true
-	case "spine":
+	case IsSpine(cg.Kind):
 		return len(cg.Files.Text) > 0 && len(cg.Files.PNG) > 0
 	}
 	return false
@@ -169,8 +175,9 @@ func sortFrames(files []string) []string {
 	return out
 }
 
-// FPS 逐帧 CG 的默认帧率。Unity 那边的 AnimationClip 常见 12fps（手绘逐帧），
-// 这里先按 12 走，后续可从 AnimationClip 里读真实帧率再覆盖。
+// FPS 逐帧 CG 的默认帧率。12 = 手绘动画的「二律」节奏，观感是逐帧质感而非卡顿。
+// 真实帧率在游戏的 AnimationClip 里（object_assets 包，跨包解引用成本高），
+// 所以做成可调：索引里给该 CG 写 "fps": 15 即覆盖默认值，不用改代码。
 const FPS = 12
 
 // BuildShow 把一部 CG 拼成演出台本。
@@ -186,7 +193,7 @@ func BuildShow(cg CG) (*ir.Event, error) {
 	if !validSegment(cg.ID) {
 		return nil, fmt.Errorf("CG id 非法：%q", cg.ID)
 	}
-	if cg.Kind == "spine" {
+	if IsSpine(cg.Kind) {
 		// Spine 的画面由前端 canvas 渲染；player 只需要一条等待撑住时间轴，
 		// 进度条/播放/暂停/seek 仍复用既有会话。
 		dur := cg.SpineDurationMs()
@@ -207,7 +214,11 @@ func BuildShow(cg CG) (*ir.Event, error) {
 		}
 	}
 
-	step := int64(1000 / FPS)
+	fps := cg.FPS
+	if fps <= 0 {
+		fps = FPS // 索引没写就用默认 12
+	}
+	step := int64(1000 / fps)
 	if cg.Kind == "still" {
 		step = 2000 // 单图停留 2 秒
 	}

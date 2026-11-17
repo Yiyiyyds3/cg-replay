@@ -76,7 +76,14 @@ bundle 是 UnityFS（LZ4 + 序列化对象 + 未压缩像素流），webview 没
 ```
 <out>/cg/<CG名>/  X.png · X.atlas · X.json …
 <out>/cg-index.json
+<out>/cover.png    可选：游戏封面（主界面截图）
 ```
+
+**封面**：这类 ACT 库没有「每部 CG 的标题画」，与其去猜首帧，不如统一用游戏主界面。
+把一张主界面截图放到 `<out>/cover.png`（或用 `--cover 图片路径` 让导出器复制过去），
+桌面端的卡片墙会优先用它；没有就回落到原来的「按事件取首图」逻辑。
+导出器**不会**自己去 bundle 里猜封面——实测这类游戏的标题画是 Spine 立绘 + UI 拼的，
+没有一张现成的整幅图（`top_1` 只是雾气遮罩），猜出来的东西不如不猜。
 
 索引里每部 CG 记录：`kind`（spine / frames / still）、`category`（战斗H·哥布林 / 商店 / 过场…）、
 `event_group`（匹配到的 DialogueData 组，**高置信才填，宁可留空也不错配**）、

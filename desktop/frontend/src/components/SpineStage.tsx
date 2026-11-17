@@ -4,7 +4,7 @@
 // SessionMeta；这里按 FrameDTO.now 同步动画时间，画面直接画在 canvas 上。
 // 暂停/拖动进度条时由 now 的跳变重置 TrackEntry.trackTime，避免动画自己跑飞。
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AnimationState,
   AnimationStateData,
@@ -15,6 +15,7 @@ import {
   ResizeMode,
   SceneRenderer,
   Skeleton,
+  SkeletonBinary,
   SkeletonJson,
   TextureAtlas,
 } from "@esotericsoftware/spine-webgl";
@@ -37,20 +38,36 @@ function pageTextureURL(spine: SpineDTO, pageName: string): string | undefined {
     ?.data_url;
 }
 
+/** base64 → 字节（二进制 .skel 走 SkeletonBinary，不吃字符串）。 */
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 export default function SpineStage({
   spine,
   now,
   playing,
   done,
+  skin,
+  onFirstFrame,
   onError,
 }: {
   spine: SpineDTO;
   now: number;
   playing: boolean;
   done: boolean;
+  /** 当前皮肤（服装/状态）。空 = 用骨架自带的 default。 */
+  skin?: string;
+  /** 首帧画好后回调一次（canvas 转 dataURL），用于生成事件缩略图。 */
+  onFirstFrame?: (dataURL: string) => void;
   onError: (msg: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const skeletonRef = useRef<Skeleton | null>(null);
+  const onFirstFrameRef = useRef(onFirstFrame);
   const nowRef = useRef(now);
   const playingRef = useRef(playing);
   const doneRef = useRef(done);
@@ -59,6 +76,13 @@ export default function SpineStage({
   playingRef.current = playing;
   doneRef.current = done;
   errRef.current = onError;
+  onFirstFrameRef.current = onFirstFrame;
+
+  // 换装面板：父组件没传 skin 时由本组件自控（VSCode 外壳的 Replay 不感知）。
+  const [localSkin, setLocalSkin] = useState<string | undefined>(undefined);
+  const effectiveSkin = skin ?? localSkin;
+  const skins = spine.skins ?? [];
+  const showSkinPanel = skin === undefined && skins.length > 1;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -87,10 +111,25 @@ export default function SpineStage({
         page.setTexture(new GLTexture(gl, img, false));
       }
 
-      const data = new SkeletonJson(new AtlasAttachmentLoader(atlas)).readSkeletonData(
-        spine.skeleton,
-      );
+      // 背景层：CG 目录里垫在角色底下的独立 PNG（如 bench.png）。
+      // 游戏内是「背景 + 角色」合成的，不画它就是黑底。
+      const bgTextures: GLTexture[] = [];
+      for (const bg of spine.backgrounds ?? []) {
+        try {
+          const img = await loadImage(bg.data_url);
+          if (disposed) return;
+          bgTextures.push(new GLTexture(gl, img, false));
+        } catch {
+          /* 单张背景失败不致命：回落黑底，warning 已由后端给 */
+        }
+      }
+
+      const loader = new AtlasAttachmentLoader(atlas);
+      const data = spine.binary
+        ? new SkeletonBinary(loader).readSkeletonData(base64ToBytes(spine.skeleton))
+        : new SkeletonJson(loader).readSkeletonData(spine.skeleton);
       const skeleton = new Skeleton(data);
+      skeletonRef.current = skeleton;
       const state = new AnimationState(new AnimationStateData(data));
       const physics = Physics.update; // 有物理约束时正常推进；没有也不报错
 
@@ -152,8 +191,31 @@ export default function SpineStage({
         state.apply(skeleton);
         skeleton.updateWorldTransform(physics);
         renderer?.begin();
-        renderer?.drawSkeleton(skeleton);
+        // 背景先铺满相机视口（与游戏内「背景填屏 + 角色居中」同构），再画角色
+        if (renderer) {
+          const cam = renderer.camera;
+          for (const tex of bgTextures) {
+            renderer.drawTexture(
+              tex,
+              cam.position.x - cam.viewportWidth / 2,
+              cam.position.y - cam.viewportHeight / 2,
+              cam.viewportWidth,
+              cam.viewportHeight,
+            );
+          }
+          renderer.drawSkeleton(skeleton, spine.pma ?? false);
+        }
         renderer?.end();
+        // 首帧回调整个会话只发一次：给缩略图生成用（canvas → dataURL）
+        if (onFirstFrameRef.current) {
+          const cb = onFirstFrameRef.current;
+          onFirstFrameRef.current = undefined;
+          try {
+            cb(canvas.toDataURL("image/png"));
+          } catch {
+            /* 截不出来就算了，卡片回落「无封面」 */
+          }
+        }
         raf = requestAnimationFrame(tick);
       };
       tick();
@@ -174,13 +236,47 @@ export default function SpineStage({
     };
   }, [spine]);
 
+  // 换皮肤：不重建渲染器，只换当前皮肤并把插槽重置到 setup pose
+  // （否则上一套服装的 attachment 会残留在插槽上）。
+  useEffect(() => {
+    const skeleton = skeletonRef.current;
+    if (!skeleton || !effectiveSkin) return;
+    try {
+      // 按名字换皮肤（setSkin 收的是 Skin 对象；setSkinByName 才吃字符串）
+      skeleton.setSkinByName(effectiveSkin);
+      skeleton.setSlotsToSetupPose();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errRef.current(`切换皮肤「${effectiveSkin}」失败：${msg}`);
+    }
+  }, [effectiveSkin]);
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={1600}
-      height={1200}
-      className="max-h-full max-w-full object-contain"
-      draggable={false}
-    />
+    <div className="relative flex h-full w-full items-center justify-center">
+      <canvas
+        ref={canvasRef}
+        width={1600}
+        height={1200}
+        className="max-h-full max-w-full object-contain"
+        draggable={false}
+      />
+      {showSkinPanel && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded border border-[--vscode-panel-border,rgba(128,128,128,.3)] bg-[rgba(30,30,30,.85)] px-2 py-1 text-xs text-[--vscode-foreground,#ccc]">
+          <span>换装</span>
+          <select
+            value={effectiveSkin ?? ""}
+            onChange={(e) => setLocalSkin(e.target.value || undefined)}
+            className="max-w-40 bg-transparent outline-none"
+          >
+            <option value="">默认</option>
+            {skins.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
   );
 }

@@ -18,6 +18,7 @@ import (
 
 	"ucgr/internal/adapter"
 	"ucgr/internal/adapter/rmmz"
+	"ucgr/internal/adapter/renpy"
 	"ucgr/internal/adapter/unitycg"
 	"ucgr/internal/catalog"
 	"ucgr/internal/cover"
@@ -85,6 +86,12 @@ func gameConvention(root, engineID string) (adapter.Convention, error) {
 			conv.ScenarioDir = dataDir
 		}
 	}
+	// Ren'Py 的 game 目录同理（标准 root/game，整合包常套壳、大小写不定）。
+	if strings.EqualFold(conv.EngineID, "renpy") {
+		if gameDir, ok := renpy.FindGameDir(root); ok {
+			conv.ScenarioDir = gameDir
+		}
+	}
 	if err := conv.Validate(); err != nil {
 		return conv, err
 	}
@@ -107,6 +114,11 @@ func detectConvention(root string) adapter.Convention {
 	}
 	if isExportedCGLibrary(root) {
 		return adapter.Convention{EngineID: "unity", ScenarioDir: "cg"}
+	}
+	if gameDir, ok := renpy.FindGameDir(root); ok {
+		conv := adapter.DefaultRenPy()
+		conv.ScenarioDir = gameDir
+		return conv
 	}
 	return adapter.DefaultKiriKiri()
 }
@@ -558,6 +570,14 @@ func (a *App) GetCoverForGame(gameID, kind, id string) (string, error) {
 
 // coverForGame 封面主逻辑：缓存目录按游戏分（不同游戏 CG 槽位会重名，如 cg017）。
 func (a *App) coverForGame(g *registry.Game, kind, id string) (string, error) {
+	// 游戏级封面：根目录的 cover.png（主界面截图），侧栏靠它分清是哪个游戏。
+	// 只对 kind=game 生效——事件卡要用各自的首帧，不能全糊成一张图。
+	if kind == "game" {
+		if url, ok := readGameCover(g.Root); ok {
+			return url, nil
+		}
+		return "", fmt.Errorf("游戏没有 cover.png（把主界面截图放进游戏目录即可）")
+	}
 	// 封面缓存按游戏分目录：不同游戏的 CG 槽位会重名（cg017）。
 	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -644,4 +664,73 @@ func safeName(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// SaveSpineThumb 前端把 Spine CG 的首帧（canvas 转 dataURL）存成缩略图。
+// 文件已存在时直接返回（幂等）：封面只生成一次，之后都读缓存。
+// 缓存路径与 GameCover 的 coverCachePath 同名同版本，并补写 meta，
+// 否则 coverCacheUsable 不认，会再走一遍采样并报「无封面」。
+func (a *App) SaveSpineThumb(gameID, id, dataURL string) error {
+	g := a.gameByID(gameID)
+	if g == nil {
+		return fmt.Errorf("找不到游戏 %s", gameID)
+	}
+	dir := filepath.Join(dataDir(), "covers", safeName(g.ID))
+	path := coverCachePath(dir, "scene", id)
+	if coverCacheUsable(path) {
+		return nil // 已有当前版本的缓存，不覆盖
+	}
+	const prefix = "data:image/png;base64,"
+	if !strings.HasPrefix(dataURL, prefix) {
+		return fmt.Errorf("缩略图不是 PNG dataURL")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(dataURL, prefix))
+	if err != nil {
+		return fmt.Errorf("缩略图解码失败：%w", err)
+	}
+	if len(raw) == 0 {
+		return fmt.Errorf("缩略图为空")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		return err
+	}
+	return writeCoverMeta(path, coverMeta{
+		Version:   cover.Version,
+		Algorithm: cover.Algorithm,
+		Valid:     true,
+		Source:    "spine-webgl",
+	})
+}
+
+// gameByID 按注册表 id 找游戏。
+func (a *App) gameByID(id string) *registry.Game {
+	c, _ := a.loadConf()
+	reg, err := a.loadRegistry(c)
+	if err != nil {
+		return nil
+	}
+	for i := range reg.Games {
+		if reg.Games[i].ID == id {
+			return &reg.Games[i]
+		}
+	}
+	return nil
+}
+
+// readGameCover 读游戏根目录下的 cover.png（主界面截图）。
+//
+// 约定：导出目录里放一张 cover.png，卡片墙就用它当封面，不再按事件去生成。
+// 没有就返回 false，交回原来的「按事件取首图」逻辑。
+func readGameCover(root string) (string, bool) {
+	if strings.TrimSpace(root) == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(root, "cover.png"))
+	if err != nil || len(data) == 0 {
+		return "", false
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(data), true
 }

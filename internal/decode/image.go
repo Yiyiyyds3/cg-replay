@@ -6,9 +6,11 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+
+	"golang.org/x/image/webp"
 )
 
-// DecodeImage 解 PNG（标准库）或 TLG5/JPEG/HG3（本包，自动还原 XOR 掩码）。
+// DecodeImage 解 PNG/WebP（第三方与标准库）或 TLG5/JPEG/HG3（本包，自动还原 XOR 掩码）。
 //
 // 放在 decode 包（而不是 replay）是为了让适配层也能用：rmmz 适配器需要
 // 读图片判断尺寸/不透明占比，若它反向依赖 replay 会与 replay 的测试形成
@@ -24,6 +26,15 @@ func DecodeImage(data []byte) (image.Image, error) {
 		img, err := png.Decode(bytes.NewReader(data))
 		if err != nil {
 			return nil, fmt.Errorf("PNG 解码失败: %w", err)
+		}
+		return img, nil
+	}
+	// Ren'Py 时代的素材大量用 WebP（RIFF….WEBP 魔数）。
+	if len(data) > 16 && bytes.Equal(data[:4], []byte("RIFF")) &&
+		bytes.Equal(data[8:12], []byte("WEBP")) {
+		img, err := webp.Decode(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("WebP 解码失败: %w", err)
 		}
 		return img, nil
 	}

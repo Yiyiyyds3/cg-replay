@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"ucgr/internal/adapter"
@@ -75,6 +76,49 @@ func TestScanUnityOnlySpine(t *testing.T) {
 	}
 	if len(lib.Scenes) != 1 || lib.Scenes[0].ID != "HCG02" {
 		t.Fatalf("应列出 spine 事件，实际 %+v", lib.Scenes)
+	}
+}
+
+// TestScanUnityBinarySkel：SkeletonBinary 通道打通后，binary-skel（有文本+贴图）
+// 应被列为可播事件；只有真正无法识别的 unknown 才被门禁拦下并如实报类型分布。
+func TestScanUnityBinarySkel(t *testing.T) {
+	root := t.TempDir()
+	writeUnityIndex(t, root, []map[string]any{
+		{"id": "bed_anna_1", "kind": "binary-skel", "category": "床",
+			"files": map[string]any{
+				"text": []string{"bed_anna_1.skel", "bed_anna_1.atlas"},
+				"png":  []string{"bed_anna_1.png"},
+			}},
+		{"id": "orphan", "kind": "unknown"},
+	})
+	lib, err := ScanWith(root, adapter.Convention{EngineID: "unity"})
+	if err != nil {
+		t.Fatalf("含 binary-skel 的库不应报错：%v", err)
+	}
+	if len(lib.Scenes) != 1 || lib.Scenes[0].ID != "bed_anna_1" {
+		t.Fatalf("应只列出 binary-skel 事件，实际 %+v", lib.Scenes)
+	}
+	if lib.Scenes[0].Label != "binary-skel" {
+		t.Fatalf("Label 应保留 kind=binary-skel，实际 %q", lib.Scenes[0].Label)
+	}
+}
+
+// TestScanUnityAllUnknown 全部不可识别时仍要报错，且错误里给出类型分布。
+func TestScanUnityAllUnknown(t *testing.T) {
+	root := t.TempDir()
+	writeUnityIndex(t, root, []map[string]any{
+		{"id": "orphan", "kind": "unknown"},
+		{"id": "broken", "kind": "spine", "files": map[string]any{"text": []string{"x.json"}}},
+	})
+	_, err := ScanWith(root, adapter.Convention{EngineID: "unity"})
+	if err == nil {
+		t.Fatal("全部不可播时应报错")
+	}
+	msg := err.Error()
+	for _, want := range []string{"unknown=1", "spine=1"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("错误应含 %q，实际：%s", want, msg)
+		}
 	}
 }
 
