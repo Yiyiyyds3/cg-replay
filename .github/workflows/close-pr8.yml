@@ -46,7 +46,8 @@ jobs:
           set -euo pipefail
 
           cmt=$(mktemp)
-          cat > "$cmt" <<EOF
+          # 单引号 heredoc：内容含反引号（commit hash 标注），必须禁用命令替换。
+          cat > "$cmt" <<'EOF'
           ## 合并说明（本地手工合并，GitHub 侧关闭存档）
 
           本 PR（feat/spine-skins-cover → main）已由**本地零分支合并**进 main，未走 GitHub 按钮合并，故在本 PR 下留档并关闭。
