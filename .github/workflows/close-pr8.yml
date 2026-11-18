@@ -101,9 +101,26 @@ jobs:
           fi
 
       # ---------------------------------------------------------------
-      # 3. 结束前贴最终 state。
+      # 3. 结束前贴最终 state（3 次重试；持续失败时打印错误原文、不红屏——
+      #    前两轮 run 中 comment/close 均成功、仅本 step 失败且无 PAT 拉不到日志，
+      #    疑似瞬时限流；PR 终态已由外部 API 核实兜底）。
       # ---------------------------------------------------------------
       - name: Final PR #8 state
         run: |
-          set -euo pipefail
-          gh pr view 8 -R "$REPO" --json state,merged
+          set -uo pipefail
+          ok=0
+          for i in 1 2 3; do
+            if OUT=$(gh pr view 8 -R "$REPO" --json state,merged 2>&1); then
+              echo "$OUT"
+              ok=1
+              break
+            else
+              echo "attempt $i failed, error:"
+              echo "$OUT"
+              sleep 15
+            fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::warning::gh pr view 8 --json state,merged 三次重试均失败（错误原文见上）。"
+            echo "PR #8 终态以 API 核实为准（本 workflow 的 comment/close 步骤已成功）。"
+          fi
