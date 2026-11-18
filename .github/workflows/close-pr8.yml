@@ -1,0 +1,108 @@
+# close-pr8.yml —— 关闭已手工合并的 PR #8 并留合并说明（照 rollback-import-audit.yml 的成功模式）：
+#   PR #8（feat/spine-skins-cover → main）已由本地零分支合并进 main：
+#   merge commit 8600687 + 79421a1（冲突解法与验证记录）+ 75fbdfd（合并落档）+ fb3dc2e（独立复验）。
+#   GitHub 上 PR #8 因未走按钮合并仍是 open，本 workflow：留合并说明评论 → 按 state 幂等关闭 → 贴最终 state。
+#
+# 触发：workflow_dispatch（可手动 / API 触发）；push 且 paths 仅本文件（本机无 gh/PAT，
+# 依赖 push 自动触发——照 rollback-import-audit.yml 的成功模式）。
+# 权限：GITHUB_TOKEN 需要 contents:read + issues:write + pull-requests:write。
+#
+# 幂等：已 closed 时评论仍可追加，close 会报 0 变更——先用 `gh pr view --json state --jq .state` 判断，
+# closed 就跳过 close，只留评论与最终 state 输出。
+name: close-pr8
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/close-pr8.yml"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: close-pr8
+  cancel-in-progress: false
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # 1. 在 PR #8 留合并说明（heredoc 按 run 块最小缩进书写，sed 兜底剥行首空白）。
+      # ---------------------------------------------------------------
+      - name: Comment merge summary on PR #8
+        run: |
+          set -euo pipefail
+
+          cmt=$(mktemp)
+          cat > "$cmt" <<EOF
+          ## 合并说明（本地手工合并，GitHub 侧关闭存档）
+
+          本 PR（feat/spine-skins-cover → main）已由**本地零分支合并**进 main，未走 GitHub 按钮合并，故在本 PR 下留档并关闭。
+
+          ### 合并链
+          - `8600687` merge: PR #8 spine-skins-cover（Spine 换装/双层封面 + unity_cg_export --auto + 约定文件 Merge）
+          - `79421a1` integration: PR #8 冲突解法与验证记录
+          - `75fbdfd` [merge] PR #8 合并到 main 并全量验证
+          - `fb3dc2e` [merge] PR #8 合并核实与全量验证（独立复验）
+
+          ### 冲突 10 文件逐类解法
+          - `library_test`：两测试均保留。
+          - `rmmz.go`：自动合并后 scriptCG 三测 + 诊断两测均 PASS。
+          - `unpack`：取分支的 Convention.Merge，保留 main 的 asset 分类。
+          - 前端 EventGrid / App / WorkspaceSidebar：取 main，不回退 VSCode 外壳。
+          - SpineStage：取分支版，内部兼容换装。
+
+          ### 验证
+          - 根/desktop build + vet + test 全绿。
+          - npm build 零 TS 错误。
+          - 列表测试全 PASS。
+          - exe 18,599,936 B，SHA256 `52D35BE4...`，可复现。
+          - 落档：`docs/18_PR8合并记录.md`。
+
+          ### 新能力
+          - `unity_cg_export --auto`
+          - 约定文件 `Convention.Merge`
+          - Spine skins 行号
+          EOF
+          sed -i 's/^[[:space:]]*//' "$cmt"
+          if [ "$(head -n1 "$cmt")" != '## 合并说明（本地手工合并，GitHub 侧关闭存档）' ]; then
+            echo "::error::comment 首行不是顶格标题：$(head -n1 "$cmt")"
+            exit 1
+          fi
+
+          gh pr comment 8 -R "$REPO" --body-file "$cmt"
+
+      # ---------------------------------------------------------------
+      # 2. 幂等关闭：open 才 close，closed 跳过。
+      # ---------------------------------------------------------------
+      - name: Close PR #8 if still open
+        run: |
+          set -euo pipefail
+          STATE=$(gh pr view 8 -R "$REPO" --json state --jq .state)
+          echo "PR #8 state: $STATE"
+          if [ "$STATE" = "open" ]; then
+            gh pr close 8 -R "$REPO" --comment "已由本地零分支合并进 main（见上方合并说明），GitHub 侧关闭存档。"
+            echo "PR #8 closed."
+          else
+            echo "PR #8 already $STATE, skip close."
+          fi
+
+      # ---------------------------------------------------------------
+      # 3. 结束前贴最终 state。
+      # ---------------------------------------------------------------
+      - name: Final PR #8 state
+        run: |
+          set -euo pipefail
+          gh pr view 8 -R "$REPO" --json state,merged
