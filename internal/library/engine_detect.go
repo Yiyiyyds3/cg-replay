@@ -70,8 +70,157 @@ func DetectEngine(root string) string {
 	if findScriptNpa(root) != "" {
 		return "nitro"
 	}
-	if id, err := adapter.IdentifyPath(root); err == nil {
+	if id, err := adapter.IdentifyPath(root); err == nil && id != "" {
 		return id
+	}
+	// 现有判定全部未命中，才轮到「只认不处理」指纹：只让 DetectEngine
+	// 报出引擎名（供审计/UI 给出「已识别但未支持」而不是「未知」），
+	// 不接适配器、不改变扫描行为。排在最后保证不抢任何已支持引擎。
+	if eng := detectUnsupportedEngine(root); eng != "" {
+		return eng
+	}
+	return ""
+}
+
+// dirFingerprint 解包目录的浅层快照（最多向下 3 层），供指纹匹配。
+type dirFingerprint struct {
+	ext   map[string]bool // 小写扩展名（含点）
+	name  map[string]bool // 小写文件名（不含目录）
+	names []string        // 小写相对路径（含目录，供「名字里含 siglus」类判断）
+	dir   map[string]bool // 小写目录相对路径
+}
+
+// fingerprintDir 收集 root 的浅层快照；root 不可读返回 ok=false。
+func fingerprintDir(root string) (fp dirFingerprint, ok bool) {
+	fp = dirFingerprint{
+		ext:  map[string]bool{},
+		name: map[string]bool{},
+		dir:  map[string]bool{},
+	}
+	root = filepath.Clean(root)
+	saw := false
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, e := filepath.Rel(root, p)
+		if e != nil {
+			return nil
+		}
+		rel = strings.ToLower(filepath.ToSlash(rel))
+		if d.IsDir() {
+			if rel != "." {
+				if strings.Count(rel, "/") >= 3 {
+					return fs.SkipDir
+				}
+				fp.dir[rel] = true
+			}
+			return nil
+		}
+		saw = true
+		fp.ext[strings.ToLower(filepath.Ext(p))] = true
+		fp.name[strings.ToLower(d.Name())] = true
+		fp.names = append(fp.names, rel)
+		return nil
+	})
+	return fp, saw
+}
+
+// unsupportedSignatures 只认不处理的引擎指纹。每条都是该引擎独有的
+// 归档/标志件（合集 §A.3–A.16 的特征文件表），互斥且不与已支持引擎
+// 的签名重叠（.int→CatSystem2、.pfs→Artemis、.xp3→KiriKiri 均在前面
+// 的判定里先认走，走不到这里）。
+var unsupportedSignatures = []struct {
+	engine string
+	match  func(fp dirFingerprint) bool
+}{
+	{"alicesoft", func(fp dirFingerprint) bool {
+		// System4.0：.afa 图像归档 / .ald 差分归档 / .ain 编译游戏数据。
+		return fp.ext[".afa"] || fp.ext[".ald"] || fp.ext[".ain"]
+	}},
+	{"yuris", func(fp dirFingerprint) bool {
+		// YU-RIS：.ypf 封包 / .ybn 栈式 VM 字节码。
+		return fp.ext[".ypf"] || fp.ext[".ybn"]
+	}},
+	{"siglus", func(fp dirFingerprint) bool {
+		// SiglusEngine（Key 社）：scene.pck 是标志件；否则 .pak+.pck 成对
+		// 或任何文件名含 siglus（SiglusEngine.exe）。
+		if fp.name["scene.pck"] {
+			return true
+		}
+		for _, n := range fp.names {
+			if strings.Contains(n, "siglus") {
+				return true
+			}
+		}
+		return fp.ext[".pak"] && fp.ext[".pck"]
+	}},
+	{"qlie", func(fp dirFingerprint) bool {
+		// QLIE：.pack 封包 + filechk.exe 启动件。
+		return fp.ext[".pack"] && fp.name["filechk.exe"]
+	}},
+	{"majiro", func(fp dirFingerprint) bool {
+		// Majiro（minori 等）：.mjo 编译脚本。.arc 与 BGI 撞名，不认。
+		return fp.ext[".mjo"]
+	}},
+	{"reallive", func(fp dirFingerprint) bool {
+		// RealLive：.g00 图像 / .nwa 音频 / .ke 脚本。
+		return fp.ext[".g00"] || fp.ext[".nwa"] || fp.ext[".ke"]
+	}},
+	{"advhd", func(fp dirFingerprint) bool {
+		// WillPlus AdvHD：.ws2「命令+字符串池」式脚本。
+		return fp.ext[".ws2"]
+	}},
+	{"cmvs", func(fp dirFingerprint) bool {
+		// CMVS（Purple software）：.ps2/.ps3/.pb3 封包 + .cpz 压缩体。
+		return fp.ext[".ps2"] || fp.ext[".ps3"] || fp.ext[".pb3"] || fp.ext[".cpz"]
+	}},
+	{"livemaker", func(fp dirFingerprint) bool {
+		// LiveMaker：.lsb「命令表+字符串表」脚本。
+		return fp.ext[".lsb"]
+	}},
+	{"wolf", func(fp dirFingerprint) bool {
+		// Wolf RPG Editor：Data.wolf / *.wolf 加密归档。
+		return fp.name["data.wolf"] || fp.ext[".wolf"]
+	}},
+	{"rmxp", func(fp dirFingerprint) bool {
+		// RPG Maker XP/VX/VA：*.rgssad / *.rgss3a 归档，或 Game.ini + Data/。
+		return fp.ext[".rgssad"] || fp.ext[".rgss2a"] || fp.ext[".rgss3a"] ||
+			(fp.name["game.ini"] && fp.dir["data"])
+	}},
+	{"eushully", func(fp dirFingerprint) bool {
+		// Eushully：.alf 归档。
+		return fp.ext[".alf"]
+	}},
+	{"unreal", func(fp dirFingerprint) bool {
+		// Unreal：.utoc+.ucas（IoStore）优先；.pak 需要 Content/ 目录佐证，
+		// 防止把其它引擎恰好叫 .pak 的归档误认成 Unreal。
+		return fp.ext[".utoc"] || fp.ext[".ucas"] ||
+			(fp.ext[".pak"] && hasContentDir(fp))
+	}},
+}
+
+// hasContentDir 报告快照里有没有 Unreal 工程惯用的 Content 目录。
+func hasContentDir(fp dirFingerprint) bool {
+	for d := range fp.dir {
+		if d == "content" || strings.HasSuffix(d, "/content") {
+			return true
+		}
+	}
+	return false
+}
+
+// detectUnsupportedEngine 对「已支持引擎全部未命中」的目录跑只认不处理
+// 指纹，返回引擎名；没有命中返回 ""。
+func detectUnsupportedEngine(root string) string {
+	fp, ok := fingerprintDir(root)
+	if !ok {
+		return ""
+	}
+	for _, sig := range unsupportedSignatures {
+		if sig.match(fp) {
+			return sig.engine
+		}
 	}
 	return ""
 }
