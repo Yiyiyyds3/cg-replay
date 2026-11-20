@@ -1,14 +1,14 @@
-# 本地游戏批量导入 v2 · 总报告（2026-11-21 02:16:54）
+# 本地游戏批量导入 v2 · 总报告（2026-11-21 02:29:12）
 
 ## 主台账（keep 57 款）
 
 | 类别 | v1 | v2 |
 |---|---:|---:|
-| import_ok | 44 | **52** |
-| import_fail | 13 | **5** |
+| import_ok | 44 | **54** |
+| import_fail | 13 | **3** |
 | import_timeout | 0 | 0 |
 
-## 已解决明细（fail → ok，7 款）
+## 已解决明细（fail → ok，10 款）
 
 | 游戏 | events | 方式 |
 |---|---:|---|
@@ -19,6 +19,9 @@
 | （一般）姉妹X催眠2 | 14 | 解包重扫 |
 | SOTDQ（很牢） | 461 | **Godot 4.3 pck 导出器**（新增 godot_cg_export.py，274 张压缩纹理未切如实记） |
 | Phoenixes-v17.0.1（浴火重火） | 2596 | **Godot 3.6 pck 导出器**，1700.pck 全量 413MB |
+| 绝对合格 | 28 | ScanRmmz Script 图片提取修复（1121 名静态提取） |
+| wuxian | 1268 | 分层立绘导出：ER_Consts 37 类别静态展开 99.7% 命中，img/portraits 全量导出 |
+| 光辉的少女们 | 1419 | **TyranoBuilder SRTS 容器逆向**：runtime.rts carve 1419 张 CG 打包导入；剧本层 data.dts 流密码待破 |
 
 ## 剩余 6 款 fail 的定性
 
