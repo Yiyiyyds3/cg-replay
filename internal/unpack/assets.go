@@ -77,6 +77,7 @@ type archiveSet struct {
 	// 选对，不能按 map 顺序随便拿一个（否则背景图会顶掉同名 CG）。
 	byBase map[string][]archiveEntry // 文件名（小写，含扩展名）→ 条目
 	byStem map[string][]archiveEntry // 去扩展名的文件名（小写）→ 条目
+	byNorm map[string][]archiveEntry // 归一化名（全角/分隔符/括号无关）→ 条目
 }
 
 // openArchives 打开归档集合并索引全部条目（同名路径的多段按出现顺序归并）。
@@ -255,14 +256,76 @@ func (s *archiveSet) nameIndex() (map[string][]archiveEntry, map[string][]archiv
 	sort.Strings(paths)
 	s.byBase = map[string][]archiveEntry{}
 	s.byStem = map[string][]archiveEntry{}
+	s.byNorm = map[string][]archiveEntry{}
 	for _, p := range paths {
 		e := s.entries[p]
 		lb := strings.ToLower(e.base())
 		s.byBase[lb] = append(s.byBase[lb], e)
 		ls := strings.ToLower(e.stem())
 		s.byStem[ls] = append(s.byStem[ls], e)
+		if k := foldName(e.stem()); k != "" {
+			s.byNorm[k] = append(s.byNorm[k], e)
+		}
 	}
 	return s.byBase, s.byStem
+}
+
+// normIndex 返回归一化名索引（首次调用时随 nameIndex 一起建好）。
+func (s *archiveSet) normIndex() map[string][]archiveEntry {
+	if s.byNorm == nil {
+		s.nameIndex()
+	}
+	return s.byNorm
+}
+
+// foldName 把名字压成「比较用」的键：全角转半角、小写、去掉分隔符与括号。
+//
+// 真机语料里同一张图在不同作里写法不同（【イベントCG】00_1-01 / 【イベントCG】
+// 00_1_01 / 全角括号），脚本引用与归档条目常常只差这些「排版字符」。这里只
+// 做无损折叠，不猜同义词：折叠后仍要全等才算命中。
+func foldName(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 0xFF01 && r <= 0xFF5E: // 全角 ASCII → 半角
+			r -= 0xFEE0
+		case r == 0x3000: // 全角空格
+			r = ' '
+		}
+		switch r {
+		case '_', '-', ' ', '.', '·', '・', '(', ')', '（', '）', '【', '】', '[', ']', '「', '」':
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return strings.ToLower(b.String())
+}
+
+// imageExts 图片类条目后缀（全量兜底用）。
+var imageExts = map[string]bool{
+	".png": true, ".bmp": true, ".tlg": true,
+	".jpg": true, ".jpeg": true, ".webp": true, ".gif": true,
+}
+
+// isImagePath 报告条目是不是图片（按后缀判断，不看目录）。
+func isImagePath(p string) bool {
+	return imageExts[strings.ToLower(filepath.Ext(p))]
+}
+
+// imageEntries 全部图片条目，按路径排序（落盘顺序必须可复现）。
+//
+// 用途：CG 库重建。脚本里的图片引用大量是运行时拼名字（立ち絵表情、差分、
+// サムネ/オンマウス），静态闭包必然漏图；建库时用「归档里所有图片」兜底，
+// 比按引用闭包解出来的更全。
+func (s *archiveSet) imageEntries() []archiveEntry {
+	var out []archiveEntry
+	for p, e := range s.entries {
+		if isImagePath(p) {
+			out = append(out, e)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].path < out[j].path })
+	return out
 }
 
 // lookup 按引用名找条目：先按完整文件名，再按去扩展名的名字；同名候选
@@ -275,6 +338,12 @@ func (s *archiveSet) lookup(ref string) (archiveEntry, bool) {
 	var cands []archiveEntry
 	cands = append(cands, byBase[lb]...)
 	cands = append(cands, byStem[ls]...)
+	if len(cands) == 0 {
+		// 归一化兜底：脚本引用与归档条目只差全角/分隔符/括号这类排版字符时，
+		// 严格比较会整片 miss（真机语料里 00_1-01 与 00_1_01 混写）。折叠后
+		// 全等才算命中，不做同义词猜测；候选仍走同一套评分选最佳。
+		cands = append(cands, s.normIndex()[foldName(ls)]...)
+	}
 	if len(cands) == 0 {
 		return archiveEntry{}, false
 	}

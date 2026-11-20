@@ -75,6 +75,8 @@ type Result struct {
 	SkippedVideo int `json:"skipped_video,omitempty"`
 	// Reused 已存在且大小一致、直接复用没有重写的文件数（增量解包）
 	Reused int `json:"reused,omitempty"`
+	// ExtraImages 被 Options.AllImages 兜底补解的图片条目数（不含闭包已解出的）
+	ExtraImages int `json:"extra_images,omitempty"`
 }
 
 // Preview 预览一个游戏目录/归档，不落盘（解包前先给用户看「会解出什么」）。
@@ -145,6 +147,14 @@ type Options struct {
 	// 用途：换了汉化/修正补丁但文件大小碰巧没变时，增量会误判为「没变」，
 	// 用户看到一个按钮就能强制重来（比默认存哈希清单便宜）。
 	Force bool
+	// AllImages 除引用闭包外，把归档里的**图片**条目也全都解出来（零值 =
+	// 只要闭包，向后兼容）。
+	//
+	// 为什么需要：图片引用里很大一部分是运行时拼名字的（差分图层、立ち絵
+	// 表情、サムネ/オンマウス），静态闭包必然漏；还有大量引用是开发期残留
+	// （测试块、旧版示例脚本）指向归档里根本不存在的文件。建 CG 库要的是
+	// 「归档里所有图」，不是「脚本按名字点到的那部分」。
+	AllImages bool
 }
 
 // Extract 解包到 dest（dest 会自动创建），写出最小集合 + 约定文件。
@@ -446,21 +456,9 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 		refs = append(refs, ref)
 	}
 	sort.Strings(refs)
-	for _, ref := range refs {
-		e, ok := assets.lookup(ref)
-		if !ok {
-			res.Missing = append(res.Missing, ref)
-			continue
-		}
-		if opts.SkipVideo && isVideoPath(e.path) {
-			res.SkippedVideo++
-			continue
-		}
-		if e.encrypted && opts.Decrypt == SchemeNone && strings.EqualFold(e.segs[0].KeyHint, "adlr") {
-			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
-			// 真解不开时上面的解析失败告警会指出。
-			res.Encrypted = append(res.Encrypted, e.path)
-		}
+	// writeAsset 落盘一个素材条目（引用命中的与「全量图片兜底」共用同一条路径）。
+	// 返回 error 只用于「写盘本身失败」；读失败/解密失败记告警后继续。
+	writeAsset := func(e archiveEntry) error {
 		assetPath := asset.DestPath(dest, deps.ImageDir, e.path)
 		assetPath = uniqueAssetPath(assetPath, e.path, usedAssetPaths)
 		want := int64(0)
@@ -479,26 +477,26 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 					videoNames = append(videoNames, filepath.ToSlash(rel))
 				}
 			}
-			continue
+			return nil
 		}
 		data, err := assets.read(e)
 		if err != nil {
 			res.Warnings = append(res.Warnings, fmt.Sprintf("读素材 %s 失败：%v", e.base(), err))
-			continue
+			return nil
 		}
 		if opts.Decrypt != SchemeNone {
 			plain, derr := ApplyDecrypt(opts.Decrypt, e.segs[0], data, opts.Key)
 			if derr != nil {
 				res.Warnings = append(res.Warnings, fmt.Sprintf("%s 解密失败：%v", e.base(), derr))
-				continue
+				return nil
 			}
 			data = plain
 		}
 		if err := os.MkdirAll(filepath.Dir(assetPath), 0o755); err != nil {
-			return nil, err
+			return err
 		}
 		if err := os.WriteFile(assetPath, data, 0o644); err != nil {
-			return nil, err
+			return err
 		}
 		res.Files++
 		res.Bytes += int64(len(data))
@@ -509,6 +507,44 @@ func extractEngine(engine string, archives []string, dest string, opts Options) 
 			if rerr == nil {
 				videoNames = append(videoNames, filepath.ToSlash(rel))
 			}
+		}
+		return nil
+	}
+
+	written := map[string]bool{} // 已落盘（或已复用）的源条目路径
+	for _, ref := range refs {
+		e, ok := assets.lookup(ref)
+		if !ok {
+			res.Missing = append(res.Missing, ref)
+			continue
+		}
+		written[e.path] = true
+		if opts.SkipVideo && isVideoPath(e.path) {
+			res.SkippedVideo++
+			continue
+		}
+		if e.encrypted && opts.Decrypt == SchemeNone && strings.EqualFold(e.segs[0].KeyHint, "adlr") {
+			// 带 adlr 的条目：先按明文试（多数是校验和，不是加密）；
+			// 真解不开时上面的解析失败告警会指出。
+			res.Encrypted = append(res.Encrypted, e.path)
+		}
+		if err := writeAsset(e); err != nil {
+			return nil, err
+		}
+	}
+	// 图片全量兜底（AllImages）：脚本里的图片引用大量是运行时拼名字（差分、
+	// 立ち絵表情、サムネ/オンマウス），静态闭包必然漏图。建 CG 库时按「归档里
+	// 所有图片」补一遍，闭包已命中的不重复落盘。
+	if opts.AllImages {
+		for _, e := range assets.imageEntries() {
+			if written[e.path] {
+				continue
+			}
+			written[e.path] = true
+			if err := writeAsset(e); err != nil {
+				return nil, err
+			}
+			res.ExtraImages++
 		}
 	}
 	// 记下这次依据的归档指纹，供下次判断「能不能复用」。
