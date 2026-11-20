@@ -6,7 +6,7 @@
 判定逻辑与 tools/local_import/selfcheck.py 完全一致（不重写空白/尺寸/体积判定，全部来自 prescreen）。
 输出：reports/local_import/suspect_v2.md、reports/local_import/data/selfcheck_v2.json
 """
-import json, os, re, subprocess, sys, time
+import argparse, json, os, re, subprocess, sys, time
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(BASE, "..", ".."))
@@ -28,6 +28,19 @@ def dims_le_128(mode_wh):
     if not m: return False
     return int(m.group(1)) <= 128 and int(m.group(2)) <= 128
 
+MV_MZ = ("rmmz", "rmmv")
+
+def suspect_remark(v):
+    """给仍 suspect 的款补一句可执行的下一步，避免笼统写"图数=0"。"""
+    eng = (v.get("engine") or "").lower()
+    if v.get("images", 0) == 0:
+        if eng and eng not in MV_MZ:
+            return "非 MV/MZ 引擎（%s），无 img 子树可读，需先解包资源（如 xp3/unity 包），不在本次解密范围" % eng
+        if v.get("v1_encrypted", 0) > 0:
+            return "加密图未解密成功，见解密失败表"
+        return "导出后无图，需人工确认导出步骤"
+    return "有图但命中判据，需人工翻图"
+
 def judge(name, r, g):
     """selfcheck.py 的 4 条判据，原样搬用。"""
     images = g.get("images", 0) or 0
@@ -44,12 +57,17 @@ def judge(name, r, g):
     if images > 0 and mode_count == images and dims_le_128(mode_wh): reasons.append("所有图尺寸一致且<=128x128 (%s)" % mode_wh)
     if images > 0 and total_kb < 100: reasons.append("总导出体积<100KB (%.1fKB)" % total_kb)
     return {"name": name, "images": images, "blank": blank, "decoded": decoded,
+            "sampled": g.get("sampled", 0) or 0, "skipped_big": g.get("skipped_big", 0) or 0,
             "avg_kb": round(avgkb, 1), "total_kb": round(total_kb, 1), "mode_wh": mode_wh,
             "mode_count": mode_count, "encrypted": encrypted, "severity": g.get("severity", 0),
             "events": r.get("events", 0), "reasons": reasons,
             "verdict": "suspect" if reasons else "pass"}
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--reuse", action="store_true",
+                    help="复用已存在的 prescreen_v2 指标文件，不重跑 prescreen")
+    args = ap.parse_args()
     imp = json.load(open(RES, encoding="utf-8"))
     ok = [r for r in imp["results"] if r["status"] == "import_ok"]
     v1 = {}
@@ -86,12 +104,16 @@ def main():
     print("MANIFEST games=%d  decrypt-mirror=%d  raw=%d" % (len(man), n_mirror, len(man) - n_mirror))
 
     os.makedirs(OUTDIR, exist_ok=True)
-    cmd = [PRE, "-from-manifest", MAN, "-out", OUTDIR, "-quiet"]
-    p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=7200)
-    print("PRESCREEN exit=%d" % p.returncode)
-    if p.returncode != 0:
-        print("STDERR:", (p.stderr or "")[-3000:])
     cands = [f for f in os.listdir(OUTDIR) if f.startswith("预筛指标") and f.endswith(".json")]
+    if args.reuse and cands:
+        print("PRESCREEN skipped (--reuse, 复用 %s)" % cands[0])
+    else:
+        cmd = [PRE, "-from-manifest", MAN, "-out", OUTDIR, "-quiet"]
+        p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=7200)
+        print("PRESCREEN exit=%d" % p.returncode)
+        if p.returncode != 0:
+            print("STDERR:", (p.stderr or "")[-3000:])
+        cands = [f for f in os.listdir(OUTDIR) if f.startswith("预筛指标") and f.endswith(".json")]
     if not cands:
         raise SystemExit("prescreen produced no metrics json in %s" % OUTDIR)
     rep = json.load(open(os.path.join(OUTDIR, cands[0]), encoding="utf-8"))
@@ -103,6 +125,7 @@ def main():
         name = r["name"]
         rec = judge(name, r, met.get(name, {}))
         rec["source_mode"] = src_mode[name]
+        rec["engine"] = (met.get(name) or {}).get("engine", "") or ""
         old = v1.get(name)
         rec["v1_verdict"] = old["verdict"] if old else "(未在 selfcheck.json)"
         rec["v1_encrypted"] = (old or {}).get("encrypted", 0)
@@ -123,6 +146,12 @@ def main():
                            "reasons": g.get("fail_reasons", {}),
                            "src_path": g.get("src_path", "")})
 
+    partial_fail = [{"name": g["name"], "status": "partial (部分图失败)",
+                      "failed": g.get("failed", 0), "reasons": g.get("fail_reasons", {}),
+                      "notes": [n for n in g.get("note", []) if n.startswith("FAIL")]}
+                    for g in dec.values()
+                    if g.get("failed", 0) > 0 and g.get("status") in ("ok", "partial")]
+
     p1 = sum(1 for v in v1.values() if v.get("verdict") == "pass")
     s1n = sum(1 for v in v1.values() if v.get("verdict") == "suspect")
     p2 = sum(1 for v in verdicts if v["verdict"] == "pass")
@@ -141,11 +170,11 @@ def main():
           % (p1, len(verdicts), p2, len(verdicts), p2 - p1),
           "- 加密图款 %d 款，解密镜像 %d 张、%.2f GB（输出全在 %s，源目录零写入）"
           % (len(dec_ok), dec_files, dec_gb, DECRYPT_ROOT),
-          "- 升级为 pass：%d 款；仍 suspect：%d 款；解密失败/未解：%d 款"
-          % (len(upgraded), len(still), len(fail_games)), ""]
+          "- 升级为 pass：%d 款；仍 suspect：%d 款；解密全失败/未解：%d 款；单图失败 %d 款"
+          % (len(upgraded), len(still), len(fail_games), len(partial_fail)), ""]
     L += ["## 判据（与 selfcheck v1 完全一致，判定逻辑未改一行）", "",
           "1. 导出图数 = 0",
-          "2. 空白图占比 > 50%%（复用 tools/review-prescreen：32x32 网格灰度方差 < 25）",
+          "2. 空白图占比 > 50%（复用 tools/review-prescreen：32x32 网格灰度方差 < 25）",
           "3. 所有图尺寸完全一致且 ≤ 128×128",
           "4. 总导出体积 < 100KB", "",
           "- 唯一变量是**输入**：v2 把解密成功的款，manifest 的 source_real_path 换成 "
@@ -161,22 +190,36 @@ def main():
             v["blank"], v["decoded"], v["total_kb"], v["mode_wh"] or "-",
             "; ".join(v["reasons"]) or "-"))
     L += ["", "## 升级后仍 suspect 的款（逐款原因）", "",
-          "| 游戏 | 图数 | 空白/抽样 | 总KB | 众数尺寸 | 命中判据 |", "|---|---:|---:|---:|---|---|"]
+          "| 游戏 | 引擎 | 图数 | 空白/抽样 | 总KB | 众数尺寸 | 命中判据 | 备注 |",
+          "|---|---|---:|---:|---:|---|---|---|"]
     if still:
         for v in still:
-            L.append("| %s | %d | %d/%d | %.1f | %s | %s |" % (
-                v["name"][:34].replace("|", "/"), v["images"], v["blank"], v["decoded"],
-                v["total_kb"], v["mode_wh"] or "-", "; ".join(v["reasons"])))
+            L.append("| %s | %s | %d | %d/%d | %.1f | %s | %s | %s |" % (
+                v["name"][:34].replace("|", "/"), v["engine"] or "-", v["images"],
+                v["blank"], v["decoded"], v["total_kb"], v["mode_wh"] or "-",
+                "; ".join(v["reasons"]), suspect_remark(v)))
     else:
-        L.append("| - | - | - | - | - | 无 |")
+        L.append("| - | - | - | - | - | - | - | 无 |")
+    L += ["", "## 像素未参与抽样的款（图过大被 -max-pixels 跳过，判据 2/3 实际未触发）", "",
+          "| 游戏 | 图数 | 抽样 | 已解码 | 跳过(过大) | 众数尺寸 | 说明 |",
+          "|---|---:|---:|---:|---:|---|---|"]
+    noblank = [v for v in verdicts if v["images"] > 0 and v["decoded"] == 0]
+    if noblank:
+        for v in noblank:
+            L.append("| %s | %d | %d | %d | %d | %s | 仍按导出图数/体积判据通过；像素级空白判定未覆盖 |" % (
+                v["name"][:34].replace("|", "/"), v["images"], v["sampled"], v["decoded"],
+                v["skipped_big"], v["mode_wh"] or "-"))
+    else:
+        L.append("| - | - | - | - | - | - | 无 |")
     L += ["", "## 解密失败 / 未解密的款（如实记录）", "",
           "| 游戏 | 状态 | 失败张数 | 原因 |", "|---|---|---:|---|"]
-    if fail_games:
-        for g in fail_games:
+    all_fail = fail_games + partial_fail
+    if all_fail:
+        for g in all_fail:
             why = "; ".join("%s ×%d" % (k, c) for k, c in (g["reasons"] or {}).items()) \
                   or "; ".join(g["notes"]) or "-"
             L.append("| %s | %s | %d | %s |" % (g["name"][:34].replace("|", "/"),
-                                                g["status"], g["failed"], why.replace("|", "/")))
+                                                g["status"], g["failed"], why.replace("|", "/")[:300]))
     else:
         L.append("| - | - | - | 无失败款 |")
     L += ["", "## 说明", "",
@@ -187,12 +230,14 @@ def main():
 
     json.dump({"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                "import_ok": len(verdicts),
+               "pass": p2, "suspect": len(suspects),   # 兼容 gen_v2_reports.py 读取的旧键名
                "pass_v1": p1, "pass_v2": p2,
                "suspect_v1": s1n, "suspect_v2": len(suspects),
                "upgraded": [v["name"] for v in upgraded],
                "still_suspect": [v["name"] for v in still],
                "downgraded": [{"name": v["name"], "reasons": v["reasons"]} for v in downgraded],
                "decrypt_failed_games": fail_games,
+               "decrypt_partial_failures": partial_fail,
                "decrypt_stats": {"games": len(dec_ok), "files": dec_files, "gb": round(dec_gb, 2)},
                "verdicts": verdicts},
               open(JS2, "w", encoding="utf-8"), ensure_ascii=False, indent=2)

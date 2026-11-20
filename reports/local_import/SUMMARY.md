@@ -1,4 +1,4 @@
-# 本地游戏批量导入 v2 · 总报告（2026-11-21 01:36:05）
+# 本地游戏批量导入 v2 · 总报告（2026-11-21 02:16:54）
 
 ## 主台账（keep 57 款）
 
@@ -28,7 +28,7 @@
 | wuxian / 绝对合格 | RPG Maker 插件驱动 | ScanRmmz 已加 Script 图片提取（本轮 D 线），以实测为准 |
 | TouchSim / 女王X / HOME | Electron portable（asar 内嵌 exe） | 无 7z；TEMP 解压试验无产物；需 exe 级提取 |
 
-## suspect 重自检
+## suspect 重自检；自检 v2：import_ok 44 中 pass 43 / suspect 1
 
 - B 线：rpg_decrypt.py 解密 .rpgmvp/.png_ 到 D:\UCGR_Work\decrypt\，selfcheck_v2 用解密镜像重跑 prescreen（结果见 suspect.md v2 段）
 

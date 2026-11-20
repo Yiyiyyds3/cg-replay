@@ -17,7 +17,7 @@
   python tools/local_import/rpg_decrypt.py --games ALL
   python tools/local_import/rpg_decrypt.py --games "Lulumachi,时勇者" --max-bytes-per-game 25000000000
 """
-import argparse, json, os, re, sys, time, shutil, hashlib
+import argparse, json, os, re, struct, sys, time, shutil, hashlib, zlib
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(BASE, "..", ".."))
@@ -29,6 +29,7 @@ DEFAULT_REPORT = os.path.join(DATA, "decrypt_report.json")
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 PNG_HDR16 = PNG_SIG + b"\x00\x00\x00\x0dIHDR"
+JPEG_SOI = b"\xff\xd8\xff"                       # 部分游戏把 .jpg 也按同样方式加密进 .rpgmvp
 CHUNK = 1 << 20
 SAMPLE_LIMIT = 3000
 BIG_GAME_BYTES = 25 * 1024 ** 3
@@ -69,19 +70,20 @@ def find_system_json(src_root):
     return None
 
 def game_keys(src_root):
-    """返回 [(key_bytes, 来源说明), ...]，按可信度排序。"""
+    """返回 [(key_bytes, 短标签), ...]，按可信度排序。"""
     out = []
     sp = find_system_json(src_root)
     if sp:
         try:
             cfg = json.load(open(sp, encoding="utf-8-sig"))
             ek = cfg.get("encryptionKey", "") or ""
-            if isinstance(ek, str):
-                out.append((hashlib.md5(ek.encode("utf-8")).digest(),
-                            "System.json encryptionKey md5(%r)" % (ek[:40])))
+            if isinstance(ek, str) and ek:
+                if re.fullmatch(r"[0-9a-fA-F]{32}", ek):
+                    out.append((bytes.fromhex(ek), "system-hex"))
+                out.append((hashlib.md5(ek.encode("utf-8")).digest(), "system-md5"))
         except Exception:
             pass
-    out.append((hashlib.md5(b"").digest(), "md5('') 缺省密钥"))
+    out.append((hashlib.md5(b"").digest(), "default-md5"))
     return out
 
 def per_file_key(head32):
@@ -90,69 +92,133 @@ def per_file_key(head32):
 
 # ---------- 单文件解密 ----------
 
+def ihdr_check(path):
+    """校验输出前 33 字节：PNG 签名 + IHDR 长度/类型/尺寸/CRC 全部自洽。"""
+    try:
+        with open(path, "rb") as f:
+            b = f.read(33)
+    except OSError as e:
+        return False, "IO: %s" % e
+    if len(b) < 33:
+        return False, "文件<33B"
+    if b[:8] != PNG_SIG:
+        return False, "签名不符"
+    if struct.unpack(">I", b[8:12])[0] != 13 or b[12:16] != b"IHDR":
+        return False, "IHDR 块头不符"
+    w, h = struct.unpack(">II", b[16:24])
+    if not (0 < w <= 100000 and 0 < h <= 100000):
+        return False, "尺寸非法 %dx%d" % (w, h)
+    if (zlib.crc32(b[12:29]) & 0xFFFFFFFF) != struct.unpack(">I", b[29:33])[0]:
+        return False, "IHDR CRC 不符"
+    return True, "%dx%d" % (w, h)
+
 def decrypt_one(src, dst, kind, keys):
-    """返回 (状态, 说明, 用了哪把钥匙)。状态: ok / plain / fail。"""
+    """返回 (状态, 说明, 用了哪个变体)。状态: ok / plain / fail。
+
+    变体顺序（每个都靠 IHDR CRC 严格校验，失败就换下一个）：
+      head16 : 头 16 字节替换为 PNG 头，其余原样（.png_ 直替型）
+      head32 : 头 16 字节替换为 PNG 头，跳过紧跟的 16 字节密文头（MV 型 .png_）
+      mvkey  : 头 16 字节 = 密钥 XOR 紧随 16 字节（.rpgmvp 规范路径）
+    """
     try:
         size = os.path.getsize(src)
-        if size < 16:
-            return "fail", "文件<16B", ""
         with open(src, "rb") as f:
-            head = f.read(32)
+            head = f.read(48)
     except OSError as e:
         return "fail", "IO: %s" % e, ""
+    if size < 16:
+        return "fail", "文件<16B", ""
 
+    variants = []
     if kind == "png_":
-        if size < 16:
-            return "fail", "文件<16B", ""
-        return _write(src, dst, PNG_HDR16, 16) + ("png_ 头替换",)
-
-    if size < 32:
-        return "fail", "文件<32B，取不到 16B 密钥+16B 密文头", ""
+        variants.append(("head16", PNG_HDR16, 16))
+        if size >= 32:
+            variants.append(("head32", PNG_HDR16, 32))
+    for k, tag in keys:
+        if size >= 32:
+            variants.append(("mvkey:" + tag, xor(k, head[16:32]), 32))
+    if size >= 32:
+        variants.append(("mvkey:derived", PNG_HDR16, 32))
+        if kind == "rpgmvp":
+            variants.append(("head16", PNG_HDR16, 16))
 
     tried = []
-    cands = list(keys) + [(per_file_key(head), "文件自身反解")]
-    for k, label in cands:
-        hdr = xor(k, head[16:32])
-        if hdr[:8] != PNG_SIG:
-            tried.append("%s: sig不匹配" % label)
+    for label, hdr16, skip in variants:
+        fmt = "png" if hdr16[:8] == PNG_SIG else ("jpg" if hdr16[:3] == JPEG_SOI else None)
+        if not fmt:
+            tried.append("%s:sig" % label)
             continue
-        if hdr[8:16] != PNG_HDR16[8:16]:
-            tried.append("%s: IHDR不匹配(%s)" % (label, hdr[8:16].hex()))
-            continue
-        st, why = _write(src, dst, hdr, 32)
-        return st, why, label
+        st, why, out = _write(src, dst, hdr16, skip, fmt)
+        if st == "ok":
+            return "ok", why, label, out
+        tried.append("%s:%s" % (label, why))
+
     # 兜底：源本身就是明文 PNG
     if head[:8] == PNG_SIG:
         st, why = _copy_plain(src, dst)
-        return st, why, "源文件已是明文"
-    return "fail", "16B 头校验失败（尝试: %s）" % "; ".join(tried[:3]), ""
+        return st, why, "源文件已是明文", dst
+    return ("fail",
+            "变体全失败（%s；载荷前 4 字节=%s，非 PNG/JPEG）"
+            % ("; ".join(tried[:4]), head[16:20].hex()), "", "")
 
 def _copy_plain(src, dst):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copyfile(src, dst)
-    with open(dst, "rb") as f:
-        if f.read(8) != PNG_SIG:
-            os.remove(dst)
-            return "fail", "明文直通后校验失败"
+    ok, info = ihdr_check(dst)
+    if not ok:
+        os.remove(dst)
+        return "fail", "明文直通后校验失败(%s)" % info
     return "plain", "源文件已是明文 PNG"
 
-def _write(src, dst, header16, skip):
+def _write(src, dst, header16, skip, fmt):
+    """按认定的格式写出：PNG 校验 IHDR/CRC，JPEG 校验 SOI+EOI。返回 (状态, 说明, 实际输出路径)。"""
+    if fmt == "jpg":
+        dst = os.path.splitext(dst)[0] + ".jpg"
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     tmp = dst + ".part"
-    with open(src, "rb") as fi, open(tmp, "wb") as fo:
-        fo.write(header16)
-        fi.seek(skip)
-        while True:
-            buf = fi.read(CHUNK)
-            if not buf:
-                break
-            fo.write(buf)
-    with open(tmp, "rb") as f:
-        if f.read(8) != PNG_SIG:
+    try:
+        with open(src, "rb") as fi, open(tmp, "wb") as fo:
+            fo.write(header16)
+            fi.seek(skip)
+            while True:
+                buf = fi.read(CHUNK)
+                if not buf:
+                    break
+                fo.write(buf)
+        if fmt == "jpg":
+            ok, info = jpeg_check(tmp)
+        else:
+            ok, info = ihdr_check(tmp)
+        if not ok:
             os.remove(tmp)
-            return "fail", "写盘后 PNG 头校验失败"
-    os.replace(tmp, dst)
-    return "ok", ""
+            return "fail", info, dst
+        os.replace(tmp, dst)
+        return "ok", info, dst
+    except OSError as e:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        return "fail", "IO: %s" % e
+
+def jpeg_check(path):
+    """JPEG 兜底校验：SOI 开头 + EOI 结尾。"""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            n = f.tell()
+            f.seek(0)
+            head = f.read(3)
+            f.seek(max(0, n - 2))
+            tail = f.read(2)
+    except OSError as e:
+        return False, "IO: %s" % e
+    if head != JPEG_SOI:
+        return False, "JPEG SOI 不符"
+    if tail != b"\xff\xd9":
+        return False, "JPEG EOI 缺失"
+    return True, "jpeg %dB" % n
 
 # ---------- 扫描 ----------
 
@@ -226,7 +292,7 @@ def main():
                "rpgmvp": 0, "png_": 0, "files_total": 0, "est_bytes": 0,
                "selected_files": 0, "decrypted": 0, "plain_copy": 0,
                "failed": 0, "fail_reasons": {}, "bytes_written": 0,
-               "keys_used": {}, "elapsed_sec": 0.0, "status": ""}
+               "keys_used": {}, "jpg_out": 0, "elapsed_sec": 0.0, "status": ""}
         if not src or not os.path.isdir(src):
             rec["status"] = "src_missing"
             rec["note"].append("源目录不存在: %s" % (src or "(import_results 无此款)"))
@@ -269,10 +335,12 @@ def main():
                 rec["note"].append("max-bytes-per-game 触顶：已写 %.2fGB，剩余 %d 张未解"
                                    % (rec["bytes_written"] / 1024 ** 3, left))
                 break
-            st, why, used = decrypt_one(ap_, dst, kind, keys)
+            st, why, used, out = decrypt_one(ap_, dst, kind, keys)
             if st in ("ok", "plain"):
                 if st == "ok":
                     rec["decrypted"] += 1
+                    if out.lower().endswith(".jpg"):
+                        rec["jpg_out"] += 1
                 else:
                     rec["plain_copy"] += 1
                 rec["bytes_written"] += want
@@ -285,9 +353,10 @@ def main():
         rec["elapsed_sec"] = round(time.time() - t0, 1)
         done = rec["decrypted"] + rec["plain_copy"]
         rec["status"] = "ok" if done == rec["selected_files"] else ("partial" if done else "failed")
-        print("  %-40s 选中%-6d 解出%-6d 明文%-4d 失败%-4d %7.2fGB %6.1fs"
-              % (name[:40], rec["selected_files"], rec["decrypted"], rec["plain_copy"],
-                 rec["failed"], rec["bytes_written"] / 1024 ** 3, rec["elapsed_sec"]), flush=True)
+        print("  %-40s 选中%-6d 解出%-6d (jpg %-4d) 明文%-4d 失败%-4d %7.2fGB %6.1fs"
+              % (name[:40], rec["selected_files"], rec["decrypted"], rec["jpg_out"],
+                 rec["plain_copy"], rec["failed"], rec["bytes_written"] / 1024 ** 3,
+                 rec["elapsed_sec"]), flush=True)
 
     rep = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
            "dry_run": bool(args.dry_run), "decrypt_root": DECRYPT_ROOT,
@@ -297,6 +366,7 @@ def main():
                         "files_selected": sum(g["selected_files"] for g in games),
                         "decrypted": sum(g["decrypted"] for g in games),
                         "plain_copy": sum(g["plain_copy"] for g in games),
+                        "jpg_out": sum(g["jpg_out"] for g in games),
                         "failed": sum(g["failed"] for g in games),
                         "est_gb": round(sum(g["est_bytes"] for g in games) / 1024 ** 3, 2),
                         "written_gb": round(sum(g["bytes_written"] for g in games) / 1024 ** 3, 2)}}
