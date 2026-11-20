@@ -54,6 +54,18 @@ Unified_CG_Replay_Library/
 └── tools/                             # Python 原型脚本存档（已被 Go 核心接替，见 tools/README.md）
 ```
 
+## 本地抽检工具（源码入库，exe 不入库）
+
+人工抽检用的小工具：`review-gallery` 生成抽检画廊（HTML 页面，便于逐款过图），`review-prescreen` 做机器预筛（按指标筛出可疑款，产出见 `reports/人工抽检/`），详见各自目录下的 README。
+
+```bash
+# 重建命令（构建产物，不入库）
+go build -o tools/review-gallery/review-gallery.exe ./tools/review-gallery
+go build -o tools/review-prescreen/review-prescreen.exe ./tools/review-prescreen
+```
+
+exe 不入库：属本地构建产物，已被 `.gitignore` 的 `*.exe` 规则忽略，克隆仓库后用上面的命令自行重建。
+
 ## 快速开始（Go 核心）
 
 ```bash
