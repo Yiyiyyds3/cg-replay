@@ -159,3 +159,6 @@ desktop.ini
 /out/
 /export/
 /cg_out/
+
+# 抽检画廊的运行时缓存（由预筛结果自动生成）
+tools/review-gallery/.cache/
