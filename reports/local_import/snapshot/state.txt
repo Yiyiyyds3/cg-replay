@@ -1,0 +1,88 @@
+SNAPSHOT_TIME=2026-11-21 00:43:21 +08:00
+REPO=E:\Software_tools\DevSpace\Projects\Agent\Unified_CG_Replay_Library\.agents\worktrees\dsh-0f13c1bf-6649
+--- GIT ---
+BRANCH=dsh-0f13c1bf-6649
+HEAD=0a73f37de244ef928cc2f02caf026fd12345fce4
+STATUS_BEGIN
+?? reports/local_import/
+STATUS_END
+--- LIB DATA (LOCALAPPDATA) ---
+LIB_DIR=C:\Users\Administrator\AppData\Local\cgreplay-ui exists=True
+FILE|catalog.db|3043328|FF6DF53836103AC8D464FE97E7E8499E1B0220BAB08CE0D2BB6099EC2F277E15
+FILE|catalog.db-shm|32768|43DD25D0C4775DB50A14758053B486790D0AEE2636772D59CE671A5A45583FA7
+FILE|catalog.db-wal|98912|3CE541F96BBE52074E725FD206EF2D470CD9B42727D79DC72096BE7FD7EEC3EE
+FILE|catalog.db.bak-20261113-230540|143360|6A1CBA1C30048E49ECFCFD72C8983540FB11E37C9216F0EE9A77D378CA5E7774
+FILE|cgreplay.conf|235|7FD8453B82FA39D3E4D907A8BC6684CCF5A5F9E708517BB9BF3B3745AB0793A2
+FILE|errors.log|4722|C25D36DFCCA2DF7DB8D6B45286B452FCAAD7423A5BC9CD8A2B22E6586CCAAD9A
+FILE|games.json|1805|7121DBB08BA4A765F0D6F1BB33522642FCDE3A89E26BE3A36A4E1940BE22D776
+FILE|games.json.bak|1411|16D843C0EEA00CBF40A4C3457CE4FD0B0892F0F2F51DF60E74CD88528DF7BEAD
+--- GAMES.JSON ---
+{
+  "version": 1,
+  "active": "g8350fe1118",
+  "games": [
+    {
+      "id": "g432d32879f",
+      "title": "重返蓝鲸岛解包",
+      "root": "C:\\Users\\Administrator\\AppData\\Roaming\\Trae CN\\ModularData\\ai-agent\\work-mode-projects\\6ab13b131865931f3912c566\\重返蓝鲸岛解包",
+      "library": "E:\\Software_tools\\DevSpace\\Projects\\Agent\\Unified_CG_Replay_Library\\desktop\\build\\bin\\libraries\\g432d32879f.json",
+      "added_at": "2026-10-21T14:00:00+08:00",
+      "last_played_at": "2026-11-16T20:35:11+08:00"
+    },
+    {
+      "id": "g48023238fa",
+      "title": "（上等）NTRエロトラップダンジョン",
+      "root": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\RPG\\上等\\（上等）NTRエロトラップダンジョン",
+      "library": "C:\\Users\\Administrator\\AppData\\Local\\cgreplay-ui\\libraries\\g48023238fa.json",
+      "engine": "rmmz",
+      "added_at": "2026-11-08T10:40:36+08:00",
+      "last_played_at": "2026-11-16T20:34:54+08:00"
+    },
+    {
+      "id": "g8350fe1118",
+      "title": "呪いの鎧 v3.0.1（夯）",
+      "root": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\呪いの鎧 v3.0.1（夯）",
+      "library": "C:\\Users\\Administrator\\AppData\\Local\\cgreplay-ui\\libraries\\g8350fe1118.json",
+      "engine": "rmmz",
+      "added_at": "2026-11-17T00:19:14+08:00",
+      "last_played_at": "2026-11-17T00:35:31+08:00"
+    },
+    {
+      "id": "gb6d75e19d2",
+      "title": "MUNIANGTIAOJIAO",
+      "root": "D:\\UCGR_Work\\unitycg\\MUNIANGTIAOJIAO",
+      "library": "C:\\Users\\Administrator\\AppData\\Local\\cgreplay-ui\\libraries\\gb6d75e19d2.json",
+      "engine": "unity",
+      "added_at": "2026-11-17T00:19:15+08:00",
+      "last_played_at": "2026-11-17T00:35:09+08:00"
+    }
+  ]
+}
+
+--- EXPORTED LIBS (D:\UCGR_Work\unitycg) ---
+LIB|1692614|cg-index=True
+LIB|BloodOfYidhra|cg-index=True
+LIB|ElectronicStore|cg-index=True
+LIB|ElvenNinja|cg-index=True
+LIB|EroTavern|cg-index=True
+LIB|Fallen|cg-index=True
+LIB|FallenElfFreya|cg-index=True
+LIB|GensouBrothel|cg-index=True
+LIB|GoblinSword|cg-index=True
+LIB|IdealEvesRoom|cg-index=True
+LIB|IdolForging|cg-index=True
+LIB|KanzenChikan|cg-index=True
+LIB|Kureya|cg-index=True
+LIB|LastTownFelixia|cg-index=True
+LIB|LifeguardHolic|cg-index=True
+LIB|LoveConfessions|cg-index=True
+LIB|MasyouSyoujo|cg-index=True
+LIB|MonsterBlackMarket|cg-index=True
+LIB|MuniangTiaojiao|cg-index=True
+LIB|MyLovableDemon|cg-index=True
+LIB|NTRaholic|cg-index=True
+LIB|OshiokiLesson|cg-index=True
+LIB|SuccubusSuccessor|cg-index=True
+LIB|SwarmBunker|cg-index=True
+LIB|TavernInnHalberd|cg-index=True
+LIB|ToxicMarriagePunisher|cg-index=True
