@@ -1,0 +1,81 @@
+# CI —— push（所有分支）/ PR 到 main / 手动触发。
+# 三段校验：Go 单测、前端构建、archify render。
+#
+# 为什么 Go job 用 windows-latest：internal/platform/win32/*.go 没有 build tag，
+# 直接调 syscall.NewLazyDLL/NewCallback，Linux 下 go test ./... 会编译失败（已实测）。
+# Go 版本取自根 go.mod（go 1.27.2）。
+# Node 版本：package.json 无 engines/.nvmrc，按 Vite 5 + TS 5.6 选 Node 20 LTS。
+# archify：独立仓库 tt-a1i/archify，只用 render（严禁 deliver/finalize）；
+#   render 仅依赖 Node 内置模块，无需 npm install（本地实测通过）。
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-test:
+    name: Go 单元测试
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Go（版本取自 go.mod）
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go test ./...
+        run: go test ./...
+
+  frontend-build:
+    name: 前端构建
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: 设置 Node（Vite 5 / TS 5.6 -> Node 20 LTS）
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+      - name: 安装依赖
+        run: npm ci
+      - name: npm run build
+        run: npm run build
+
+  archify-render:
+    name: archify render 校验（仅 render）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 设置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 检出 archify 工具
+        run: git clone --depth 1 https://github.com/tt-a1i/archify.git "$RUNNER_TEMP/archify"
+      - name: 确认 CLI 与 candidate 存在
+        run: |
+          test -f "$RUNNER_TEMP/archify/archify/bin/archify.mjs"
+          test -f "$RUNNER_TEMP/archify/archify/examples/agent-tool-call.workflow.json"
+      - name: 运行 archify render（仅 render，禁止 deliver/finalize）
+        run: |
+          mkdir -p "$RUNNER_TEMP/archify-out"
+          node "$RUNNER_TEMP/archify/archify/bin/archify.mjs" render workflow \
+            "$RUNNER_TEMP/archify/archify/examples/agent-tool-call.workflow.json" \
+            "$RUNNER_TEMP/archify-out/ci-workflow.html"
+          test -s "$RUNNER_TEMP/archify-out/ci-workflow.html"
