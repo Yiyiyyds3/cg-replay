@@ -1,0 +1,5703 @@
+{
+  "root": "reports\\人工抽检\\pass清单.json",
+  "manifest": "reports\\人工抽检\\pass清单.json",
+  "engine": "rmmz",
+  "generated_at": "2026-11-16T10:44:09+08:00",
+  "params": {
+    "max_sample": 300,
+    "max_pixels": 9000000,
+    "conc": 8,
+    "min_side": 64,
+    "var_thresh": 25,
+    "small_kb": 5,
+    "outlier_mul": 1.5,
+    "seed": 20261116,
+    "manifest": "reports\\人工抽检\\pass清单.json",
+    "engine": "rmmz",
+    "skip_sparse": true
+  },
+  "summary": {
+    "games": 37,
+    "images_total": 15151,
+    "severity_counts": [
+      0,
+      3,
+      2,
+      32
+    ],
+    "scanned_total": 79013,
+    "encrypted_total": 77551,
+    "plain_games": 18,
+    "no_plain_games": 19
+  },
+  "games": [
+    {
+      "name": "(中等)The Forbidden Tomes of Olipos",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260818\\RPG\\中等\\(中等)The Forbidden Tomes of Olipos",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1957 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 21,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\(中等)The Forbidden Tomes of Olipos",
+      "manifest_cg": 336,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 1957,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "(夯)魔塔",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260818\\RPG\\夯\\(夯)魔塔",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 2409 个（.rpgmvp/.png_；另有引擎素材 4 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 43,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\(夯)魔塔",
+      "manifest_cg": 31,
+      "scan_roots": [
+        "The Dungeon of Lulu Farea/www/img",
+        "The Dungeon of Lulu Farea Rebirth v1.01/www/img"
+      ],
+      "scanned": 4,
+      "asset_images": 4,
+      "encrypted": 2409,
+      "families": [
+        {
+          "name": "The Dungeon of Lulu Farea Rebirth v1.01/www/img/system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "The Dungeon of Lulu Farea/www/img/system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ],
+      "note": "扫到 2 个 img 根，两套目录各存一份图，重复率会被抬高"
+    },
+    {
+      "name": "(牛)RJ01618221",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\未评级\\(牛)RJ01618221",
+      "engine": "rmmz",
+      "images": 706,
+      "small": 0,
+      "outliers": 55,
+      "blank": 1,
+      "dup_groups": 52,
+      "dup_rate": 0.3131,
+      "sparse": 423,
+      "avg_kb": 543.8,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 1/297 (0.3%) (+1)",
+        "尺寸离群 55/706 (7.8%) (+1)",
+        "重复帧 52 组，冗余率 31.3% (+1)",
+        "序列断裂 92 处 / 14 个目录 (+2)",
+        "另有引擎素材 232 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x720",
+      "mode_count": 651,
+      "sampled": 300,
+      "decoded": 297,
+      "skipped_big": 3,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 1,
+      "small_samples": null,
+      "outlier_samples": [
+        "img/pictures/02 オナニーと手マン/服あり/_一覧.png (1500x1184)",
+        "img/pictures/37 追加_戦闘手つかみ/アリナ_手つかみ_仮.png (4359x3864)",
+        "img/pictures/38 断面図/断面図_01_未挿入.png (456x305)",
+        "img/pictures/38 断面図/断面図_02_未挿入_濡れ.png (456x305)",
+        "img/pictures/38 断面図/断面図_03_手マン.png (456x305)",
+        "img/pictures/38 断面図/断面図_04_ちんぽ挿入.png (456x305)",
+        "img/pictures/39 後ろ蹲踞/アリナ_後ろ蹲踞_02_手マン.png (640x468)",
+        "img/pictures/39 後ろ蹲踞/アリナ_後ろ蹲踞_05_手マン_汁_動き.png (640x468)",
+        "img/pictures/39 後ろ蹲踞/アリナ_後ろ蹲踞_06_絶頂_潮吹き.png (640x468)",
+        "img/pictures/40 手マンクンニ/アリナ_手マンクンニ1.png (419x468)"
+      ],
+      "outlier_sizes": [
+        "374x468 x12",
+        "467x112 x9",
+        "419x468 x7",
+        "632x468 x6",
+        "504x700 x5"
+      ],
+      "blank_samples": [
+        "img/pictures/背景/黒背景.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "img/pictures/メニュー画面_素材/whiteButton.png (0.8KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pictures/12 酒場1/背景無し/酒場 (20).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (22).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (26).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (31).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (7).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (8).png"
+        ],
+        [
+          "img/pictures/立ち絵/立ち絵_バニー/arina_バニー_困り_照れ.png",
+          "img/pictures/立ち絵/立ち絵_バニー/arina_バニー_困り笑顔照れ.png",
+          "img/pictures/立ち絵/立ち絵_バニー/arina_バニー_怒り.png",
+          "img/pictures/立ち絵/立ち絵_バニー/arina_バニー_笑顔.png",
+          "img/pictures/立ち絵/立ち絵_バニー/arina_バニー_通常.png",
+          "img/pictures/立ち絵/立ち絵_服/arina_服_笑顔_妊婦.png"
+        ],
+        [
+          "img/pictures/01 正常位/1 アリナ 正常位１－1_0010.png",
+          "img/pictures/01 正常位/1 アリナ 正常位１－1_0011.png",
+          "img/pictures/01 正常位/1 アリナ 正常位１－1_0012.png",
+          "img/pictures/01 正常位/1 アリナ 正常位１－1_0013.png",
+          "img/pictures/01 正常位/1 アリナ 正常位１－1_007.png"
+        ],
+        [
+          "img/pictures/02 オナニーと手マン/アリナオナニー１ー4_020.png",
+          "img/pictures/02 オナニーと手マン/アリナオナニー１ー4_028.png",
+          "img/pictures/02 オナニーと手マン/アリナオナニー１ー4_031.png",
+          "img/pictures/02 オナニーと手マン/アリナオナニー１ー4_032.png",
+          "img/pictures/02 オナニーと手マン/アリナオナニー１ー4_043.png"
+        ],
+        [
+          "img/pictures/12 酒場1/背景無し/酒場 (1).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (15).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (17).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (19).png",
+          "img/pictures/12 酒場1/背景無し/酒場 (2).png"
+        ],
+        [
+          "img/pictures/43 娼婦ダンス改/アリナ＿ダンス改1-3.png",
+          "img/pictures/43 娼婦ダンス改/アリナ＿ダンス改1-4.png",
+          "img/pictures/43 娼婦ダンス改/アリナ＿ダンス改3.png",
+          "img/pictures/43 娼婦ダンス改/アリナ＿ダンス改7-3.png",
+          "img/pictures/43 娼婦ダンス改/アリナ＿ダンス改7.png"
+        ],
+        [
+          "img/pictures/立ち絵/立ち絵_服/arina_服_泣き笑い.png",
+          "img/pictures/立ち絵/立ち絵_服/arina_服_笑顔.png",
+          "img/pictures/立ち絵/立ち絵_服/arina_服_通常.png",
+          "img/pictures/立ち絵/立ち絵_服/arina_服_通常_照れ.png",
+          "img/pictures/立ち絵/立ち絵_服/arina_服_驚き_照れ.png"
+        ],
+        [
+          "img/pictures/隠れNTRエンド/隠れNTRエンド2_001.png",
+          "img/pictures/隠れNTRエンド/隠れNTRエンド2_003.png",
+          "img/pictures/隠れNTRエンド/隠れNTRエンド2_003_催眠.png",
+          "img/pictures/隠れNTRエンド/隠れNTRエンド2_004.png",
+          "img/pictures/隠れNTRエンド/隠れNTRエンド2_004_催眠.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 92,
+      "seq_break_dirs": 14,
+      "name_conflicts": 73,
+      "spine_files": 0,
+      "scan_ms": 854,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\(牛)RJ01618221",
+      "manifest_cg": 203,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 938,
+      "asset_images": 232,
+      "families": [
+        {
+          "name": "characters",
+          "count": 86,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/02 オナニーと手マン",
+          "count": 83,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/立ち絵",
+          "count": 82,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets",
+          "count": 59,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/12 酒場1",
+          "count": 50,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/22 酒場VIP4P",
+          "count": 34,
+          "kind": "cg"
+        },
+        {
+          "name": "enemies",
+          "count": 27,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/43 娼婦ダンス改",
+          "count": 26,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/30 スライム夜",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/エロステータス_素材",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/44 盗賊頭BE",
+          "count": 23,
+          "kind": "cg"
+        },
+        {
+          "name": "system",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/08マッサージ2",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/メニュー画面_素材",
+          "count": 19,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/31 放尿オナ夜",
+          "count": 18,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/19 種付けプレス",
+          "count": 15,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/01 正常位",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/11 パンチラ",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/30 酔っ払い夜",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/アリナエリカ3P",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/03痴漢",
+          "count": 13,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/05フェラ",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/09正常位ヤリオ",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/42 尻壁2",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/16 アリナ×エリカ",
+          "count": 11,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/18 バレずにセックス",
+          "count": 11,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/20 バックハメ",
+          "count": 10,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/23 娼婦お尻フリ",
+          "count": 10,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/背景",
+          "count": 10,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/04マッサージ",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/13胸揉み",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/15 エリカご褒美セックス",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/28 ユーキに騎乗位",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/32二人と",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "characters/arina",
+          "count": 8,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 8,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/07痴漢2",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/14 娼婦ダンス",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/25 村長バック",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/40 手マンクンニ",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/隠れNTRエンド",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/21 ショタとまんぐり",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/27 横になってユーキに手コキ",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/41 尻壁",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/45 小汚い男",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/10キス",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/38 断面図",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/29 エリカのデカチン実験",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/39 後ろ蹲踞",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/endroll",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/17 ユーキ手コキ",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/24 エリカ 乳首責め",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/26 全裸土下座",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/37 追加_戦闘手つかみ",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "titles1",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "(牛)RJ01680223",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260820\\RPG\\未评级\\(牛)RJ01680223",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 2461 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 24,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\(牛)RJ01680223",
+      "manifest_cg": 1025,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 2461,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "Chronicles of Clams Island",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260820\\RPG\\未评级\\Chronicles of Clams Island",
+      "engine": "rmmz",
+      "images": 842,
+      "small": 26,
+      "outliers": 106,
+      "blank": 8,
+      "dup_groups": 52,
+      "dup_rate": 0.34,
+      "sparse": 812,
+      "avg_kb": 277,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 8/300 (2.7%) (+1)",
+        "极小图 26/842 (3.1%) (+1)",
+        "尺寸离群 106/842 (12.6%) (+1)",
+        "重复帧 52 组，冗余率 34.0% (+1)",
+        "\u003c5KB 小文件 32/842 (3.8%) (+1)",
+        "序列断裂 529 处 / 25 个目录 (+2)",
+        "另有引擎素材 1151 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "816x624",
+      "mode_count": 736,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 32,
+      "small_samples": [
+        "www/img/bosshp/Boss_HP_A.png",
+        "www/img/bosshp/Boss_HP_B.png",
+        "www/img/bosshp/Boss_HP_C.png",
+        "www/img/bosshp/Boss_HP_D.png",
+        "www/img/pictures/GaugeFrame.png",
+        "www/img/pictures/GoldWindowPictue.png",
+        "www/img/pictures/questchoice_11.png",
+        "www/img/pictures/questchoice_12.png",
+        "www/img/pictures/questchoice_13.png",
+        "www/img/pictures/questchoice_14.png"
+      ],
+      "outlier_samples": [
+        "www/img/bosshp/Boss_HP_A.png (482x29)",
+        "www/img/bosshp/Boss_HP_B.png (464x22)",
+        "www/img/bosshp/Boss_HP_C.png (200x28)",
+        "www/img/bosshp/Boss_HP_D.png (29x26)",
+        "www/img/bosshp/Face_70.png (86x84)",
+        "www/img/bosshp/Face_71.png (86x84)",
+        "www/img/bosshp/Face_72.png (86x84)",
+        "www/img/bosshp/Face_73.png (86x84)",
+        "www/img/bosshp/Face_74.png (86x84)",
+        "www/img/bosshp/Face_78.png (86x84)"
+      ],
+      "outlier_sizes": [
+        "389x624 x27",
+        "195x33 x20",
+        "287x624 x15",
+        "391x624 x15",
+        "86x84 x9"
+      ],
+      "blank_samples": [
+        "www/img/pictures/BDCG2-レディスライムZ.png (var=15.8)",
+        "www/img/pictures/BHCG-1BハウンドZ.png (var=18.7)",
+        "www/img/pictures/Hステータス立ち絵ザーメン0.png (var=0.0)",
+        "www/img/pictures/amyF17.png (var=5.9)",
+        "www/img/pictures/galleryチェック1.png (var=1.7)",
+        "www/img/pictures/menu冒険者ランク0.png (var=0.0)",
+        "www/img/pictures/oliviaF10.png (var=10.4)",
+        "www/img/pictures/oliviaF5.png (var=1.5)"
+      ],
+      "tiny_samples": [
+        "www/img/bosshp/Boss_HP_A.png (4.2KB)",
+        "www/img/bosshp/Boss_HP_B.png (4.2KB)",
+        "www/img/pictures/Black2.png (2.4KB)",
+        "www/img/pictures/FaceLayer1.png (3.1KB)",
+        "www/img/pictures/GaugeFrame.png (1.9KB)",
+        "www/img/pictures/Window_Original.png (2.4KB)",
+        "www/img/pictures/amyF12.png (3.8KB)",
+        "www/img/pictures/amyF17.png (5.0KB)",
+        "www/img/pictures/amyZ1.png (2.7KB)",
+        "www/img/pictures/menu冒険者ランク0.png (3.8KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/Hステータス立ち絵ザーメン0.png",
+          "www/img/pictures/PSCおまんこ敏感lv1.png",
+          "www/img/pictures/PSCアナル敏感lv2.png",
+          "www/img/pictures/PSFゴブリンの玩具.png",
+          "www/img/pictures/PSFレイプ願望.png",
+          "www/img/pictures/PS心理1.png",
+          "…等 18 张"
+        ],
+        [
+          "www/img/pictures/amyF11.png",
+          "www/img/pictures/amyF17.png",
+          "www/img/pictures/amyF18.png",
+          "www/img/pictures/amyF21.png",
+          "www/img/pictures/amyF6.png",
+          "www/img/pictures/amyF7.png"
+        ],
+        [
+          "www/img/pictures/questorder_paper13.png",
+          "www/img/pictures/questorder_paper22.png",
+          "www/img/pictures/questorder_paper26.png",
+          "www/img/pictures/questorder_paper41.png",
+          "www/img/pictures/questorder_paper43.png",
+          "www/img/pictures/questorder_paper46.png"
+        ],
+        [
+          "www/img/pictures/BHCGｰ4B取り憑かれた冒険者2.png",
+          "www/img/pictures/BHCGｰ4B取り憑かれた冒険者3.png",
+          "www/img/pictures/BHCGｰ4B取り憑かれた冒険者3ex.png",
+          "www/img/pictures/BHCGｰ4B取り憑かれた冒険者6ex.png",
+          "www/img/pictures/BHCGｰ4B取り憑かれた冒険者7ex.png"
+        ],
+        [
+          "www/img/pictures/BPmadman10.png",
+          "www/img/pictures/BPmadman30.png",
+          "www/img/pictures/BPmadman3Z.png",
+          "www/img/pictures/BPmadmanB10.png",
+          "www/img/pictures/BPmadmanB1Z.png"
+        ],
+        [
+          "www/img/pictures/oliviaF10.png",
+          "www/img/pictures/oliviaF4.png",
+          "www/img/pictures/oliviaF5.png",
+          "www/img/pictures/oliviaF6.png",
+          "www/img/pictures/oliviaF7.png"
+        ],
+        [
+          "www/img/pictures/BHCG-2スライム3B.png",
+          "www/img/pictures/BHCG-2スライム4Bex.png",
+          "www/img/pictures/BHCG-2スライム5Bex.png",
+          "www/img/pictures/BHCG-2スライム6Bex.png"
+        ],
+        [
+          "www/img/pictures/BPorc1Z.png",
+          "www/img/pictures/BPorc20.png",
+          "www/img/pictures/BPorcB10.png",
+          "www/img/pictures/BPorcB1Z.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 529,
+      "seq_break_dirs": 25,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 577,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Chronicles of Clams Island",
+      "manifest_cg": 161,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 1993,
+      "asset_images": 1151,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 829,
+          "kind": "cg"
+        },
+        {
+          "name": "characters",
+          "count": 366,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 268,
+          "kind": "asset"
+        },
+        {
+          "name": "animations",
+          "count": 117,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 101,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 79,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 70,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 23,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 20,
+          "kind": "asset"
+        },
+        {
+          "name": "bosshp",
+          "count": 13,
+          "kind": "cg"
+        },
+        {
+          "name": "faces",
+          "count": 11,
+          "kind": "asset"
+        },
+        {
+          "name": "titles2",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "RA26037409(",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\RA26037409(",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 324 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 11,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\RA26037409(",
+      "manifest_cg": 198,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 324,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "Restore(",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\Restore(",
+      "engine": "rmmz",
+      "images": 1072,
+      "small": 23,
+      "outliers": 274,
+      "blank": 7,
+      "dup_groups": 40,
+      "dup_rate": 0.37,
+      "sparse": 994,
+      "avg_kb": 619.9,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 7/300 (2.3%) (+1)",
+        "极小图 23/1072 (2.1%) (+1)",
+        "尺寸离群 274/1072 (26%) (+2)",
+        "重复冗余率 37.0%（近似重复 40 组） (+1)",
+        "\u003c5KB 小文件 32/1072 (3.0%) (+1)",
+        "序列断裂 3 处 / 3 个目录 (+1)",
+        "另有引擎素材 989 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x720",
+      "mode_count": 798,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 32,
+      "small_samples": [
+        "img/actorhud/EXP_Meter.png",
+        "img/actorhud/HP_Meter.png",
+        "img/actorhud/HP_Number.png",
+        "img/actorhud/HP_Number2.png",
+        "img/actorhud/LV_Number.png",
+        "img/actorhud/MP_Meter.png",
+        "img/actorhud/MP_Number.png",
+        "img/actorhud/MP_Number2.png",
+        "img/actorhud/TP_Meter.png",
+        "img/actorhud/TP_Number.png"
+      ],
+      "outlier_samples": [
+        "img/actorhud/EXP_Meter.png (73x6)",
+        "img/actorhud/Face_1.png (190x158)",
+        "img/actorhud/Face_2.png (190x158)",
+        "img/actorhud/Face_3.png (190x158)",
+        "img/actorhud/Face_4.png (190x158)",
+        "img/actorhud/Face_5.png (190x158)",
+        "img/actorhud/Face_7.png (150x165)",
+        "img/actorhud/Face_8.png (190x158)",
+        "img/actorhud/HP_Meter.png (164x36)",
+        "img/actorhud/HP_Number.png (169x19)"
+      ],
+      "outlier_sizes": [
+        "640x720 x201",
+        "190x158 x14",
+        "160x80 x12",
+        "500x250 x7",
+        "169x19 x6"
+      ],
+      "blank_samples": [
+        "img/actorhud/Face_1.png (var=0.0)",
+        "img/actorhud/Face_2.png (var=0.0)",
+        "img/actorhud/Face_3.png (var=0.0)",
+        "img/actorhud/Face_4.png (var=0.0)",
+        "img/actorhud/HP_Meter.png (var=3.3)",
+        "img/battlehud/ATB_Meter.png (var=0.0)",
+        "img/pictures/fe-do.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "img/actorhud/EXP_Meter.png (0.2KB)",
+        "img/actorhud/Face_1.png (0.2KB)",
+        "img/actorhud/Face_2.png (0.2KB)",
+        "img/actorhud/Face_3.png (0.2KB)",
+        "img/actorhud/Face_4.png (0.2KB)",
+        "img/actorhud/Face_5.png (0.2KB)",
+        "img/actorhud/Face_8.png (0.2KB)",
+        "img/actorhud/HP_Meter.png (0.4KB)",
+        "img/actorhud/MP_Meter.png (0.3KB)",
+        "img/actorhud/TP_Meter.png (0.3KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pictures/tk emiri 16.png",
+          "img/pictures/tk emiri 19.png",
+          "img/pictures/tk emiri 20.png",
+          "img/pictures/tk emiri　1.png",
+          "img/pictures/tk emiri　3.png",
+          "img/pictures/tk emiri　4.png",
+          "…等 25 张"
+        ],
+        [
+          "img/pictures/item HPring.png",
+          "img/pictures/item ba-sa-ka-ring.png",
+          "img/pictures/item bannouyaku.png",
+          "img/pictures/item binbin.png",
+          "img/pictures/item buri-fu.png",
+          "img/pictures/item doroppu.png",
+          "…等 17 张"
+        ],
+        [
+          "img/pictures/fe-do.png",
+          "img/pictures/h op 2.png",
+          "img/pictures/tk maou 4.png",
+          "img/pictures/tk mika　2.png",
+          "img/pictures/tk mika　6.png",
+          "img/pictures/tk mika　8.png",
+          "…等 11 张"
+        ],
+        [
+          "img/pictures/t emiri 1280 10.png",
+          "img/pictures/t emiri 1280 15.png",
+          "img/pictures/t emiri 1280 20.png",
+          "img/pictures/t emiri 1280 3.png",
+          "img/pictures/t emiri 1280 4.png",
+          "img/pictures/t emiri 1280 5.png",
+          "…等 9 张"
+        ],
+        [
+          "img/actorhud/Face_1.png",
+          "img/actorhud/Face_2.png",
+          "img/actorhud/Face_3.png",
+          "img/actorhud/Face_4.png"
+        ],
+        [
+          "img/pictures/h scene azuha tyoukyou 57.png",
+          "img/pictures/h scene azuha tyoukyou 58.png",
+          "img/pictures/h scene azuha tyoukyou 59.png",
+          "img/pictures/h scene azuha tyoukyou 61.png"
+        ],
+        [
+          "img/pictures/t karudlie 1280 4.png",
+          "img/pictures/t karudlie 1280 5.png",
+          "img/pictures/t karudlie 1280 6.png",
+          "img/pictures/t karudlie 1280 9.png"
+        ],
+        [
+          "img/pictures/tk a syouiti 4.png",
+          "img/pictures/tk a syouiti 6.png",
+          "img/pictures/tk a syouiti 7.png",
+          "img/pictures/tk a syouiti n.png"
+        ]
+      ],
+      "exact_dup_groups": 3,
+      "exact_dup_rate": 0.0167,
+      "seq_gaps": 3,
+      "seq_break_dirs": 3,
+      "name_conflicts": 18,
+      "spine_files": 0,
+      "scan_ms": 953,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Restore(",
+      "manifest_cg": 338,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 2061,
+      "asset_images": 989,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 1020,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets",
+          "count": 265,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 251,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 133,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 105,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 64,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 40,
+          "kind": "asset"
+        },
+        {
+          "name": "battlehud",
+          "count": 31,
+          "kind": "cg"
+        },
+        {
+          "name": "parallaxes",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "actorhud",
+          "count": 20,
+          "kind": "cg"
+        },
+        {
+          "name": "faces",
+          "count": 16,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 16,
+          "kind": "asset"
+        },
+        {
+          "name": "titles2",
+          "count": 6,
+          "kind": "asset"
+        },
+        {
+          "name": "choices",
+          "count": 1,
+          "kind": "cg"
+        }
+      ]
+    },
+    {
+      "name": "Risty and the Village of Bocchino v1.0.0",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260303\\RPG\\未评级\\Risty and the Village of Bocchino v1.0.0",
+      "engine": "rmmz",
+      "images": 288,
+      "small": 0,
+      "outliers": 131,
+      "blank": 1,
+      "dup_groups": 30,
+      "dup_rate": 0.7535,
+      "sparse": 237,
+      "avg_kb": 420.5,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 1/288 (0.3%) (+1)",
+        "尺寸离群 131/288 (45%) (+2)",
+        "重复冗余率 75.3%（近似重复 30 组） (+2)",
+        "另有引擎素材 806 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "868x1228",
+      "mode_count": 152,
+      "sampled": 288,
+      "decoded": 288,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "www/img/pictures/bad-01.png (1280x720)",
+        "www/img/pictures/bad-02.png (1280x720)",
+        "www/img/pictures/bad-03.png (1280x720)",
+        "www/img/pictures/bad-04.png (1280x720)",
+        "www/img/pictures/bad-05.png (1280x720)",
+        "www/img/pictures/bad-06.png (1280x720)",
+        "www/img/pictures/bad-07.png (1280x720)",
+        "www/img/pictures/bad-08.png (1280x720)",
+        "www/img/pictures/bad-09.png (1280x720)",
+        "www/img/pictures/bad-10.png (1280x720)"
+      ],
+      "outlier_sizes": [
+        "1280x720 x125",
+        "120x120 x4",
+        "1282x714 x1",
+        "1282x719 x1"
+      ],
+      "blank_samples": [
+        "www/img/pictures/blackBG.png (var=0.0)"
+      ],
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/r0_0.png",
+          "www/img/pictures/r0_1.png",
+          "www/img/pictures/r0_10.png",
+          "www/img/pictures/r0_11.png",
+          "www/img/pictures/r0_12.png",
+          "www/img/pictures/r0_13.png",
+          "…等 100 张"
+        ],
+        [
+          "www/img/pictures/r1_0.png",
+          "www/img/pictures/r1_1.png",
+          "www/img/pictures/r1_10.png",
+          "www/img/pictures/r1_11.png",
+          "www/img/pictures/r1_12.png",
+          "www/img/pictures/r1_13.png",
+          "…等 51 张"
+        ],
+        [
+          "www/img/pictures/o2-06.png",
+          "www/img/pictures/o2-07.png",
+          "www/img/pictures/o2-08.png",
+          "www/img/pictures/o2-09.png",
+          "www/img/pictures/o2-10.png",
+          "www/img/pictures/o2-11.png",
+          "…等 9 张"
+        ],
+        [
+          "www/img/pictures/munemomi1_01.png",
+          "www/img/pictures/munemomi1_02.png",
+          "www/img/pictures/munemomi1_03.png",
+          "www/img/pictures/munemomi1_04.png",
+          "www/img/pictures/munemomi2_01.png",
+          "www/img/pictures/munemomi2_02.png",
+          "…等 8 张"
+        ],
+        [
+          "www/img/pictures/sl1_01.png",
+          "www/img/pictures/sl1_02.png",
+          "www/img/pictures/sl1_03.png",
+          "www/img/pictures/sl1_04.png",
+          "www/img/pictures/sl1_05.png",
+          "www/img/pictures/sl1_06.png",
+          "…等 7 张"
+        ],
+        [
+          "www/img/pictures/s1_01.png",
+          "www/img/pictures/s1_02.png",
+          "www/img/pictures/s1_03.png",
+          "www/img/pictures/s1_04.png",
+          "www/img/pictures/s1_05.png",
+          "www/img/pictures/s1_06.png"
+        ],
+        [
+          "www/img/pictures/kabe2-04.png",
+          "www/img/pictures/kabe2-05.png",
+          "www/img/pictures/kabe2-06.png",
+          "www/img/pictures/kabe2-07.png",
+          "www/img/pictures/kabe2-08.png"
+        ],
+        [
+          "www/img/pictures/o2-01.png",
+          "www/img/pictures/o2-02.png",
+          "www/img/pictures/o2-03.png",
+          "www/img/pictures/o2-04.png",
+          "www/img/pictures/o2-05.png"
+        ]
+      ],
+      "exact_dup_groups": 6,
+      "exact_dup_rate": 0.0208,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 573,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Risty and the Village of Bocchino v1.0.0",
+      "manifest_cg": 25,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 1094,
+      "asset_images": 806,
+      "families": [
+        {
+          "name": "characters",
+          "count": 469,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 288,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets",
+          "count": 182,
+          "kind": "asset"
+        },
+        {
+          "name": "animations",
+          "count": 117,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 15,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "Scars of Summer After v1.01（牛）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260425\\RPG\\未评级\\Scars of Summer After v1.01（牛）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 3987 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 72,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Scars of Summer After v1.01（牛）",
+      "manifest_cg": 1350,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 3987,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "Unholy_maiden_Ver.1.0.10",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\未评级\\Unholy_maiden_Ver.1.0.10",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 4182 个（.rpgmvp/.png_；另有引擎素材 0 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 64,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\Unholy_maiden_Ver.1.0.10",
+      "manifest_cg": 843,
+      "scan_roots": [
+        "img"
+      ],
+      "encrypted": 4182
+    },
+    {
+      "name": "ayuureiCN（夯）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260303\\RPG\\夯\\ayuureiCN（夯）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1726 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 17,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\ayuureiCN（夯）",
+      "manifest_cg": 132,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 1726,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "人柱阿拉卡 v230216(创意)",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260811\\其他\\创意\\人柱阿拉卡 v230216(创意)",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1911 个（.rpgmvp/.png_；另有引擎素材 8 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 155,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\创意\\人柱阿拉卡 v230216(创意)",
+      "manifest_cg": 86,
+      "scan_roots": [
+        "人柱阿拉卡~官方中文版~遊戲本體/www/img",
+        "人柱阿拉卡~简体中文更新档/www/img"
+      ],
+      "scanned": 8,
+      "asset_images": 8,
+      "encrypted": 1911,
+      "families": [
+        {
+          "name": "人柱阿拉卡~官方中文版~遊戲本體/www/img/characters",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "人柱阿拉卡~官方中文版~遊戲本體/www/img/system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "人柱阿拉卡~官方中文版~遊戲本體/www/img/tilesets",
+          "count": 1,
+          "kind": "asset"
+        }
+      ],
+      "note": "扫到 2 个 img 根，两套目录各存一份图，重复率会被抬高"
+    },
+    {
+      "name": "呪いの鎧 v3.0.1（夯）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260629\\RPG\\夯\\呪いの鎧 v3.0.1（夯）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 3385 个（.rpgmvp/.png_；另有引擎素材 54 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 73,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\呪いの鎧 v3.0.1（夯）",
+      "manifest_cg": 222,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 54,
+      "asset_images": 54,
+      "encrypted": 3385,
+      "families": [
+        {
+          "name": "battlebacks1",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "女主角（大雷）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260424\\RPG\\大雷\\女主角（大雷）",
+      "engine": "rmmz",
+      "images": 715,
+      "small": 13,
+      "outliers": 274,
+      "blank": 4,
+      "dup_groups": 52,
+      "dup_rate": 0.4233,
+      "sparse": 688,
+      "avg_kb": 518.1,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 4/300 (1.3%) (+1)",
+        "极小图 13/715 (1.8%) (+1)",
+        "尺寸离散（众数 1280x720 仅占 38%，离群 274/715） (+1)",
+        "重复冗余率 42.3%（近似重复 52 组） (+1)",
+        "\u003c5KB 小文件 30/715 (4.2%) (+1)",
+        "序列断裂 2 处 / 1 个目录 (+1)",
+        "另有引擎素材 178 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x720",
+      "mode_count": 273,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 30,
+      "small_samples": [
+        "www/img/pictures/UI_AUTO.png",
+        "www/img/pictures/UI_EXIT.png",
+        "www/img/pictures/UI_EXIT2.png",
+        "www/img/pictures/UI_LOAD.png",
+        "www/img/pictures/UI_LOAD2.png",
+        "www/img/pictures/UI_SAVE.png",
+        "www/img/pictures/UI_SAVE2.png",
+        "www/img/pictures/UI_SKIP.png",
+        "www/img/pictures/UI_SYSTEM.png",
+        "www/img/pictures/UI_SYSTEM2.png"
+      ],
+      "outlier_samples": [
+        "www/img/pictures/UI_AUTO.png (101x30)",
+        "www/img/pictures/UI_EXIT.png (101x30)",
+        "www/img/pictures/UI_EXIT2.png (150x45)",
+        "www/img/pictures/UI_LOAD.png (101x30)",
+        "www/img/pictures/UI_LOAD2.png (150x45)",
+        "www/img/pictures/UI_SAVE.png (101x30)",
+        "www/img/pictures/UI_SAVE2.png (150x45)",
+        "www/img/pictures/UI_SKIP.png (101x30)",
+        "www/img/pictures/UI_SYSTEM.png (101x30)",
+        "www/img/pictures/UI_SYSTEM2.png (150x45)"
+      ],
+      "outlier_sizes": [
+        "716x1200 x125",
+        "210x70 x78",
+        "895x1500 x43",
+        "1193x2000 x8",
+        "101x30 x6"
+      ],
+      "blank_samples": [
+        "www/img/pictures/BCE73_26.png (var=15.5)",
+        "www/img/pictures/メイン3part4.png (var=5.6)",
+        "www/img/pictures/メイン6part2.png (var=0.0)",
+        "www/img/pictures/背景_黒幕.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "www/img/pictures/UI_AUTO.png (3.6KB)",
+        "www/img/pictures/UI_EXIT.png (3.6KB)",
+        "www/img/pictures/UI_LOAD.png (3.6KB)",
+        "www/img/pictures/UI_SAVE.png (3.8KB)",
+        "www/img/pictures/UI_SKIP.png (3.6KB)",
+        "www/img/pictures/UI_SYSTEM.png (4.0KB)",
+        "www/img/pictures/シナリオ0.png (2.0KB)",
+        "www/img/pictures/シナリオ00.png (1.9KB)",
+        "www/img/pictures/シナリオ012.png (5.0KB)",
+        "www/img/pictures/シナリオA.png (2.2KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/heroine_angry.png",
+          "www/img/pictures/heroine_normalE.png",
+          "www/img/pictures/heroine_normalF.png",
+          "www/img/pictures/heroine_smile.png",
+          "www/img/pictures/heroine_talk1.png",
+          "www/img/pictures/heroine_talk1C.png",
+          "…等 10 张"
+        ],
+        [
+          "www/img/pictures/NCE81_12.png",
+          "www/img/pictures/NCE81_2.png",
+          "www/img/pictures/NCE81_3.png",
+          "www/img/pictures/NCE81_4.png",
+          "www/img/pictures/NCE81_5.png",
+          "www/img/pictures/NCE81_6.png",
+          "…等 8 张"
+        ],
+        [
+          "www/img/pictures/メイン3part3.png",
+          "www/img/pictures/メイン4part1.png",
+          "www/img/pictures/メイン5part3.png",
+          "www/img/pictures/メイン5part4.png",
+          "www/img/pictures/メイン6part2.png",
+          "www/img/pictures/メイン6part3.png",
+          "…等 8 张"
+        ],
+        [
+          "www/img/pictures/BCE73_14.png",
+          "www/img/pictures/BCE73_16.png",
+          "www/img/pictures/BCE73_20.png",
+          "www/img/pictures/BCE73_21.png",
+          "www/img/pictures/BCE73_22.png",
+          "www/img/pictures/BCE73_23.png",
+          "…等 7 张"
+        ],
+        [
+          "www/img/pictures/heroine_clothes.png",
+          "www/img/pictures/heroine_clothesA.png",
+          "www/img/pictures/heroine_clothesC.png",
+          "www/img/pictures/heroine_clothesD.png",
+          "www/img/pictures/heroine_clothesE.png",
+          "www/img/pictures/heroine_clothesF.png",
+          "…等 7 张"
+        ],
+        [
+          "www/img/pictures/BCE73_1.png",
+          "www/img/pictures/BCE73_10.png",
+          "www/img/pictures/BCE73_11.png",
+          "www/img/pictures/BCE73_12.png",
+          "www/img/pictures/BCE73_13.png",
+          "www/img/pictures/BCE73_3.png"
+        ],
+        [
+          "www/img/pictures/SCE83_2.png",
+          "www/img/pictures/SCE83_3.png",
+          "www/img/pictures/SCE83_5.png",
+          "www/img/pictures/SCE93_2.png",
+          "www/img/pictures/SCE93_5.png",
+          "www/img/pictures/SCE93_6.png"
+        ],
+        [
+          "www/img/pictures/heroine_sex.png",
+          "www/img/pictures/heroine_sex1.png",
+          "www/img/pictures/heroine_sex3.png",
+          "www/img/pictures/heroine_sex4.png",
+          "www/img/pictures/heroine_sex5.png",
+          "www/img/pictures/heroine_sex6.png"
+        ]
+      ],
+      "exact_dup_groups": 4,
+      "exact_dup_rate": 0.0133,
+      "seq_gaps": 2,
+      "seq_break_dirs": 1,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 708,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\大雷\\女主角（大雷）",
+      "manifest_cg": 44,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 893,
+      "asset_images": 178,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 715,
+          "kind": "cg"
+        },
+        {
+          "name": "animations",
+          "count": 117,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 18,
+          "kind": "asset"
+        },
+        {
+          "name": "titles2",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "transitions",
+          "count": 3,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "妹神官（牛）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260425\\RPG\\未评级\\妹神官（牛）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 5894 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 132,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\妹神官（牛）",
+      "manifest_cg": 211,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 5894,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "希尔丝大冒险  1.06（夯）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260625\\RPG\\夯\\希尔丝大冒险  1.06（夯）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1352 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 49,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\希尔丝大冒险  1.06（夯）",
+      "manifest_cg": 101,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 1352,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "忍耐色诱的告白游戏 V2.0（不赖）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260613\\RPG\\不赖\\忍耐色诱的告白游戏 V2.0（不赖）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1332 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 35,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\不赖\\忍耐色诱的告白游戏 V2.0（不赖）",
+      "manifest_cg": 478,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 1332,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "时间勇者（中等）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260904\\RPG\\中等\\时间勇者（中等）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 4530 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 39,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\时间勇者（中等）",
+      "manifest_cg": 125,
+      "scan_roots": [
+        "时勇者/www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 4530,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "栩的人生已经没救了（一般）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260613\\RPG\\一般\\栩的人生已经没救了（一般）",
+      "engine": "rmmz",
+      "images": 935,
+      "small": 3,
+      "outliers": 397,
+      "blank": 18,
+      "dup_groups": 20,
+      "dup_rate": 0.45,
+      "sparse": 888,
+      "avg_kb": 192.9,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 18/300 (6%) (+2)",
+        "极小图 3/935 (0.3%) (+1)",
+        "尺寸离群 397/935 (42%) (+2)",
+        "重复冗余率 45.0%（近似重复 20 组） (+1)",
+        "\u003c5KB 小文件 73/935 (7.8%) (+1)",
+        "序列断裂 81 处 / 4 个目录 (+2)",
+        "另有引擎素材 1070 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "816x624",
+      "mode_count": 533,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 73,
+      "small_samples": [
+        "www/img/pictures/_HPgauge2.png",
+        "www/img/pictures/_HPgaugeRED.png",
+        "www/img/pictures/_HPgaugeTP.png"
+      ],
+      "outlier_samples": [
+        "www/img/pictures/BoxA.png (96x96)",
+        "www/img/pictures/BoxA_waifu2x_art_noise3_scale.png (192x192)",
+        "www/img/pictures/BoxB.png (96x96)",
+        "www/img/pictures/BoxB_waifu2x_art_noise3_scale.png (192x192)",
+        "www/img/pictures/BoxC.png (96x96)",
+        "www/img/pictures/BoxC_waifu2x_art_noise3_scale.png (192x192)",
+        "www/img/pictures/_HPgauge2.png (141x13)",
+        "www/img/pictures/_HPgaugeRED.png (141x13)",
+        "www/img/pictures/_HPgaugeTP.png (141x13)",
+        "www/img/pictures/aura.png (422x624)"
+      ],
+      "outlier_sizes": [
+        "422x624 x293",
+        "422x732 x44",
+        "352x674 x16",
+        "116x116 x11",
+        "192x192 x7"
+      ],
+      "blank_samples": [
+        "www/img/pictures/!makkuro.png (var=0.0)",
+        "www/img/pictures/!yoru.png (var=0.0)",
+        "www/img/pictures/Mgaku2.png (var=6.4)",
+        "www/img/pictures/_LV1.png (var=0.0)",
+        "www/img/pictures/_LV8.png (var=0.0)",
+        "www/img/pictures/_bunbo35.png (var=0.0)",
+        "www/img/pictures/_bunbo55.png (var=0.0)",
+        "www/img/pictures/_bunsi00.png (var=0.0)",
+        "www/img/pictures/_bunsi03.png (var=0.0)",
+        "www/img/pictures/_bunsi08.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "www/img/pictures/!makkuro.png (2.9KB)",
+        "www/img/pictures/!yoru.png (2.9KB)",
+        "www/img/pictures/_HPgauge.png (3.2KB)",
+        "www/img/pictures/_HPgauge2.png (0.3KB)",
+        "www/img/pictures/_HPgaugeRED.png (0.3KB)",
+        "www/img/pictures/_HPgaugeTP.png (0.3KB)",
+        "www/img/pictures/_HPgaugeWAKU.png (3.7KB)",
+        "www/img/pictures/_LV0.png (3.2KB)",
+        "www/img/pictures/_LV1.png (3.0KB)",
+        "www/img/pictures/_LV2.png (3.2KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/busts/kunu/bat_aiso.png",
+          "www/img/pictures/busts/kunu/bat_default.png",
+          "www/img/pictures/busts/kunu/bat_fu-n.png",
+          "www/img/pictures/busts/kunu/bat_guru.png",
+          "www/img/pictures/busts/kunu/bat_hazu.png",
+          "www/img/pictures/busts/kunu/bat_komari.png",
+          "…等 91 张"
+        ],
+        [
+          "www/img/pictures/!makkuro.png",
+          "www/img/pictures/!yoru.png",
+          "www/img/pictures/A.png",
+          "www/img/pictures/Dname_ekimae.png",
+          "www/img/pictures/Dname_kouen.png",
+          "www/img/pictures/Mgaku2.png",
+          "…等 20 张"
+        ],
+        [
+          "www/img/pictures/busts/m05/normal_default.png",
+          "www/img/pictures/busts/m08/normal_default.png",
+          "www/img/pictures/busts/m09/normal_default.png",
+          "www/img/pictures/busts/mama/normal_default.png"
+        ],
+        [
+          "www/img/pictures/busts/nona予備/normal_doka.png",
+          "www/img/pictures/busts/nona予備/normal_miku.png",
+          "www/img/pictures/busts/nona予備/normal_niko.png",
+          "www/img/pictures/busts/nona予備/normal_sin.png"
+        ],
+        [
+          "www/img/pictures/sede1_02.png",
+          "www/img/pictures/sede1_04.png",
+          "www/img/pictures/sede1_05.png",
+          "www/img/pictures/sede1_08.png"
+        ],
+        [
+          "www/img/pictures/aura.png",
+          "www/img/pictures/aura_r.png",
+          "www/img/pictures/busts/aura/normal.png"
+        ],
+        [
+          "www/img/pictures/haga_5.png",
+          "www/img/pictures/haga_6.png",
+          "www/img/pictures/haga_8.png"
+        ],
+        [
+          "www/img/pictures/B.png",
+          "www/img/pictures/C.png"
+        ]
+      ],
+      "exact_dup_groups": 30,
+      "exact_dup_rate": 0.18,
+      "seq_gaps": 81,
+      "seq_break_dirs": 4,
+      "name_conflicts": 59,
+      "spine_files": 0,
+      "scan_ms": 537,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\栩的人生已经没救了（一般）",
+      "manifest_cg": 95,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2005,
+      "asset_images": 1070,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 581,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/busts",
+          "count": 354,
+          "kind": "cg"
+        },
+        {
+          "name": "characters/nona",
+          "count": 238,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 172,
+          "kind": "asset"
+        },
+        {
+          "name": "animations",
+          "count": 171,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 140,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 101,
+          "kind": "asset"
+        },
+        {
+          "name": "characters/未分類",
+          "count": 74,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 53,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 43,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 39,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 35,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "气息（上等）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260612\\RPG\\上等\\气息（上等）",
+      "engine": "rmmz",
+      "images": 1521,
+      "small": 3,
+      "outliers": 127,
+      "blank": 38,
+      "dup_groups": 13,
+      "dup_rate": 0.7033,
+      "sparse": 1496,
+      "avg_kb": 114.4,
+      "severity": 3,
+      "severity_reasons": [
+        "文件头损坏 1 张 (+3)",
+        "扩展名与实际格式不符 228/1521 张 (+1)",
+        "空白帧 38/300 (13%) (+2)",
+        "极小图 3/1521 (0.2%) (+1)",
+        "尺寸离群 127/1521 (8.3%) (+1)",
+        "重复冗余率 70.3%（近似重复 13 组） (+2)",
+        "序列断裂 1 处 / 1 个目录 (+1)",
+        "另有引擎素材 48254 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1792x1008",
+      "mode_count": 1069,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 1,
+      "tiny_files": 23,
+      "small_samples": [
+        "SAO_verβ7/www/img/pictures/text_win.png",
+        "SAO_verβ7/www/img/pictures/txt_back.png",
+        "SAO_verβ7/www/img/pictures/退出键.png"
+      ],
+      "outlier_samples": [
+        "SAO_verβ7/www/img/pictures/384白边框 - 副本.png (384x384)",
+        "SAO_verβ7/www/img/pictures/384白边框.png (384x384)",
+        "SAO_verβ7/www/img/pictures/716-浴室-猪田炫耀自拍.png (433x775)",
+        "SAO_verβ7/www/img/pictures/AVntrs.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV亚丝娜.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV精灵母女.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV莉法.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV蛇岛.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV迷奸.png (1024x768)",
+        "SAO_verβ7/www/img/pictures/AV逆寝取.png (1024x768)"
+      ],
+      "outlier_sizes": [
+        "336x240 x25",
+        "800x1008 x18",
+        "1024x768 x15",
+        "138x120 x11",
+        "433x817 x7"
+      ],
+      "blank_samples": [
+        "SAO_verβ7/www/img/pictures/384白边框 - 副本.png (var=0.0)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠发情.png (var=18.6)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠回应.png (var=21.0)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠得意.png (var=18.4)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠愉悦发情.png (var=19.2)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠服从.png (var=18.9)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠温柔脸红.png (var=18.4)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝催眠脸红.png (var=19.0)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝斥责脸红.png (var=22.1)",
+        "SAO_verβ7/www/img/pictures/FOG爱丽丝鄙夷脸红.png (var=22.1)"
+      ],
+      "tiny_samples": [
+        "SAO_verβ7/www/img/pictures/384白边框 - 副本.png (2.7KB)",
+        "SAO_verβ7/www/img/pictures/384白边框.png (1.4KB)",
+        "SAO_verβ7/www/img/pictures/text_win.png (0.2KB)",
+        "SAO_verβ7/www/img/pictures/txt_back.png (2.8KB)",
+        "SAO_verβ7/www/img/pictures/心跳3 - 副本.png (4.1KB)",
+        "SAO_verβ7/www/img/pictures/心跳3.png (4.1KB)",
+        "SAO_verβ7/www/img/pictures/心跳4.png (2.1KB)",
+        "SAO_verβ7/www/img/pictures/心跳5.png (2.1KB)",
+        "SAO_verβ7/www/img/pictures/心跳6.png (4.6KB)",
+        "SAO_verβ7/www/img/pictures/白色线条864-576x1008.png (4.4KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "SAO_verβ7/www/img/pictures/FOG明日奈严肃脸红.png",
+          "SAO_verβ7/www/img/pictures/FOG明日奈失望.png",
+          "SAO_verβ7/www/img/pictures/FOG明日奈接吻.png",
+          "SAO_verβ7/www/img/pictures/FOG明日奈无奈.png",
+          "SAO_verβ7/www/img/pictures/FOG明日奈激动.png",
+          "SAO_verβ7/www/img/pictures/FOG明日奈理解.png",
+          "…等 164 张"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/FOG莉兹凛然.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹凛然脸红.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹嘲弄.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹微笑.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹批评.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹温柔.png",
+          "…等 21 张"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/FOG莉兹.png",
+          "SAO_verβ7/www/img/pictures/FOG莉兹对魔忍.png",
+          "SAO_verβ7/www/img/pictures/fog亚丝娜裸.png",
+          "SAO_verβ7/www/img/pictures/fog莉兹内衣.png",
+          "SAO_verβ7/www/img/pictures/立绘-妓女亚2-为难.png",
+          "SAO_verβ7/www/img/pictures/立绘-妓女亚2-微笑.png",
+          "…等 11 张"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/FOG诗乃立绘.png",
+          "SAO_verβ7/www/img/pictures/明日奈双马尾体操服立绘.png",
+          "SAO_verβ7/www/img/pictures/明日奈居家服立绘.png",
+          "SAO_verβ7/www/img/pictures/明日奈浴巾.png",
+          "SAO_verβ7/www/img/pictures/诗乃伪装服.png"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/0717-契约反转-吃惊.png",
+          "SAO_verβ7/www/img/pictures/0717-契约反转-思考.png",
+          "SAO_verβ7/www/img/pictures/0717-契约反转-愤怒.png",
+          "SAO_verβ7/www/img/pictures/0717-契约反转-齁哦.png"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/SYNCHRONIZED.png",
+          "SAO_verβ7/www/img/pictures/教程1.png",
+          "SAO_verβ7/www/img/pictures/猪田手机-日记.png",
+          "SAO_verβ7/www/img/pictures/透视镜-渐变异形椭圆形1440x1008.png"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/京子cos.png",
+          "SAO_verβ7/www/img/pictures/莉兹泳装.png",
+          "SAO_verβ7/www/img/pictures/莉兹私服-黑渐变.png"
+        ],
+        [
+          "SAO_verβ7/www/img/pictures/716-浴室-傲娇.png",
+          "SAO_verβ7/www/img/pictures/716-浴室-叹气.png"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0033,
+      "seq_gaps": 1,
+      "seq_break_dirs": 1,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 1225,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\上等\\气息（上等）",
+      "manifest_cg": 348,
+      "scan_roots": [
+        "SAO_verβ7/www/img"
+      ],
+      "scanned": 49775,
+      "asset_images": 48254,
+      "families": [
+        {
+          "name": "Special__actionSeq",
+          "count": 44817,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 1521,
+          "kind": "cg"
+        },
+        {
+          "name": "Menu__layer_gif",
+          "count": 901,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 550,
+          "kind": "asset"
+        },
+        {
+          "name": "layers",
+          "count": 409,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 374,
+          "kind": "asset"
+        },
+        {
+          "name": "particles",
+          "count": 200,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__layer_gif",
+          "count": 167,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 146,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 136,
+          "kind": "asset"
+        },
+        {
+          "name": "animations",
+          "count": 126,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 58,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__meter",
+          "count": 44,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__number",
+          "count": 33,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__self",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__ui_message",
+          "count": 29,
+          "kind": "asset"
+        },
+        {
+          "name": "eventindicators",
+          "count": 29,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__illumination",
+          "count": 24,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 15,
+          "kind": "asset"
+        },
+        {
+          "name": "Battle__ui_hud",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__textBigImg",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__layer_dynamicMask",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 13,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 13,
+          "kind": "asset"
+        },
+        {
+          "name": "Battle__ui_command",
+          "count": 12,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__ui_messageBtn",
+          "count": 11,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__variable",
+          "count": 10,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__ui_mouse",
+          "count": 9,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__layer",
+          "count": 6,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__main",
+          "count": 6,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__ui",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__ui",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__boss",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "Special__dialogPic",
+          "count": 5,
+          "kind": "asset"
+        },
+        {
+          "name": "Menu__layer",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "Map__ui_gaugeButton",
+          "count": 1,
+          "kind": "asset"
+        }
+      ],
+      "misnamed": 228,
+      "misnamed_samples": [
+        "SAO_verβ7/www/img/pictures/0717-契约反转-吃惊.png",
+        "SAO_verβ7/www/img/pictures/0717-契约反转-思考.png",
+        "SAO_verβ7/www/img/pictures/0717-契约反转-愤怒.png",
+        "SAO_verβ7/www/img/pictures/0717-契约反转-懵逼.png",
+        "SAO_verβ7/www/img/pictures/0717-契约反转-齁哦.png",
+        "SAO_verβ7/www/img/pictures/7-10-按摩事后-1.png",
+        "SAO_verβ7/www/img/pictures/7-10-按摩事后-2.png",
+        "SAO_verβ7/www/img/pictures/7-10-按摩事后-3.png"
+      ]
+    },
+    {
+      "name": "苍红界域（夯）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260424\\RPG\\夯\\苍红界域（夯）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 8224 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 191,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\苍红界域（夯）",
+      "manifest_cg": 209,
+      "scan_roots": [
+        "MELFIAS －Azure and Crimson Verge－/www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 8224,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "裏垢JKは露出でバズりたい（一般）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260501\\RPG\\一般\\裏垢JKは露出でバズりたい（一般）",
+      "engine": "rmmz",
+      "images": 1724,
+      "small": 8,
+      "outliers": 876,
+      "blank": 96,
+      "dup_groups": 29,
+      "dup_rate": 0.6767,
+      "sparse": 1558,
+      "avg_kb": 101.5,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 96/300 (32%) (+3)",
+        "极小图 8/1724 (0.5%) (+1)",
+        "尺寸离散（众数 1080x720 仅占 48%，离群 876/1724） (+1)",
+        "重复冗余率 67.7%（近似重复 29 组） (+2)",
+        "\u003c5KB 小文件 38/1724 (2.2%) (+1)",
+        "另有引擎素材 5276 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1080x720",
+      "mode_count": 836,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 38,
+      "small_samples": [
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_胸見せボタン当たり判定_01.png",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_通常自撮りボタン当たり判定.png",
+        "内嵌/img/pictures/OP_CG/チュートリアル/胸見せ枠.png",
+        "内嵌/img/pictures/OP_CG/チュートリアル/黄色_通常枠.png",
+        "外挂/Game/img/pictures/OP_CG/チュートリアル/tutorial_胸見せボタン当たり判定_01.png",
+        "外挂/Game/img/pictures/OP_CG/チュートリアル/tutorial_通常自撮りボタン当たり判定.png",
+        "外挂/Game/img/pictures/OP_CG/チュートリアル/胸見せ枠.png",
+        "外挂/Game/img/pictures/OP_CG/チュートリアル/黄色_通常枠.png"
+      ],
+      "outlier_samples": [
+        "内嵌/img/pictures/OP_CG/OP用_TL.png (384x580)",
+        "内嵌/img/pictures/OP_CG/OP用_私服.png (384x580)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/01_操作説明ロゴ.png (1073x100)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/02_WASD対応.png (687x114)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/03_おっぱい見せる.png (607x440)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_上半身ボタン当たり判定.png (104x104)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_胸見せボタン当たり判定_01.png (102x37)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_自撮りボタン当たり判定.png (102x102)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_通常自撮りボタン当たり判定.png (102x37)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/上半身枠.png (109x109)"
+      ],
+      "outlier_sizes": [
+        "739x1116 x598",
+        "580x387 x172",
+        "580x435 x64",
+        "384x580 x6",
+        "102x37 x4"
+      ],
+      "blank_samples": [
+        "内嵌/img/pictures/CGイベント/CG_02/56_放尿.png (var=8.6)",
+        "内嵌/img/pictures/CGイベント/CG_02/57_愛液_腿.png (var=0.3)",
+        "内嵌/img/pictures/CGイベント/CG_02/61_股間いじり用_正、淫紋.png (var=19.0)",
+        "内嵌/img/pictures/CGイベント/CG_07/53_苦悶.png (var=0.0)",
+        "内嵌/img/pictures/CGイベント/CG_07/60_愛液大.png (var=0.5)",
+        "内嵌/img/pictures/CGイベント/CG_07/61_射精.png (var=0.2)",
+        "内嵌/img/pictures/CGイベント/CG_07/64_吐息.png (var=0.0)",
+        "内嵌/img/pictures/CGイベント/CG_フェラ/52_汗.png (var=0.0)",
+        "内嵌/img/pictures/CGイベント/CG_フェラ/54_熱気.png (var=0.0)",
+        "内嵌/img/pictures/CGイベント/CG_フェラ/56_通常ピアス.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_上半身ボタン当たり判定.png (2.8KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_胸見せボタン当たり判定_01.png (1.8KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_自撮りボタン当たり判定.png (2.1KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/tutorial_通常自撮りボタン当たり判定.png (1.8KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/上半身枠.png (2.5KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/胸見せ枠.png (1.3KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/黄色_自撮り枠.png (2.6KB)",
+        "内嵌/img/pictures/OP_CG/チュートリアル/黄色_通常枠.png (1.3KB)",
+        "内嵌/img/pictures/背景/全てを覆い隠す真っ黒な背景.png (4.7KB)",
+        "内嵌/img/pictures/自撮りスキル/CG_02/乳首ピアス_通常.png (4.5KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "内嵌/img/pictures/CGイベント/01_Sex_eve_popup.png",
+          "内嵌/img/pictures/CGイベント/01_mustor_eve_popup.png",
+          "内嵌/img/pictures/CGイベント/02_Sex_eve_popup.png",
+          "内嵌/img/pictures/CGイベント/02_mustor_eve_popup.png",
+          "内嵌/img/pictures/CGイベント/03_Sex_eve_popup.png",
+          "内嵌/img/pictures/CGイベント/03_mustor_eve_popup.png",
+          "…等 68 张"
+        ],
+        [
+          "内嵌/img/pictures/立ち絵/57_首輪03_金玉ベル.png",
+          "内嵌/img/pictures/立ち絵/58_乳首ピアス02_鎖_変形.png",
+          "内嵌/img/pictures/立ち絵/58_乳首ピアス02_鎖_通常.png",
+          "内嵌/img/pictures/立ち絵/59_愛液大_コート通常時.png",
+          "内嵌/img/pictures/立ち絵/59_愛液小_私服通常時.png",
+          "内嵌/img/pictures/立ち絵/60_垂れてる.png",
+          "…等 68 张"
+        ],
+        [
+          "内嵌/img/pictures/立ち絵/63_頬両方.png",
+          "内嵌/img/pictures/立ち絵/表情差分/04_驚顔.png",
+          "内嵌/img/pictures/立ち絵/表情差分/08_絶望顔.png",
+          "内嵌/img/pictures/立ち絵/表情差分/10_警戒.png",
+          "内嵌/img/pictures/立ち絵/表情差分/猫耳専用/14_恥ずかしそう_01.png",
+          "外挂/Game/img/pictures/立ち絵/63_頬両方.png",
+          "…等 10 张"
+        ],
+        [
+          "内嵌/img/pictures/Result素材/写真部分影.png",
+          "内嵌/img/pictures/Result素材/背景/06_遊園地_昼_01.png",
+          "外挂/Game/img/pictures/CGイベント/CG_05/51_絶頂顔.png",
+          "外挂/Game/img/pictures/CGイベント/CG_05/51_驚き_ハイライト.png",
+          "外挂/Game/img/pictures/Result素材/背景/02_公園_夜_02.png",
+          "外挂/Game/img/pictures/Result素材/背景/05_カフェ_夜_01.png",
+          "…等 8 张"
+        ],
+        [
+          "内嵌/img/pictures/自撮りスキル/CG_02/乳首ピアス_通常.png",
+          "内嵌/img/pictures/自撮りスキル/CG_02/吐息.png",
+          "内嵌/img/pictures/自撮りスキル/CG_05/吐息.png",
+          "内嵌/img/pictures/自撮りスキル/CG_05/正文字.png",
+          "内嵌/img/pictures/自撮りスキル/CG_07/吐息.png",
+          "外挂/Game/img/pictures/自撮りスキル/CG_03/乳首ピアス_鈴.png",
+          "…等 8 张"
+        ],
+        [
+          "内嵌/img/pictures/立ち絵/ガーターベルト赤/コート全出し.png",
+          "外挂/Game/img/pictures/立ち絵/ガーターベルト白/コート全出し.png",
+          "外挂/Game/img/pictures/立ち絵/濡れ透け/胸上げたくし上げ/赤_ガーターベルト.png",
+          "外挂/Game/img/pictures/立ち絵/濡れ透け/通常、たくし上げ/赤_ガーターベルト.png",
+          "外挂/Game/img/pictures/立ち絵/裸/白_ガーターベルト.png",
+          "外挂/Game/img/pictures/立ち絵/裸/赤_ガーターベルト.png"
+        ],
+        [
+          "内嵌/img/pictures/立ち絵/60_垂れてる_私服通常時.png",
+          "内嵌/img/pictures/立ち絵/60_潮吹き、放尿.png",
+          "内嵌/img/pictures/立ち絵/黒手/股間_手.png",
+          "外挂/Game/img/pictures/立ち絵/60_お漏らし.png",
+          "外挂/Game/img/pictures/立ち絵/60_垂れてる_私服通常時.png"
+        ],
+        [
+          "内嵌/img/pictures/立ち絵/ガーターベルト白/制服_胸出し、変形.png",
+          "内嵌/img/pictures/立ち絵/ガーターベルト黒/制服_たくし上げ、両方.png",
+          "内嵌/img/pictures/立ち絵/濡れ透け/通常、通常/黒_ガーターベルト.png",
+          "外挂/Game/img/pictures/立ち絵/ガーターベルト白/コート_たくし上げ.png",
+          "外挂/Game/img/pictures/立ち絵/ガーターベルト白/私服_通常、胸出し.png"
+        ]
+      ],
+      "exact_dup_groups": 39,
+      "exact_dup_rate": 0.16,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 1197,
+      "spine_files": 0,
+      "scan_ms": 847,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\裏垢JKは露出でバズりたい（一般）",
+      "manifest_cg": 25,
+      "scan_roots": [
+        "内嵌/img",
+        "外挂/Game/img"
+      ],
+      "scanned": 7000,
+      "asset_images": 5276,
+      "families": [
+        {
+          "name": "内嵌/img/pictures/ホーム画面UI達",
+          "count": 1743,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/pictures/ホーム画面UI達",
+          "count": 1743,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/tilesets",
+          "count": 317,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/tilesets",
+          "count": 317,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures/立ち絵",
+          "count": 296,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/立ち絵",
+          "count": 296,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/pictures/露出シーンUI関係",
+          "count": 265,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/pictures/露出シーンUI関係",
+          "count": 265,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures/CGイベント",
+          "count": 208,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/CGイベント",
+          "count": 208,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/pictures/Result素材",
+          "count": 139,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/Result素材",
+          "count": 139,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/pictures/自撮りスキル",
+          "count": 120,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/自撮りスキル",
+          "count": 120,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/characters",
+          "count": 66,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/characters",
+          "count": 66,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures/マップイベント用CG",
+          "count": 60,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/マップイベント用CG",
+          "count": 60,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/battlebacks1",
+          "count": 51,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/battlebacks1",
+          "count": 51,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/sv_actors",
+          "count": 40,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/sv_actors",
+          "count": 40,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/tilesets/規約要りそうなやつ",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/tilesets/規約要りそうなやつ",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/tilesets/tsukumate",
+          "count": 27,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/tilesets/tsukumate",
+          "count": 27,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures/OP_CG",
+          "count": 23,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/OP_CG",
+          "count": 23,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/parallaxes",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/parallaxes",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/system",
+          "count": 18,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/system",
+          "count": 18,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures/背景",
+          "count": 15,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/pictures/背景",
+          "count": 15,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/tilesets/遊園地",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/tilesets/遊園地",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/tilesets/良い感じのやつ",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/tilesets/良い感じのやつ",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/faces",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "内嵌/img/pictures",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "内嵌/img/titles1",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/faces",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "外挂/Game/img/pictures",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "外挂/Game/img/titles1",
+          "count": 1,
+          "kind": "asset"
+        }
+      ],
+      "note": "扫到 2 个 img 根，两套目录各存一份图，重复率会被抬高"
+    },
+    {
+      "name": "詛咒铠甲2（夯）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260629\\RPG\\夯\\詛咒铠甲2（夯）",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 18212 个（.rpgmvp/.png_；另有引擎素材 53 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 619,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\詛咒铠甲2（夯）",
+      "manifest_cg": 267,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 53,
+      "asset_images": 53,
+      "encrypted": 18212,
+      "families": [
+        {
+          "name": "battlebacks1",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "魔法学園見聞録",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260709\\RPG\\未评级\\魔法学園見聞録",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1475 个（.rpgmvp/.png_；另有引擎素材 3 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 24,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\魔法学園見聞録",
+      "manifest_cg": 523,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 3,
+      "asset_images": 3,
+      "encrypted": 1475,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "魔法少女木叶  v2.04（中上）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260519\\RPG\\中上\\魔法少女木叶  v2.04（中上）",
+      "engine": "rmmz",
+      "images": 1317,
+      "small": 151,
+      "outliers": 475,
+      "blank": 7,
+      "dup_groups": 28,
+      "dup_rate": 0.13,
+      "sparse": 890,
+      "avg_kb": 519.4,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 7/300 (2.3%) (+1)",
+        "极小图 151/1317 (11.5%) (+1)",
+        "尺寸离群 475/1317 (36%) (+2)",
+        "重复帧 28 组，冗余率 13.0% (+1)",
+        "\u003c5KB 小文件 27/1317 (2.1%) (+1)",
+        "序列断裂 21 处 / 3 个目录 (+2)",
+        "另有引擎素材 2603 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x960",
+      "mode_count": 694,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 27,
+      "small_samples": [
+        "www/img/BJ/BJ_d_cole.png",
+        "www/img/BJ/BJ_d_drop.png",
+        "www/img/BJ/BJ_d_reise.png",
+        "www/img/BJ/BJ_d_stay.png",
+        "www/img/BJ/BJ_mark.png",
+        "www/img/BJ/BJ_p_cole_off.png",
+        "www/img/BJ/BJ_p_cole_on.png",
+        "www/img/BJ/BJ_p_drop_off.png",
+        "www/img/BJ/BJ_p_drop_on.png",
+        "www/img/BJ/BJ_p_reise_off.png"
+      ],
+      "outlier_samples": [
+        "www/img/BJ/BJ_JUDGE.png (885x139)",
+        "www/img/BJ/BJ_VICTORY.png (1097x166)",
+        "www/img/BJ/BJ_announce01.png (630x128)",
+        "www/img/BJ/BJ_announce02.png (630x128)",
+        "www/img/BJ/BJ_d_cole.png (182x52)",
+        "www/img/BJ/BJ_d_drop.png (182x52)",
+        "www/img/BJ/BJ_d_reise.png (182x52)",
+        "www/img/BJ/BJ_d_stay.png (182x52)",
+        "www/img/BJ/BJ_dealerturn.png (1162x141)",
+        "www/img/BJ/BJ_dealerwin.png (1095x141)"
+      ],
+      "outlier_sizes": [
+        "140x210 x53",
+        "144x48 x44",
+        "334x439 x33",
+        "192x192 x32",
+        "640x360 x28"
+      ],
+      "blank_samples": [
+        "www/img/menus/file/Layout.png (var=0.0)",
+        "www/img/pictures/Ma_fa_bare_04.png (var=17.7)",
+        "www/img/pictures/Pi_heapin.png (var=0.0)",
+        "www/img/pictures/Scene_EnemyBook_back.png (var=5.3)",
+        "www/img/pictures/Scene_Quest_back.png (var=5.3)",
+        "www/img/weather/Cloud_01C.png (var=0.0)",
+        "www/img/weather/Wind_01.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "www/img/BJ/BJ_mark.png (1.8KB)",
+        "www/img/BJ/c01.png (4.7KB)",
+        "www/img/BJ/d01.png (3.7KB)",
+        "www/img/BJ/d02.png (4.0KB)",
+        "www/img/BJ/d03.png (4.7KB)",
+        "www/img/BJ/h01.png (3.6KB)",
+        "www/img/BJ/h02.png (4.2KB)",
+        "www/img/BJ/h03.png (4.9KB)",
+        "www/img/BJ/s02.png (5.0KB)",
+        "www/img/menus/main/FaceArrow.png (2.9KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/H_022/sekkanA_06.png",
+          "www/img/pictures/H_022/sekkanA_08.png",
+          "www/img/pictures/H_022/sekkanAb_07.png",
+          "www/img/pictures/H_022/sekkanB_06.png",
+          "www/img/pictures/H_022/sekkanB_08.png",
+          "www/img/pictures/H_022/sekkanBb_07.png"
+        ],
+        [
+          "www/img/pictures/H_012/eido_01.png",
+          "www/img/pictures/H_012/eido_02.png",
+          "www/img/pictures/H_012/eido_06.png",
+          "www/img/pictures/H_012/eido_07.png"
+        ],
+        [
+          "www/img/pictures/H_026/bai1_i_A_03.png",
+          "www/img/pictures/H_026/bai1_i_A_04.png",
+          "www/img/pictures/H_026/bai1_i_B_03.png"
+        ],
+        [
+          "www/img/pictures/H_035/H_sakaba_b02.png",
+          "www/img/pictures/H_sakaba/H_sakaba_02.png",
+          "www/img/pictures/H_sakaba/H_sakaba_b02.png"
+        ],
+        [
+          "www/img/pictures/H_035/H_sakaba_c01.png",
+          "www/img/pictures/H_035/H_sakaba_c02.png",
+          "www/img/pictures/H_035/H_sakaba_c03.png"
+        ],
+        [
+          "www/img/pictures/H_044/D_hanyo1B_02.png",
+          "www/img/pictures/H_044/D_hanyo1B_i_02.png",
+          "www/img/pictures/H_044/D_hanyo1B_i_03.png"
+        ],
+        [
+          "www/img/weather/Fog_01a.png",
+          "www/img/weather/Fog_01b.png",
+          "www/img/weather/Fog_01c.png"
+        ],
+        [
+          "www/img/BJ/h06.png",
+          "www/img/BJ/h08.png"
+        ]
+      ],
+      "exact_dup_groups": 2,
+      "exact_dup_rate": 0.0067,
+      "seq_gaps": 21,
+      "seq_break_dirs": 3,
+      "name_conflicts": 64,
+      "spine_files": 0,
+      "scan_ms": 1115,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中上\\魔法少女木叶  v2.04（中上）",
+      "manifest_cg": 22,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 3920,
+      "asset_images": 2603,
+      "families": [
+        {
+          "name": "animations",
+          "count": 627,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 404,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 342,
+          "kind": "asset"
+        },
+        {
+          "name": "spines/Battle",
+          "count": 320,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 276,
+          "kind": "cg"
+        },
+        {
+          "name": "parallaxes",
+          "count": 197,
+          "kind": "asset"
+        },
+        {
+          "name": "particles",
+          "count": 143,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 142,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 137,
+          "kind": "asset"
+        },
+        {
+          "name": "eventindicators",
+          "count": 111,
+          "kind": "asset"
+        },
+        {
+          "name": "BJ",
+          "count": 81,
+          "kind": "cg"
+        },
+        {
+          "name": "weather",
+          "count": 71,
+          "kind": "cg"
+        },
+        {
+          "name": "system/battle",
+          "count": 60,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_022",
+          "count": 40,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_043",
+          "count": 36,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/faces",
+          "count": 34,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_011",
+          "count": 32,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_018",
+          "count": 32,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_047",
+          "count": 32,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/main",
+          "count": 31,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_037",
+          "count": 30,
+          "kind": "cg"
+        },
+        {
+          "name": "system",
+          "count": 30,
+          "kind": "asset"
+        },
+        {
+          "name": "particles/_old",
+          "count": 27,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_041",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_044",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_045",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/komado",
+          "count": 24,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_028",
+          "count": 23,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_042",
+          "count": 23,
+          "kind": "cg"
+        },
+        {
+          "name": "spines/Default",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_back",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_008",
+          "count": 20,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_026",
+          "count": 20,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_046",
+          "count": 20,
+          "kind": "cg"
+        },
+        {
+          "name": "sv_actors",
+          "count": 17,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_015",
+          "count": 16,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_017",
+          "count": 16,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_009",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_012",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_034",
+          "count": 14,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_013",
+          "count": 13,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_019",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_020",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_035",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_036",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_055",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_sakaba",
+          "count": 12,
+          "kind": "cg"
+        },
+        {
+          "name": "transitions",
+          "count": 12,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_032",
+          "count": 10,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_051",
+          "count": 10,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_025",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_033",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "faces",
+          "count": 8,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/H_010",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_021",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_023",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_029",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_030",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/equip",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_001",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_006",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_016",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_031",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_048",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/actorwindow",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/item",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/skill",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_002",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_003",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_004",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_014",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_053",
+          "count": 6,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_005",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_007",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_024",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_027",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_039",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_049",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_050",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_052",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_054",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_056",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_057",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/file",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "menus/status",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_038",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/H_040",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "spines/Erost",
+          "count": 4,
+          "kind": "asset"
+        },
+        {
+          "name": "menus",
+          "count": 1,
+          "kind": "cg"
+        }
+      ]
+    },
+    {
+      "name": "（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\RPG\\一般\\（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 662 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 21,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般） 电脑 冒险者莉扎西亚 冒険者リザシア -葛藤と屈辱の日間-",
+      "manifest_cg": 137,
+      "scan_roots": [
+        "冒険者リザシア/www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 662,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "（一般）Shitsuke-ai_dlsite",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260808\\RPG\\一般\\（一般）Shitsuke-ai_dlsite",
+      "engine": "rmmz",
+      "images": 1026,
+      "small": 0,
+      "outliers": 146,
+      "blank": 0,
+      "dup_groups": 50,
+      "dup_rate": 0.4733,
+      "sparse": 885,
+      "avg_kb": 429.7,
+      "severity": 3,
+      "severity_reasons": [
+        "扩展名与实际格式不符 759/1026 张 (+1)",
+        "尺寸离群 146/1026 (14.2%) (+1)",
+        "重复冗余率 47.3%（近似重复 50 组） (+1)",
+        "序列断裂 533 处 / 2 个目录 (+2)",
+        "另有引擎素材 850 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1920x1080",
+      "mode_count": 763,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 1,
+      "small_samples": null,
+      "outlier_samples": [
+        "img/pictures/Actor1_1.png (330x350)",
+        "img/pictures/Actor1_2.png (330x350)",
+        "img/pictures/Actor1_3.png (330x350)",
+        "img/pictures/Actor1_4.png (330x350)",
+        "img/pictures/Actor1_5.png (330x350)",
+        "img/pictures/Actor1_6.png (330x350)",
+        "img/pictures/Actor1_7.png (330x350)",
+        "img/pictures/Actor1_8.png (330x350)",
+        "img/pictures/Actor2_1.png (330x350)",
+        "img/pictures/Actor2_2.png (330x350)"
+      ],
+      "outlier_sizes": [
+        "330x350 x120",
+        "1920x200 x11",
+        "695x1080 x8",
+        "144x144 x2",
+        "1064x1080 x1"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "img/pictures/BackgroundCG/BlackFade.png (0.4KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pictures/Lunaal_Stand/Lunaal_Anger.png",
+          "img/pictures/Lunaal_Stand/Lunaal_Despair.png",
+          "img/pictures/Lunaal_Stand/Lunaal_Lose.png",
+          "img/pictures/Lunaal_Stand/Lunaal_Mad.png",
+          "img/pictures/Lunaal_Stand/Lunaal_Normal.png",
+          "img/pictures/Lunaal_Stand/Lunaal_Realize.png",
+          "…等 10 张"
+        ],
+        [
+          "img/pictures/CG/SariaH3/SariaH3_03JP.png",
+          "img/pictures/CG/SariaH3/SariaH3_04JP.png",
+          "img/pictures/CG/SariaH3/SariaH3_07JP.png",
+          "img/pictures/CG/SariaH3/SariaH3_18JP.png",
+          "img/pictures/CG/SariaH3/SariaH3_20JP.png",
+          "img/pictures/CG/SariaH6/SariaH6_01JP.png",
+          "…等 9 张"
+        ],
+        [
+          "img/pictures/CG/ChelseaH8/ChelseaH8_06.png",
+          "img/pictures/CG/SariaH1/SariaH1_09.png",
+          "img/pictures/CG/SariaH1/SariaH1_10.png",
+          "img/pictures/CG/SariaH1/SariaH1_11.png",
+          "img/pictures/CG/SariaH4/SariaH4_08.png",
+          "img/pictures/CG/SariaH4/SariaH4_12.png",
+          "…等 8 张"
+        ],
+        [
+          "img/pictures/CG/LilisH7/LilisH7_015JP.png",
+          "img/pictures/CG/LilisH7/LilisH7_021JP.png",
+          "img/pictures/CG/LilisH7/LilisH7_023JP.png",
+          "img/pictures/CG/LilisH7/LilisH7_033JP.png",
+          "img/pictures/CG/LilisH7/LilisH7_034JP.png",
+          "img/pictures/CG/LilisH7/LilisH7_035JP.png",
+          "…等 7 张"
+        ],
+        [
+          "img/pictures/CG/LunaalH3/LunaalH3_01JP.png",
+          "img/pictures/CG/LunaalH3/LunaalH3_02JP.png",
+          "img/pictures/CG/LunaalH3/LunaalH3_12JP.png",
+          "img/pictures/CG/LunaalH3/LunaalH3_14JP.png",
+          "img/pictures/CG/LunaalH6/LunaalH6_05JP.png",
+          "img/pictures/CG/LunaalH6/LunaalH6_12JP.png",
+          "…等 7 张"
+        ],
+        [
+          "img/pictures/CG/LunaalH7/LunaalH7_011JP.png",
+          "img/pictures/CG/LunaalH7/LunaalH7_012JP.png",
+          "img/pictures/CG/LunaalH7/LunaalH7_013JP.png",
+          "img/pictures/CG/LunaalH7/LunaalH7_01JP.png",
+          "img/pictures/CG/LunaalH7/LunaalH7_021JP.png",
+          "img/pictures/CG/LunaalH7/LunaalH7_025JP.png",
+          "…等 7 张"
+        ],
+        [
+          "img/pictures/Player_Stand/Player_Anger.png",
+          "img/pictures/Player_Stand/Player_Desperate.png",
+          "img/pictures/Player_Stand/Player_ForSystem1.png",
+          "img/pictures/Player_Stand/Player_Glare.png",
+          "img/pictures/Player_Stand/Player_Sad.png",
+          "img/pictures/Player_Stand/Player_Sermon.png",
+          "…等 7 张"
+        ],
+        [
+          "img/pictures/Saria_Stand/Saria_Abuse.png",
+          "img/pictures/Saria_Stand/Saria_Anxiety.png",
+          "img/pictures/Saria_Stand/Saria_Glad.png",
+          "img/pictures/Saria_Stand/Saria_Normal.png",
+          "img/pictures/Saria_Stand/Saria_Sad.png",
+          "img/pictures/Saria_Stand/Saria_Smile1.png",
+          "…等 7 张"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0167,
+      "seq_gaps": 533,
+      "seq_break_dirs": 2,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 1663,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）Shitsuke-ai_dlsite",
+      "manifest_cg": 47,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 1876,
+      "asset_images": 850,
+      "families": [
+        {
+          "name": "pictures/CG",
+          "count": 781,
+          "kind": "cg"
+        },
+        {
+          "name": "enemies",
+          "count": 187,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 127,
+          "kind": "cg"
+        },
+        {
+          "name": "system/Novel_UI",
+          "count": 118,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 105,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 73,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 61,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 52,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "system/WindowUI",
+          "count": 41,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 40,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 26,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/Chelsea_Stand",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/Lunaal_Stand",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/Saria_Stand",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "titles1",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 20,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/Lilis_Stand",
+          "count": 19,
+          "kind": "cg"
+        },
+        {
+          "name": "system/TitleUI",
+          "count": 16,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/Player_Stand",
+          "count": 13,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/BackgroundCG",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/BattleStand",
+          "count": 8,
+          "kind": "cg"
+        },
+        {
+          "name": "system/DefeatLog",
+          "count": 8,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/DefeatLog",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "characters/Chelsea_Down",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "characters/Lilis_Down",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "characters/Slave_Down",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/ED",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "titles2",
+          "count": 2,
+          "kind": "asset"
+        }
+      ],
+      "misnamed": 759,
+      "misnamed_samples": [
+        "img/pictures/BackgroundCG/Desert.png",
+        "img/pictures/BackgroundCG/ED1.png",
+        "img/pictures/BackgroundCG/HeroinesRoom.png",
+        "img/pictures/BackgroundCG/OP1.png",
+        "img/pictures/BackgroundCG/OP2.png",
+        "img/pictures/BackgroundCG/PlayersRoom.png",
+        "img/pictures/BackgroundCG/Throne.png",
+        "img/pictures/CG/ChelseaH1/ChelseaH1_01JP.png"
+      ]
+    },
+    {
+      "name": "（上等）NTRエロトラップダンジョン",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260716\\RPG\\上等\\（上等）NTRエロトラップダンジョン",
+      "engine": "rmmz",
+      "images": 172,
+      "small": 1,
+      "outliers": 63,
+      "blank": 0,
+      "dup_groups": 21,
+      "dup_rate": 0.2036,
+      "sparse": 163,
+      "avg_kb": 548.9,
+      "severity": 3,
+      "severity_reasons": [
+        "极小图 1/172 (0.6%) (+1)",
+        "尺寸离群 63/172 (37%) (+2)",
+        "重复帧 21 组，冗余率 20.4% (+1)",
+        "序列断裂 5 处 / 3 个目录 (+1)",
+        "另有引擎素材 297 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x720",
+      "mode_count": 92,
+      "sampled": 172,
+      "decoded": 167,
+      "skipped_big": 5,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 2,
+      "small_samples": [
+        "img/menus/Cursor_A.png"
+      ],
+      "outlier_samples": [
+        "img/live2d/eriza/eriza.2048/texture_00.png (2048x2048)",
+        "img/live2d/eriza/eriza.2048/texture_01.png (2048x2048)",
+        "img/live2d/h_dakituki/dakituki_sex.4096/texture_00.png (4096x2048)",
+        "img/live2d/h_fella/eriza_fella.4096/texture_00.png (4096x4096)",
+        "img/live2d/h_i_balance/eriza_i.4096/texture_00.png (4096x2048)",
+        "img/live2d/h_ne_back/ne_back.8192/texture_00.png (8192x4096)",
+        "img/live2d/pisuton_mission/pisuton_mission.4096/texture_00.png (4096x4096)",
+        "img/live2d/saimin_kiss/saimin_kiss.4096/texture_00.png (4096x4096)",
+        "img/live2d/sirimomi/sirimomi.8192/texture_00.png (8192x4096)",
+        "img/menus/Cursor_A.png (32x32)"
+      ],
+      "outlier_sizes": [
+        "2560x1440 x13",
+        "288x162 x12",
+        "320x180 x10",
+        "288x163 x4",
+        "4096x4096 x3"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "img/menus/Cursor_A.png (4.2KB)",
+        "img/pictures/1701.png (1.3KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pictures/I-barance-0.png",
+          "img/pictures/I-barance-1-0.png",
+          "img/pictures/I-barance-1-1.png",
+          "img/pictures/I-barance-1-2.png",
+          "img/pictures/I-barance-1-3.png",
+          "img/pictures/I-barance-1-4.png",
+          "…等 8 张"
+        ],
+        [
+          "img/pictures/ED-gokkun-0.png",
+          "img/pictures/ED-gokkun-1.png",
+          "img/pictures/ED-gokkun-hart-0.png",
+          "img/pictures/ED-gokkun-hart-1.png"
+        ],
+        [
+          "img/pictures/munemomiv2-0-0.png",
+          "img/pictures/munemomiv2-1-0.png",
+          "img/pictures/munemomiv2-2-0.png",
+          "img/pictures/munemomiv2-3-0.png"
+        ],
+        [
+          "img/pictures/paizuri-1-1.png",
+          "img/pictures/paizuri-1.png",
+          "img/pictures/paizuri-2-1.png",
+          "img/pictures/paizuri-2.png"
+        ],
+        [
+          "img/pictures/ED-fella-0.png",
+          "img/pictures/ED-fella-1.png",
+          "img/pictures/ED-fella-2.png"
+        ],
+        [
+          "img/pictures/ED-fella-cutin-0.png",
+          "img/pictures/ED-fella-cutin-1.png"
+        ],
+        [
+          "img/pictures/ED-miseyari-0-0.png",
+          "img/pictures/ED-miseyari-0-1.png"
+        ],
+        [
+          "img/pictures/ED-miseyari-1-0.png",
+          "img/pictures/ED-miseyari-1-1.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 5,
+      "seq_break_dirs": 3,
+      "name_conflicts": 7,
+      "spine_files": 0,
+      "scan_ms": 419,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\上等\\（上等）NTRエロトラップダンジョン",
+      "manifest_cg": 97,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 469,
+      "asset_images": 297,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 160,
+          "kind": "cg"
+        },
+        {
+          "name": "characters",
+          "count": 110,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 62,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/UI sozai",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/massage-window",
+          "count": 28,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 22,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 16,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/UI-ero-status",
+          "count": 12,
+          "kind": "asset"
+        },
+        {
+          "name": "live2d/eriza",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/emotion-effect",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/h_dakituki",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/h_fella",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/h_i_balance",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/h_ne_back",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/pisuton_mission",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/saimin_kiss",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/sirimomi",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "menus",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "titles1",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "titles2",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "（上等）哈尔法斯的恶魔",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260722\\RPG\\上等\\（上等）哈尔法斯的恶魔",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 2865 个（.rpgmvp/.png_；另有引擎素材 2 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 87,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\上等\\（上等）哈尔法斯的恶魔",
+      "manifest_cg": 68,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 2,
+      "asset_images": 2,
+      "encrypted": 2865,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "（中等）NTR Hunter",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260808\\RPG\\中等\\（中等）NTR Hunter",
+      "engine": "rmmz",
+      "images": 181,
+      "small": 6,
+      "outliers": 156,
+      "blank": 15,
+      "dup_groups": 9,
+      "dup_rate": 0.1436,
+      "sparse": 73,
+      "avg_kb": 737.6,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 15/181 (8%) (+2)",
+        "极小图 6/181 (3.3%) (+1)",
+        "尺寸离散（众数 1280x420 仅占 11%，离群 156/181） (+1)",
+        "重复帧 9 组，冗余率 14.4% (+1)",
+        "\u003c5KB 小文件 6/181 (3.3%) (+1)",
+        "序列断裂 424 处 / 10 个目录 (+2)",
+        "另有引擎素材 269 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1280x420",
+      "mode_count": 20,
+      "sampled": 181,
+      "decoded": 181,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 6,
+      "small_samples": [
+        "img/pictures/1-star.png",
+        "img/pictures/2-star.png",
+        "img/pictures/3-star.png",
+        "img/pictures/4-star.png",
+        "img/pictures/5-star.png",
+        "img/pictures/Pink_arrow.png"
+      ],
+      "outlier_samples": [
+        "img/pSpineAssets/EV_new/ev_new.png (2007x2008)",
+        "img/pSpineAssets/EV_new/ev_new2.png (2025x1923)",
+        "img/pSpineAssets/EV_new/ev_new3.png (1562x1757)",
+        "img/pSpineAssets/EV_new/ev_new4.png (1964x1778)",
+        "img/pSpineAssets/EV_new/ev_new5.png (1751x2045)",
+        "img/pSpineAssets/EV_new/ev_new6.png (2010x1916)",
+        "img/pSpineAssets/EV_new/ev_new7.png (1619x1816)",
+        "img/pSpineAssets/EV_new/ev_new8.png (1234x1084)",
+        "img/pSpineAssets/EV_new/ev_new9.png (1174x1086)",
+        "img/pSpineAssets/Heading/Heading.png (1980x1785)"
+      ],
+      "outlier_sizes": [
+        "394x698 x18",
+        "1924x1084 x13",
+        "1984x1084 x9",
+        "540x1080 x9",
+        "1280x720 x6"
+      ],
+      "blank_samples": [
+        "img/pSpineAssets/EV_new/ev_new8.png (var=0.0)",
+        "img/pSpineAssets/Heading/Heading2.png (var=0.0)",
+        "img/pSpineAssets/animate_01_Lick_pussy_hotel/animate_01_Lick_pussy_hotel3.png (var=0.0)",
+        "img/pSpineAssets/animate_05_sex_glass_hotel/animate_05_sex_glass_hotel3.png (var=0.0)",
+        "img/pSpineAssets/animate_06_pickpocketing/animate_06_pickpocketing3.png (var=0.0)",
+        "img/pSpineAssets/animate_07_Lick_pussy_hotel CT6/animate_07_Lick_pussy_hotel CT63.png (var=0.0)",
+        "img/pSpineAssets/animate_08_Lick_pussy_hotel CT7/animate_08_Lick_pussy_hotel CT73.png (var=0.0)",
+        "img/pSpineAssets/camera_scene/camera_scene3.png (var=0.0)",
+        "img/pSpineAssets/ex011/ex0113.png (var=0.0)",
+        "img/pSpineAssets/ex011_2/ex011_23.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "img/pictures/1-star.png (4.0KB)",
+        "img/pictures/2-star.png (4.4KB)",
+        "img/pictures/3-star.png (4.0KB)",
+        "img/pictures/4-star.png (4.0KB)",
+        "img/pictures/5-star.png (4.1KB)",
+        "img/pictures/Pink_arrow.png (1.6KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pSpineAssets/Heading/Heading2.png",
+          "img/pSpineAssets/animate_01_Lick_pussy_hotel/animate_01_Lick_pussy_hotel3.png",
+          "img/pSpineAssets/animate_05_sex_glass_hotel/animate_05_sex_glass_hotel3.png",
+          "img/pSpineAssets/animate_06_pickpocketing/animate_06_pickpocketing3.png",
+          "img/pSpineAssets/animate_07_Lick_pussy_hotel CT6/animate_07_Lick_pussy_hotel CT63.png",
+          "img/pSpineAssets/animate_08_Lick_pussy_hotel CT7/animate_08_Lick_pussy_hotel CT73.png",
+          "…等 13 张"
+        ],
+        [
+          "img/pictures/Wife_angry.png",
+          "img/pictures/Wife_embarrassing_lying.png",
+          "img/pictures/Wife_fall.png",
+          "img/pictures/Wife_nomal.png"
+        ],
+        [
+          "img/pictures/Wife_ass_01.png",
+          "img/pictures/Wife_ass_02.png",
+          "img/pictures/Wife_ass_dirt.png"
+        ],
+        [
+          "img/pictures/Wife_ass_03.png",
+          "img/pictures/Wife_ass_10.png",
+          "img/pictures/Wife_ass_11.png"
+        ],
+        [
+          "img/pictures/Wife_ass_09.png",
+          "img/pictures/Wife_ass_semen.png",
+          "img/pictures/Wife_ass_semen_02.png"
+        ],
+        [
+          "img/pictures/status_cn.png",
+          "img/pictures/status_en.png",
+          "img/pictures/status_jp.png"
+        ],
+        [
+          "img/pSpineAssets/animate_04_sex_reveseOnTop_hotel/animate_04_sex_reveseOnTop_hotel3.png",
+          "img/pSpineAssets/animate_04_sex_reveseOnTop_hotel/animate_04_sex_reveseOnTop_hotel4.png"
+        ],
+        [
+          "img/pictures/Wife_ass_06.png",
+          "img/pictures/Wife_ass_wet.png"
+        ]
+      ],
+      "exact_dup_groups": 4,
+      "exact_dup_rate": 0.0884,
+      "seq_gaps": 424,
+      "seq_break_dirs": 10,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 544,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\（中等）NTR Hunter",
+      "manifest_cg": 216,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 450,
+      "asset_images": 269,
+      "families": [
+        {
+          "name": "tilesets",
+          "count": 92,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 91,
+          "kind": "cg"
+        },
+        {
+          "name": "characters",
+          "count": 79,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 41,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 15,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 13,
+          "kind": "asset"
+        },
+        {
+          "name": "pSpineAssets/EV_new",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/camera_scene",
+          "count": 9,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/office_boss_view",
+          "count": 7,
+          "kind": "cg"
+        },
+        {
+          "name": "titles1",
+          "count": 6,
+          "kind": "asset"
+        },
+        {
+          "name": "pSpineAssets/office_protogist_view",
+          "count": 5,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_02_dildo_pussy_hotel",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_04_sex_reveseOnTop_hotel",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_08_Lick_pussy_hotel CT7",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/ex011",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/ex011_2",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/p2_master1200 V2",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/p2_master1200 V3",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/p2_master1200 V4",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/p2_master1200 V5",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_01_Lick_pussy_hotel",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_05_sex_glass_hotel",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_06_pickpocketing",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_07_Lick_pussy_hotel CT6",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/p2_master1200 V6",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/Heading",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/animate_03_sex ontop hotel",
+          "count": 2,
+          "kind": "cg"
+        },
+        {
+          "name": "titles2",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "pSpineAssets/full_body",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/full_body_skins_cow",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/full_body_skins_dress",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/full_body_skins_suit",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "pSpineAssets/full_body_skins_swim",
+          "count": 1,
+          "kind": "cg"
+        }
+      ]
+    },
+    {
+      "name": "（夯）直到这个魅魔的心灵崩坏",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\夯\\（夯）直到这个魅魔的心灵崩坏",
+      "engine": "rmmz",
+      "images": 0,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 0,
+      "severity": 3,
+      "severity_reasons": [
+        "CG 族里没有明文图，只剩加密图 1580 个（.rpgmvp/.png_；另有引擎素材 0 张已剔除），机器读不到像素 (+5)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "",
+      "mode_count": 0,
+      "sampled": 0,
+      "decoded": 0,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": null,
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 53,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\夯\\（夯）直到这个魅魔的心灵崩坏",
+      "manifest_cg": 50,
+      "scan_roots": [
+        "img"
+      ],
+      "encrypted": 1580
+    },
+    {
+      "name": "（牛）间谍任务",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\未评级\\（牛）间谍任务",
+      "engine": "rmmz",
+      "images": 3076,
+      "small": 0,
+      "outliers": 2,
+      "blank": 41,
+      "dup_groups": 50,
+      "dup_rate": 0.6767,
+      "sparse": 3044,
+      "avg_kb": 198.9,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 41/300 (14%) (+2)",
+        "尺寸离群 2/3076 (0.1%) (+1)",
+        "重复冗余率 67.7%（近似重复 50 组） (+2)",
+        "\u003c5KB 小文件 72/3076 (2.3%) (+1)",
+        "序列断裂 24 处 / 3 个目录 (+2)",
+        "另有引擎素材 845 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "816x624",
+      "mode_count": 3063,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 72,
+      "small_samples": null,
+      "outlier_samples": [
+        "www/img/pictures/ItemSlot.png (384x120)",
+        "www/img/pictures/身体検査.png (1700x624)"
+      ],
+      "outlier_sizes": [
+        "1700x624 x1",
+        "384x120 x1"
+      ],
+      "blank_samples": [
+        "www/img/pictures/Blakout.png (var=0.0)",
+        "www/img/pictures/Grayout.png (var=0.0)",
+        "www/img/pictures/PC(ヒント)_4_？-4_選択済.png (var=21.3)",
+        "www/img/pictures/パソコン_更新_赤3.png (var=24.4)",
+        "www/img/pictures/パソコン_選択3.png (var=7.4)",
+        "www/img/pictures/パソコン_選択4.png (var=7.4)",
+        "www/img/pictures/メニュー(本編)_5_セーブ_未選択.png (var=22.5)",
+        "www/img/pictures/モブ質問_ソラ.png (var=0.0)",
+        "www/img/pictures/ラブレター_ソラ.png (var=12.9)",
+        "www/img/pictures/個別イベタイトル_メイド長1.png (var=1.5)"
+      ],
+      "tiny_samples": [
+        "www/img/pictures/ItemSlot.png (2.3KB)",
+        "www/img/pictures/PC(ヒント)_1_？-1_選択済.png (4.8KB)",
+        "www/img/pictures/PC(ヒント)_2_？-2_選択済.png (4.8KB)",
+        "www/img/pictures/PC(ヒント)_3_？-3_選択済.png (4.8KB)",
+        "www/img/pictures/PC(ヒント)_4_？-4_選択済.png (4.8KB)",
+        "www/img/pictures/PC(ヒント)_5_？-5_選択済.png (4.8KB)",
+        "www/img/pictures/PC(最初の画面)_2_選択_未選択.png (4.5KB)",
+        "www/img/pictures/PC(最初の画面)_3_回想_未選択.png (4.4KB)",
+        "www/img/pictures/PC(最初の画面)_3_回想_選択済.png (4.8KB)",
+        "www/img/pictures/PC(説明)_0.png (4.8KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/Grayout.png",
+          "www/img/pictures/PC(説明)_4_選択済.png",
+          "www/img/pictures/エロステコメ_あなる_6.png",
+          "www/img/pictures/エロステコメ_おくち_3.png",
+          "www/img/pictures/エロステコメ_おまんこ_0(経験済み).png",
+          "www/img/pictures/パソコン_更新_赤3.png",
+          "…等 90 张"
+        ],
+        [
+          "www/img/pictures/H5_お掃除なめ_1.png",
+          "www/img/pictures/H5_お掃除なめ_2.png",
+          "www/img/pictures/H5_お掃除なめ_4.png",
+          "www/img/pictures/H5_クンニ_12.png",
+          "www/img/pictures/H5_クンニ_2.png",
+          "www/img/pictures/H5_クンニ_3.png",
+          "…等 9 张"
+        ],
+        [
+          "www/img/pictures/屋敷図_水・夕.png",
+          "www/img/pictures/屋敷図_水・夜_アザミ・私室.png",
+          "www/img/pictures/屋敷図_水・夜_アロエ・第二寝室.png",
+          "www/img/pictures/屋敷図_水・夜_ソラ・浴室.png",
+          "www/img/pictures/屋敷図_水・夜_マロン・第二寝室.png",
+          "www/img/pictures/屋敷図_水・夜_メイド長・浴室.png",
+          "…等 8 张"
+        ],
+        [
+          "www/img/pictures/H7_射精_16.png",
+          "www/img/pictures/H7_射精_22.png",
+          "www/img/pictures/H7_射精_4.png",
+          "www/img/pictures/H7_挿入_4.png",
+          "www/img/pictures/H7_男影_1.png",
+          "www/img/pictures/H7_男影_14.png",
+          "…等 7 张"
+        ],
+        [
+          "www/img/pictures/H1_お掃除フェラ_1.png",
+          "www/img/pictures/H1_お掃除フェラ_2.png",
+          "www/img/pictures/H1_挿入_3.png",
+          "www/img/pictures/H1_顔射_1.png",
+          "www/img/pictures/H1_顔射_2.png",
+          "www/img/pictures/H1_顔射_なみだ2.png"
+        ],
+        [
+          "www/img/pictures/Hモモ_初回(挿入)_10.png",
+          "www/img/pictures/Hモモ_初回(挿入)_15.png",
+          "www/img/pictures/Hモモ_初回(挿入)_3.png",
+          "www/img/pictures/Hモモ_初回(挿入)_4.png",
+          "www/img/pictures/Hモモ_初回(挿入)_5.png",
+          "www/img/pictures/Hモモ_初回(未挿入)_3.png"
+        ],
+        [
+          "www/img/pictures/立ち絵(カリン)_忍装束_まったり3.png",
+          "www/img/pictures/立ち絵(カリン)_忍装束_泣き2.png",
+          "www/img/pictures/立ち絵(カリン)_忍装束_照れ4.png",
+          "www/img/pictures/立ち絵(カリン)_忍装束_通常3.png",
+          "www/img/pictures/立ち絵(カリン)_忍装束_通常4.png",
+          "www/img/pictures/立ち絵(カリン)_忍装束_驚き2.png"
+        ],
+        [
+          "www/img/pictures/H7_未挿入_10.png",
+          "www/img/pictures/H7_未挿入_19.png",
+          "www/img/pictures/H7_未挿入_4.png",
+          "www/img/pictures/H7_未挿入_7.png",
+          "www/img/pictures/H7_未挿入_9.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 24,
+      "seq_break_dirs": 3,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 878,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\（牛）间谍任务",
+      "manifest_cg": 716,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 3921,
+      "asset_images": 845,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 3076,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets",
+          "count": 215,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 188,
+          "kind": "asset"
+        },
+        {
+          "name": "animations",
+          "count": 118,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 72,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 70,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 20,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 15,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 10,
+          "kind": "asset"
+        },
+        {
+          "name": "titles2",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "女大学生 DX(8)",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\女大学生 DX(8)",
+      "engine": "rmmz",
+      "images": 1404,
+      "small": 0,
+      "outliers": 146,
+      "blank": 8,
+      "dup_groups": 54,
+      "dup_rate": 0.43,
+      "sparse": 356,
+      "avg_kb": 682.2,
+      "severity": 2,
+      "severity_reasons": [
+        "空白帧 8/300 (2.7%) (+1)",
+        "尺寸离群 146/1404 (10.4%) (+1)",
+        "重复冗余率 43.0%（近似重复 54 组） (+1)",
+        "序列断裂 10 处 / 1 个目录 (+1)",
+        "另有引擎素材 374 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "1280x720",
+      "mode_count": 1248,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 1,
+      "small_samples": null,
+      "outlier_samples": [
+        "img/pictures/BackView/名称未設定 1.png (1920x1280)",
+        "img/pictures/ero_status/char_standing_for_process.png (2480x3508)",
+        "img/pictures/event scene/12_General_sex/01/01.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/02.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/03.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/04.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/05.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/06.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/07.png (1920x1440)",
+        "img/pictures/event scene/12_General_sex/01/08.png (1920x1440)"
+      ],
+      "outlier_sizes": [
+        "1920x1440 x47",
+        "636x900 x39",
+        "270x203 x19",
+        "270x152 x15",
+        "318x265 x7"
+      ],
+      "blank_samples": [
+        "img/pictures/ero_status/11_03_normal_stand_naked_bottan.png (var=5.2)",
+        "img/pictures/ero_status/72_Face_03_cry.png (var=2.4)",
+        "img/pictures/event scene/Pick UP Picture/animation/BLESS.png (var=0.0)",
+        "img/pictures/event scene/animation/CG_06_Event/BLESS.png (var=0.0)",
+        "img/pictures/event scene/standing_picture/Sweat.png (var=0.0)",
+        "img/pictures/event scene/standing_picture/facial/angry.png (var=1.1)",
+        "img/pictures/event scene/standing_picture/facial/wary.png (var=1.2)",
+        "img/pictures/event scene/standing_picture/love_juice_02.png (var=3.7)"
+      ],
+      "tiny_samples": [
+        "img/pictures/never_watch_picture.png (4.6KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img/pictures/event scene/Pick UP Picture/07_school/school_08.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/09_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/12_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/14_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/17_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/22_coin_laundry.png",
+          "…等 15 张"
+        ],
+        [
+          "img/pictures/event scene/Pick UP Picture/06_in_forest/in_forest_14.png",
+          "img/pictures/event scene/Pick UP Picture/08_convenience/13_convenience.png",
+          "img/pictures/event scene/Pick UP Picture/08_convenience/14_convenience.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/03_apartment.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/05_apartment.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/02_coin_laundry.png",
+          "…等 11 张"
+        ],
+        [
+          "img/pictures/event scene/Pick UP Picture/06_in_forest/in_forest_06.png",
+          "img/pictures/event scene/Pick UP Picture/08_convenience/05_convenience.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/01_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/06_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/10_coin_laundry.png",
+          "img/pictures/event scene/Pick UP Picture/09_apartment/10_coin_laundry/18_coin_laundry.png",
+          "…等 9 张"
+        ],
+        [
+          "img/pictures/event scene/03_Exclusive_Residential area/sex/11.png",
+          "img/pictures/event scene/03_Exclusive_Residential area/sex/12.png",
+          "img/pictures/recollection_mode/02_Residential area/sex/06.png",
+          "img/pictures/recollection_mode/02_Residential area/sex/08.png",
+          "img/pictures/recollection_mode/02_Residential area/sex/10.png",
+          "img/pictures/recollection_mode/02_Residential area/sex/11.png"
+        ],
+        [
+          "img/pictures/event scene/05_Exclusive_in_forest/02_sex/08.png",
+          "img/pictures/event scene/12_General_sex/05/05.png",
+          "img/pictures/recollection_mode/05_in_forest/sex/08.png",
+          "img/pictures/recollection_mode/05_in_forest/sex/19.png",
+          "img/pictures/recollection_mode/12_General purpose sex/sex_05/03.png",
+          "img/pictures/recollection_mode/12_General purpose sex/sex_05/06.png"
+        ],
+        [
+          "img/pictures/event scene/08_Exclusive_apartment/sex/04.png",
+          "img/pictures/event scene/08_Exclusive_apartment/sex/05.png",
+          "img/pictures/event scene/08_Exclusive_apartment/sex/06.png",
+          "img/pictures/event scene/08_Exclusive_apartment/sex/07.png",
+          "img/pictures/event scene/12_General_sex/04/05.png",
+          "img/pictures/event scene/12_General_sex/04/08.png"
+        ],
+        [
+          "img/pictures/ero_status/11_03_normal_stand_naked_bottan.png",
+          "img/pictures/ero_status/72_Face_03_cry.png",
+          "img/pictures/ero_status/7_02_Exposure_stand_pussy_bottan.png",
+          "img/pictures/ero_status/9_01_normal_stand_nipple_slip_bottan.png",
+          "img/pictures/event scene/Pick UP Picture/animation/BLESS.png"
+        ],
+        [
+          "img/pictures/event scene/03_Exclusive_street light/sex/08.png",
+          "img/pictures/recollection_mode/03_street light/sex/06.png",
+          "img/pictures/recollection_mode/03_street light/sex/07.png",
+          "img/pictures/recollection_mode/03_street light/sex/08.png",
+          "img/pictures/recollection_mode/03_street light/sex/11.png"
+        ]
+      ],
+      "exact_dup_groups": 11,
+      "exact_dup_rate": 0.0367,
+      "seq_gaps": 10,
+      "seq_break_dirs": 1,
+      "name_conflicts": 1037,
+      "spine_files": 0,
+      "scan_ms": 1000,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\女大学生 DX(8)",
+      "manifest_cg": 70,
+      "scan_roots": [
+        "img"
+      ],
+      "scanned": 1778,
+      "asset_images": 374,
+      "families": [
+        {
+          "name": "pictures/event scene",
+          "count": 693,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/recollection_mode",
+          "count": 604,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets",
+          "count": 316,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/ero_status",
+          "count": 45,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/thumbnail",
+          "count": 40,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/BackView",
+          "count": 21,
+          "kind": "cg"
+        },
+        {
+          "name": "tilesets/規約要りそうなやつ",
+          "count": 18,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "spines",
+          "count": 13,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 11,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "titles1",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "（一般）命に代えてもお守りします!",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260726\\RPG\\一般\\（一般）命に代えてもお守りします!",
+      "engine": "rmmz",
+      "images": 152,
+      "small": 0,
+      "outliers": 31,
+      "blank": 0,
+      "dup_groups": 20,
+      "dup_rate": 0.3224,
+      "sparse": 138,
+      "avg_kb": 7251.7,
+      "severity": 2,
+      "severity_reasons": [
+        "尺寸离群 31/152 (20%) (+2)",
+        "重复帧 20 组，冗余率 32.2% (+1)",
+        "另有引擎素材 513 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "3264x2496",
+      "mode_count": 121,
+      "sampled": 152,
+      "decoded": 152,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "www/img/pictures/10bミカゲ（笑顔）b.png (1248x1632)",
+        "www/img/pictures/10ミカゲ（笑顔）.png (1248x1632)",
+        "www/img/pictures/11bミカゲ（真剣）b.png (1248x1632)",
+        "www/img/pictures/11ミカゲ（真剣）.png (1248x1632)",
+        "www/img/pictures/12bミカゲ（体力限界）b.png (1248x1632)",
+        "www/img/pictures/12ミカゲ（体力限界）.png (1248x1632)",
+        "www/img/pictures/13bミカゲ（憂鬱気な笑顔）b.png (1248x1632)",
+        "www/img/pictures/13ミカゲ（憂鬱気な笑顔）.png (1248x1632)",
+        "www/img/pictures/14ミカゲ（微妙な）.png (1248x1632)",
+        "www/img/pictures/15ミカゲ（驚き）.png (1248x1632)"
+      ],
+      "outlier_sizes": [
+        "1248x1632 x27",
+        "830x622 x4"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "www/img/pictures/17エルレシア（微妙な）.png",
+          "www/img/pictures/18エルレシア（押し殺した顔）.png",
+          "www/img/pictures/19エルレシア（涙）.png",
+          "www/img/pictures/1エルレシア（通常）.png",
+          "www/img/pictures/20 エルレシア（絶望）.png",
+          "www/img/pictures/21エルレシア（覚悟）.png",
+          "…等 11 张"
+        ],
+        [
+          "www/img/pictures/10ミカゲ（笑顔）.png",
+          "www/img/pictures/11ミカゲ（真剣）.png",
+          "www/img/pictures/12ミカゲ（体力限界）.png",
+          "www/img/pictures/13ミカゲ（憂鬱気な笑顔）.png",
+          "www/img/pictures/14ミカゲ（微妙な）.png",
+          "www/img/pictures/15ミカゲ（驚き）.png",
+          "…等 10 张"
+        ],
+        [
+          "www/img/pictures/エルレシア02-02.png",
+          "www/img/pictures/エルレシア02-03.png",
+          "www/img/pictures/エルレシア02-04.png",
+          "www/img/pictures/エルレシア02-05.png",
+          "www/img/pictures/エルレシア02-06.png"
+        ],
+        [
+          "www/img/pictures/11bミカゲ（真剣）b.png",
+          "www/img/pictures/12bミカゲ（体力限界）b.png",
+          "www/img/pictures/13bミカゲ（憂鬱気な笑顔）b.png",
+          "www/img/pictures/9bミカゲ（焦燥）b.png"
+        ],
+        [
+          "www/img/pictures/zh-CN/世界地図01.png",
+          "www/img/pictures/zh-CN/世界地図02.png",
+          "www/img/pictures/zh-TW/世界地図01.png",
+          "www/img/pictures/zh-TW/世界地図02.png"
+        ],
+        [
+          "www/img/pictures/エルレシア01-02.png",
+          "www/img/pictures/エルレシア01-03.png",
+          "www/img/pictures/エルレシア01-04.png",
+          "www/img/pictures/エルレシア01-05.png"
+        ],
+        [
+          "www/img/pictures/エルレシア06-01.png",
+          "www/img/pictures/エルレシア06-02.png",
+          "www/img/pictures/エルレシア06-05.png"
+        ],
+        [
+          "www/img/pictures/ミカゲ01-01.png",
+          "www/img/pictures/ミカゲ01-02.png",
+          "www/img/pictures/ミカゲ01-03.png"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0066,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 9,
+      "spine_files": 0,
+      "scan_ms": 3149,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\一般\\（一般）命に代えてもお守りします!",
+      "manifest_cg": 187,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 665,
+      "asset_images": 513,
+      "families": [
+        {
+          "name": "pictures",
+          "count": 143,
+          "kind": "cg"
+        },
+        {
+          "name": "animations",
+          "count": 117,
+          "kind": "asset"
+        },
+        {
+          "name": "enemies",
+          "count": 78,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_enemies",
+          "count": 70,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks1",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "battlebacks2",
+          "count": 50,
+          "kind": "asset"
+        },
+        {
+          "name": "characters",
+          "count": 32,
+          "kind": "asset"
+        },
+        {
+          "name": "tilesets",
+          "count": 31,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1",
+          "count": 21,
+          "kind": "asset"
+        },
+        {
+          "name": "sv_actors",
+          "count": 20,
+          "kind": "asset"
+        },
+        {
+          "name": "parallaxes",
+          "count": 15,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 14,
+          "kind": "asset"
+        },
+        {
+          "name": "faces",
+          "count": 10,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures/en",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/zh-CN",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "pictures/zh-TW",
+          "count": 3,
+          "kind": "cg"
+        },
+        {
+          "name": "titles2",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1/en",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1/zh-CN",
+          "count": 1,
+          "kind": "asset"
+        },
+        {
+          "name": "titles1/zh-TW",
+          "count": 1,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "(中等)魔法是无所不能",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260930\\RPG\\中等\\(中等)魔法是无所不能",
+      "engine": "rmmz",
+      "images": 4,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 232.2,
+      "severity": 1,
+      "severity_reasons": [
+        "无明显异常",
+        "加密图 4535 个未计入（明文只 4 张） (+2)",
+        "另有引擎素材 2 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "816x624",
+      "mode_count": 4,
+      "sampled": 4,
+      "decoded": 4,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 146,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\中等\\(中等)魔法是无所不能",
+      "manifest_cg": 12,
+      "scan_roots": [
+        "魔法/www/img"
+      ],
+      "scanned": 6,
+      "asset_images": 2,
+      "encrypted": 4535,
+      "families": [
+        {
+          "name": "special",
+          "count": 4,
+          "kind": "cg"
+        },
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        }
+      ]
+    },
+    {
+      "name": "对魔战士美月(",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260420\\RPG\\未评级\\对魔战士美月(",
+      "engine": "rmmz",
+      "images": 15,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 15,
+      "avg_kb": 1883.3,
+      "severity": 1,
+      "severity_reasons": [
+        "无明显异常",
+        "加密图 1277 个未计入（明文只 15 张） (+2)",
+        "另有引擎素材 5 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "2048x2048",
+      "mode_count": 15,
+      "sampled": 15,
+      "decoded": 15,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 14,
+      "spine_files": 0,
+      "scan_ms": 194,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\对魔战士美月(",
+      "manifest_cg": 129,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 20,
+      "asset_images": 5,
+      "encrypted": 1277,
+      "families": [
+        {
+          "name": "characters",
+          "count": 3,
+          "kind": "asset"
+        },
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "live2d/00_akari_opening",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/22_mizuki",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/22_seciria",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/34",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/Akari",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/Mariana",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/Mizuki",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/MobTaima",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/Rekka",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/Sesiria",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/emuji",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/kousoku",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/oppai",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/sesiria_fera",
+          "count": 1,
+          "kind": "cg"
+        },
+        {
+          "name": "live2d/syokusyu",
+          "count": 1,
+          "kind": "cg"
+        }
+      ]
+    },
+    {
+      "name": "星天之魔女（Arpg）",
+      "dir": "E:\\Personal_entertainment\\game\\ero\\egame\\20260506\\RPG\\未评级\\星天之魔女（Arpg）",
+      "engine": "rmmz",
+      "images": 1,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 1,
+      "avg_kb": 42.2,
+      "severity": 1,
+      "severity_reasons": [
+        "无明显异常",
+        "加密图 3271 个未计入（明文只 1 张） (+2)",
+        "另有引擎素材 2 张（tilesets/characters 等，已剔除，见 families）"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "1200x720",
+      "mode_count": 1,
+      "sampled": 1,
+      "decoded": 1,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 38,
+      "manifest_dir": "E:\\Personal_entertainment\\game\\ero\\egame\\_游戏库\\按评价\\未评级\\星天之魔女（Arpg）",
+      "manifest_cg": 238,
+      "scan_roots": [
+        "www/img"
+      ],
+      "scanned": 3,
+      "asset_images": 2,
+      "encrypted": 3271,
+      "families": [
+        {
+          "name": "system",
+          "count": 2,
+          "kind": "asset"
+        },
+        {
+          "name": "pictures",
+          "count": 1,
+          "kind": "cg"
+        }
+      ]
+    }
+  ]
+}

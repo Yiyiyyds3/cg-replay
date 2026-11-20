@@ -1,0 +1,166 @@
+{
+  "schema": 2,
+  "root": "D:\\UCGR_Work\\unpack\\姉妹X催眠\\raw",
+  "engine_id": "kirikiri",
+  "game": "raw",
+  "generated_at": "2026-11-16T12:20:11+08:00",
+  "cgs": [],
+  "scenes": [
+    {
+      "id": "SKAE_001r",
+      "title": "SKAE_001r",
+      "script": "data/scenario/SKAE_001r.ks"
+    },
+    {
+      "id": "SKAH_001r",
+      "title": "SKAH_001r",
+      "script": "data/scenario/SKAH_001r.ks"
+    },
+    {
+      "id": "SKAH_002r",
+      "title": "SKAH_002r",
+      "script": "data/scenario/SKAH_002r.ks"
+    },
+    {
+      "id": "SKAH_003r",
+      "title": "SKAH_003r",
+      "script": "data/scenario/SKAH_003r.ks"
+    },
+    {
+      "id": "SKAH_004r",
+      "title": "SKAH_004r",
+      "script": "data/scenario/SKAH_004r.ks"
+    },
+    {
+      "id": "SKBE_001r",
+      "title": "SKBE_001r",
+      "script": "data/scenario/SKBE_001r.ks"
+    },
+    {
+      "id": "SKBH_001r",
+      "title": "SKBH_001r",
+      "script": "data/scenario/SKBH_001r.ks"
+    },
+    {
+      "id": "SKBH_002r",
+      "title": "SKBH_002r",
+      "script": "data/scenario/SKBH_002r.ks"
+    },
+    {
+      "id": "SKBH_003r",
+      "title": "SKBH_003r",
+      "script": "data/scenario/SKBH_003r.ks"
+    },
+    {
+      "id": "SKBH_004r",
+      "title": "SKBH_004r",
+      "script": "data/scenario/SKBH_004r.ks"
+    },
+    {
+      "id": "SKZE_001r",
+      "title": "SKZE_001r",
+      "script": "data/scenario/SKZE_001r.ks"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "SKAE_001r#0",
+      "index": 1,
+      "title": "SKAE_001r",
+      "script": "data/scenario/SKAE_001r.ks",
+      "scene": "SKAE_001r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKAH_001r#0",
+      "index": 1,
+      "title": "SKAH_001r",
+      "script": "data/scenario/SKAH_001r.ks",
+      "scene": "SKAH_001r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKAH_002r#0",
+      "index": 1,
+      "title": "SKAH_002r",
+      "script": "data/scenario/SKAH_002r.ks",
+      "scene": "SKAH_002r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKAH_003r#0",
+      "index": 1,
+      "title": "SKAH_003r",
+      "script": "data/scenario/SKAH_003r.ks",
+      "scene": "SKAH_003r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKAH_004r#0",
+      "index": 1,
+      "title": "SKAH_004r",
+      "script": "data/scenario/SKAH_004r.ks",
+      "scene": "SKAH_004r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKBE_001r#0",
+      "index": 1,
+      "title": "SKBE_001r",
+      "script": "data/scenario/SKBE_001r.ks",
+      "scene": "SKBE_001r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKBH_001r#0",
+      "index": 1,
+      "title": "SKBH_001r",
+      "script": "data/scenario/SKBH_001r.ks",
+      "scene": "SKBH_001r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKBH_002r#0",
+      "index": 1,
+      "title": "SKBH_002r",
+      "script": "data/scenario/SKBH_002r.ks",
+      "scene": "SKBH_002r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKBH_003r#0",
+      "index": 1,
+      "title": "SKBH_003r",
+      "script": "data/scenario/SKBH_003r.ks",
+      "scene": "SKBH_003r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKBH_004r#0",
+      "index": 1,
+      "title": "SKBH_004r",
+      "script": "data/scenario/SKBH_004r.ks",
+      "scene": "SKBH_004r",
+      "label_pos": 0,
+      "name": "label01"
+    },
+    {
+      "id": "SKZE_001r#0",
+      "index": 1,
+      "title": "SKZE_001r",
+      "script": "data/scenario/SKZE_001r.ks",
+      "scene": "SKZE_001r",
+      "label_pos": 0,
+      "name": "label01"
+    }
+  ]
+}

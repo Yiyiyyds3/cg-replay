@@ -1,0 +1,1420 @@
+{
+  "root": "D:\\UCGR_Work\\unitycg",
+  "generated_at": "2026-11-16T10:16:59+08:00",
+  "params": {
+    "root": "D:\\UCGR_Work\\unitycg",
+    "max_sample": 300,
+    "max_pixels": 9000000,
+    "conc": 8,
+    "min_side": 64,
+    "var_thresh": 25,
+    "small_kb": 5,
+    "outlier_mul": 1.5,
+    "seed": 20261116
+  },
+  "summary": {
+    "games": 16,
+    "images_total": 2756,
+    "severity_counts": [
+      1,
+      8,
+      2,
+      5
+    ]
+  },
+  "games": [
+    {
+      "name": "IdealEvesRoom",
+      "dir": "D:\\UCGR_Work\\unitycg\\IdealEvesRoom\\cg",
+      "images": 17,
+      "small": 1,
+      "outliers": 3,
+      "blank": 0,
+      "dup_groups": 1,
+      "dup_rate": 0.0588,
+      "sparse": 0,
+      "avg_kb": 5.8,
+      "severity": 3,
+      "severity_reasons": [
+        "极小图 1/17 (5.9%) (+1)",
+        "尺寸离群 3/17 (17.6%) (+1)",
+        "\u003c5KB 小文件 15/17 (88%) (+2)",
+        "均单图仅 5.8KB (+1)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "154x113",
+      "mode_count": 14,
+      "sampled": 17,
+      "decoded": 17,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 15,
+      "small_samples": [
+        "aphrodisiac/aphrodisiac.png"
+      ],
+      "outlier_samples": [
+        "aphrodisiac/aphrodisiac.png (32x32)",
+        "vt12/vt12.png (679x508)",
+        "vt32a/vt32a.png (679x508)"
+      ],
+      "outlier_sizes": [
+        "679x508 x2",
+        "32x32 x1"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "age_play/age_play.png (3.8KB)",
+        "anal/anal.png (3.0KB)",
+        "aphrodisiac/aphrodisiac.png (0.3KB)",
+        "deprivation_release/deprivation_release.png (3.4KB)",
+        "eye_socket_sex/eye_socket_sex.png (3.7KB)",
+        "fake_moaning/fake_moaning.png (3.4KB)",
+        "footjob/footjob.png (4.2KB)",
+        "love_lock/love_lock.png (4.4KB)",
+        "pet_play/pet_play.png (2.8KB)",
+        "pose_embarrassing/pose_embarrassing.png (3.2KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "pose_embarrassing_pudding/pose_embarrassing_pudding.png",
+          "pose_embrrasing_pudding/pose_embrrasing_pudding.png"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0588,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 5
+    },
+    {
+      "name": "KanzenChikan",
+      "dir": "D:\\UCGR_Work\\unitycg\\KanzenChikan\\cg",
+      "images": 17,
+      "small": 0,
+      "outliers": 0,
+      "blank": 1,
+      "dup_groups": 1,
+      "dup_rate": 0.8235,
+      "sparse": 0,
+      "avg_kb": 1.1,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 1/17 (6%) (+2)",
+        "重复冗余率 82.3%（近似重复 1 组） (+2)",
+        "\u003c5KB 小文件 17/17 (100%) (+2)",
+        "均单图仅 1.1KB (+1)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "100x100",
+      "mode_count": 17,
+      "sampled": 17,
+      "decoded": 17,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 17,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": [
+        "7/7.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "0/0.png (1.1KB)",
+        "1/1.png (1.0KB)",
+        "10/10.png (1.0KB)",
+        "11/11.png (1.1KB)",
+        "12/12.png (1.0KB)",
+        "13/13.png (1.1KB)",
+        "14/14.png (1.1KB)",
+        "15/15.png (1.1KB)",
+        "16/16.png (1.2KB)",
+        "2/2.png (1.2KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "0/0.png",
+          "1/1.png",
+          "10/10.png",
+          "11/11.png",
+          "12/12.png",
+          "13/13.png",
+          "…等 15 张"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 2
+    },
+    {
+      "name": "MasyouSyoujo",
+      "dir": "D:\\UCGR_Work\\unitycg\\MasyouSyoujo\\cg",
+      "images": 425,
+      "small": 10,
+      "outliers": 14,
+      "blank": 26,
+      "dup_groups": 31,
+      "dup_rate": 0.6767,
+      "sparse": 0,
+      "avg_kb": 89.3,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 26/300 (9%) (+2)",
+        "极小图 10/425 (2.4%) (+1)",
+        "尺寸离群 14/425 (3.3%) (+1)",
+        "重复冗余率 67.7%（近似重复 31 组） (+2)",
+        "\u003c5KB 小文件 10/425 (2.4%) (+1)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1920x1080",
+      "mode_count": 411,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 10,
+      "small_samples": [
+        "erobana_10/erobana_10.png",
+        "erobana_11/erobana_11.png",
+        "erobana_13/erobana_13.png",
+        "erobana_14/erobana_14.png",
+        "erobana_6/erobana_6.png",
+        "erobana_7/erobana_7.png",
+        "erobana_8/erobana_8.png",
+        "erobana_9/erobana_9.png",
+        "gallery06/gallery06.png",
+        "gallery2/gallery2.png"
+      ],
+      "outlier_samples": [
+        "erobana_10/erobana_10.png (589x51)",
+        "erobana_11/erobana_11.png (478x35)",
+        "erobana_13/erobana_13.png (378x35)",
+        "erobana_14/erobana_14.png (310x25)",
+        "erobana_6/erobana_6.png (292x58)",
+        "erobana_7/erobana_7.png (292x58)",
+        "erobana_8/erobana_8.png (292x58)",
+        "erobana_9/erobana_9.png (32x28)",
+        "gallery03/gallery03.png (186x182)",
+        "gallery04/gallery04.png (170x170)"
+      ],
+      "outlier_sizes": [
+        "292x58 x3",
+        "170x170 x1",
+        "172x38 x1",
+        "186x182 x1",
+        "242x241 x1"
+      ],
+      "blank_samples": [
+        "gallery2/gallery2.png (var=0.0)",
+        "img_011g/img_011g.png (var=0.0)",
+        "img_012g/img_012g.png (var=0.0)",
+        "img_1014g/img_1014g.png (var=6.2)",
+        "img_1129g/img_1129g.png (var=0.0)",
+        "img_1132g/img_1132g.png (var=2.5)",
+        "img_1142g/img_1142g.png (var=17.2)",
+        "img_1198g/img_1198g.png (var=0.0)",
+        "img_323g/img_323g.png (var=0.0)",
+        "img_405g/img_405g.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "erobana_10/erobana_10.png (2.3KB)",
+        "erobana_11/erobana_11.png (0.5KB)",
+        "erobana_13/erobana_13.png (1.5KB)",
+        "erobana_14/erobana_14.png (0.6KB)",
+        "erobana_6/erobana_6.png (1.5KB)",
+        "erobana_7/erobana_7.png (0.3KB)",
+        "erobana_8/erobana_8.png (0.3KB)",
+        "erobana_9/erobana_9.png (0.8KB)",
+        "gallery06/gallery06.png (0.1KB)",
+        "gallery2/gallery2.png (1.5KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "img_003g/img_003g.png",
+          "img_011g/img_011g.png",
+          "img_012g/img_012g.png",
+          "img_013g/img_013g.png",
+          "img_014g/img_014g.png",
+          "img_030g/img_030g.png",
+          "…等 140 张"
+        ],
+        [
+          "img_040g/img_040g.png",
+          "img_1128g/img_1128g.png",
+          "img_222g/img_222g.png",
+          "img_828g/img_828g.png",
+          "img_830g/img_830g.png",
+          "img_831g/img_831g.png",
+          "…等 7 张"
+        ],
+        [
+          "img_060g/img_060g.png",
+          "img_659g/img_659g.png",
+          "img_660g/img_660g.png",
+          "img_661g/img_661g.png",
+          "img_662g/img_662g.png",
+          "img_663g/img_663g.png",
+          "…等 7 张"
+        ],
+        [
+          "img_640g/img_640g.png",
+          "img_642g/img_642g.png",
+          "img_643g/img_643g.png",
+          "img_644g/img_644g.png",
+          "img_657g/img_657g.png"
+        ],
+        [
+          "img_703g/img_703g.png",
+          "img_704g/img_704g.png",
+          "img_705g/img_705g.png",
+          "img_706g/img_706g.png",
+          "img_712g/img_712g.png"
+        ],
+        [
+          "img_031g/img_031g.png",
+          "img_032g/img_032g.png",
+          "img_034g/img_034g.png",
+          "img_039g/img_039g.png"
+        ],
+        [
+          "img_1145g/img_1145g.png",
+          "img_1147g/img_1147g.png",
+          "img_1151g/img_1151g.png",
+          "img_1153g/img_1153g.png"
+        ],
+        [
+          "img_322g/img_322g.png",
+          "img_323g/img_323g.png",
+          "img_506g/img_506g.png",
+          "img_580g/img_580g.png"
+        ]
+      ],
+      "exact_dup_groups": 32,
+      "exact_dup_rate": 0.1467,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 750
+    },
+    {
+      "name": "NTRaholic",
+      "dir": "D:\\UCGR_Work\\unitycg\\NTRaholic\\cg",
+      "images": 86,
+      "small": 0,
+      "outliers": 51,
+      "blank": 0,
+      "dup_groups": 12,
+      "dup_rate": 0.5349,
+      "sparse": 0,
+      "avg_kb": 11.8,
+      "severity": 3,
+      "severity_reasons": [
+        "尺寸离散（众数 175x388 仅占 31%，离群 51/86） (+1)",
+        "重复冗余率 53.5%（近似重复 12 组） (+1)",
+        "\u003c5KB 小文件 18/86 (21%) (+2)",
+        "均单图仅 11.8KB (+1)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "175x388",
+      "mode_count": 27,
+      "sampled": 86,
+      "decoded": 86,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 18,
+      "small_samples": null,
+      "outlier_samples": [
+        "01/01.png (360x320)",
+        "02/02.png (360x277)",
+        "03/03.png (367x500)",
+        "1128/1128.png (2048x1024)",
+        "heis_251227_1/heis_251227_1.png (512x512)",
+        "heis_251227_2/heis_251227_2.png (512x512)",
+        "main dashi 01/main dashi 01.png (439x613)",
+        "main dashi 02/main dashi 02.png (439x613)",
+        "main dashi 03/main dashi 03.png (439x613)",
+        "main dashi 04/main dashi 04.png (439x613)"
+      ],
+      "outlier_sizes": [
+        "370x231 x15",
+        "439x613 x13",
+        "307x376 x11",
+        "409x463 x6",
+        "512x512 x2"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "ossan01 deru 01/ossan01 deru 01.png (3.9KB)",
+        "ossan01 deru 02/ossan01 deru 02.png (3.9KB)",
+        "ossan01 deru 03/ossan01 deru 03.png (3.9KB)",
+        "ossan01 deru 04/ossan01 deru 04.png (3.9KB)",
+        "ossan01 deru 05/ossan01 deru 05.png (4.0KB)",
+        "ossan01 deru 06/ossan01 deru 06.png (3.9KB)",
+        "ossan01 deru 07/ossan01 deru 07.png (3.9KB)",
+        "ossan01 deru 08/ossan01 deru 08.png (3.8KB)",
+        "ossan02 deru 01/ossan02 deru 01.png (5.0KB)",
+        "ossan02 deru 02/ossan02 deru 02.png (5.0KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "mob dash 01/mob dash 01.png",
+          "mob dash 02/mob dash 02.png",
+          "mob dash 03/mob dash 03.png",
+          "mob dash 04/mob dash 04.png",
+          "mob dash 05/mob dash 05.png",
+          "mob dash 06/mob dash 06.png",
+          "…等 11 张"
+        ],
+        [
+          "ossan03 deru 03/ossan03 deru 03.png",
+          "ossan03 deru 04/ossan03 deru 04.png",
+          "ossan03 deru 06/ossan03 deru 06.png",
+          "ossan03 deru 07/ossan03 deru 07.png",
+          "ossan03 deru 08/ossan03 deru 08.png",
+          "ossan03 deru 09/ossan03 deru 09.png",
+          "…等 8 张"
+        ],
+        [
+          "nakadashi 21/nakadashi 21.png",
+          "nakadashi 22/nakadashi 22.png",
+          "nakadashi 23/nakadashi 23.png",
+          "nakadashi 25/nakadashi 25.png",
+          "nakadashi 26/nakadashi 26.png",
+          "nakadashi 28/nakadashi 28.png",
+          "…等 7 张"
+        ],
+        [
+          "ossan01 deru 03/ossan01 deru 03.png",
+          "ossan01 deru 04/ossan01 deru 04.png",
+          "ossan01 deru 05/ossan01 deru 05.png",
+          "ossan01 deru 06/ossan01 deru 06.png",
+          "ossan01 deru 07/ossan01 deru 07.png",
+          "ossan01 deru 08/ossan01 deru 08.png"
+        ],
+        [
+          "ossan02 deru 03/ossan02 deru 03.png",
+          "ossan02 deru 04/ossan02 deru 04.png",
+          "ossan02 deru 05/ossan02 deru 05.png",
+          "ossan02 deru 06/ossan02 deru 06.png",
+          "ossan02 deru 07/ossan02 deru 07.png",
+          "ossan02 deru 08/ossan02 deru 08.png"
+        ],
+        [
+          "nakadashi 08/nakadashi 08.png",
+          "nakadashi 09/nakadashi 09.png",
+          "nakadashi 15/nakadashi 15.png",
+          "nakadashi 16/nakadashi 16.png",
+          "nakadashi 17/nakadashi 17.png"
+        ],
+        [
+          "main dashi 11/main dashi 11.png",
+          "main dashi 12/main dashi 12.png",
+          "main dashi 13/main dashi 13.png"
+        ],
+        [
+          "nakadashi 05/nakadashi 05.png",
+          "nakadashi 10/nakadashi 10.png",
+          "nakadashi 19/nakadashi 19.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 12,
+      "scan_ms": 30
+    },
+    {
+      "name": "SwarmBunker",
+      "dir": "D:\\UCGR_Work\\unitycg\\SwarmBunker\\cg",
+      "images": 544,
+      "small": 0,
+      "outliers": 168,
+      "blank": 107,
+      "dup_groups": 36,
+      "dup_rate": 0.6233,
+      "sparse": 0,
+      "avg_kb": 14.9,
+      "severity": 3,
+      "severity_reasons": [
+        "空白帧 107/300 (36%) (+3)",
+        "尺寸离群 168/544 (31%) (+2)",
+        "重复冗余率 62.3%（近似重复 36 组） (+2)",
+        "\u003c5KB 小文件 98/544 (18.0%) (+1)",
+        "均单图仅 14.9KB (+1)"
+      ],
+      "verdict": "建议全量肉眼",
+      "mode_wh": "1204x540",
+      "mode_count": 376,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 98,
+      "small_samples": null,
+      "outlier_samples": [
+        "GirlB_H01_01BeforeEnter_0000/GirlB_H01_01BeforeEnter_0000.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0001/GirlB_H01_01BeforeEnter_0001.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0002/GirlB_H01_01BeforeEnter_0002.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0003/GirlB_H01_01BeforeEnter_0003.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0004/GirlB_H01_01BeforeEnter_0004.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0005/GirlB_H01_01BeforeEnter_0005.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0006/GirlB_H01_01BeforeEnter_0006.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0007/GirlB_H01_01BeforeEnter_0007.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0008/GirlB_H01_01BeforeEnter_0008.png (320x180)",
+        "GirlB_H01_01BeforeEnter_0009/GirlB_H01_01BeforeEnter_0009.png (320x180)"
+      ],
+      "outlier_sizes": [
+        "320x180 x168"
+      ],
+      "blank_samples": [
+        "WomanA_H03_AfterLoop_Liquid2_0001/WomanA_H03_AfterLoop_Liquid2_0001.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0002/WomanA_H03_AfterLoop_Liquid2_0002.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0005/WomanA_H03_AfterLoop_Liquid2_0005.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0006/WomanA_H03_AfterLoop_Liquid2_0006.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0008/WomanA_H03_AfterLoop_Liquid2_0008.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0009/WomanA_H03_AfterLoop_Liquid2_0009.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0010/WomanA_H03_AfterLoop_Liquid2_0010.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0011/WomanA_H03_AfterLoop_Liquid2_0011.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0015/WomanA_H03_AfterLoop_Liquid2_0015.png (var=0.0)",
+        "WomanA_H03_AfterLoop_Liquid2_0019/WomanA_H03_AfterLoop_Liquid2_0019.png (var=0.0)"
+      ],
+      "tiny_samples": [
+        "WomanA_H03_AfterLoop_Liquid2_0000/WomanA_H03_AfterLoop_Liquid2_0000.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0001/WomanA_H03_AfterLoop_Liquid2_0001.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0002/WomanA_H03_AfterLoop_Liquid2_0002.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0003/WomanA_H03_AfterLoop_Liquid2_0003.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0004/WomanA_H03_AfterLoop_Liquid2_0004.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0005/WomanA_H03_AfterLoop_Liquid2_0005.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0006/WomanA_H03_AfterLoop_Liquid2_0006.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0007/WomanA_H03_AfterLoop_Liquid2_0007.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0008/WomanA_H03_AfterLoop_Liquid2_0008.png (2.5KB)",
+        "WomanA_H03_AfterLoop_Liquid2_0009/WomanA_H03_AfterLoop_Liquid2_0009.png (2.5KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "WomanA_H03_AfterLoop_Liquid2_0001/WomanA_H03_AfterLoop_Liquid2_0001.png",
+          "WomanA_H03_AfterLoop_Liquid2_0002/WomanA_H03_AfterLoop_Liquid2_0002.png",
+          "WomanA_H03_AfterLoop_Liquid2_0005/WomanA_H03_AfterLoop_Liquid2_0005.png",
+          "WomanA_H03_AfterLoop_Liquid2_0006/WomanA_H03_AfterLoop_Liquid2_0006.png",
+          "WomanA_H03_AfterLoop_Liquid2_0008/WomanA_H03_AfterLoop_Liquid2_0008.png",
+          "WomanA_H03_AfterLoop_Liquid2_0009/WomanA_H03_AfterLoop_Liquid2_0009.png",
+          "…等 102 张"
+        ],
+        [
+          "WomanA_H03_BeforeLoop_Woman_0001/WomanA_H03_BeforeLoop_Woman_0001.png",
+          "WomanA_H03_BeforeLoop_Woman_0002/WomanA_H03_BeforeLoop_Woman_0002.png",
+          "WomanA_H03_BeforeLoop_Woman_0004/WomanA_H03_BeforeLoop_Woman_0004.png",
+          "WomanA_H03_BeforeLoop_Woman_0005/WomanA_H03_BeforeLoop_Woman_0005.png",
+          "WomanA_H03_BeforeLoop_Woman_0006/WomanA_H03_BeforeLoop_Woman_0006.png",
+          "WomanA_H03_BeforeLoop_Woman_0007/WomanA_H03_BeforeLoop_Woman_0007.png",
+          "…等 13 张"
+        ],
+        [
+          "WomanA_H03_AfterLoop_Woman_0000/WomanA_H03_AfterLoop_Woman_0000.png",
+          "WomanA_H03_AfterLoop_Woman_0002/WomanA_H03_AfterLoop_Woman_0002.png",
+          "WomanA_H03_AfterLoop_Woman_0003/WomanA_H03_AfterLoop_Woman_0003.png",
+          "WomanA_H03_AfterLoop_Woman_0004/WomanA_H03_AfterLoop_Woman_0004.png",
+          "WomanA_H03_AfterLoop_Woman_0005/WomanA_H03_AfterLoop_Woman_0005.png",
+          "WomanA_H03_AfterLoop_Woman_0007/WomanA_H03_AfterLoop_Woman_0007.png",
+          "…等 12 张"
+        ],
+        [
+          "WomanA_H03_BeforeLoop_Man_0000/WomanA_H03_BeforeLoop_Man_0000.png",
+          "WomanA_H03_BeforeLoop_Man_0007/WomanA_H03_BeforeLoop_Man_0007.png",
+          "WomanA_H03_BeforeLoop_Man_0008/WomanA_H03_BeforeLoop_Man_0008.png",
+          "WomanA_H03_BeforeLoop_Man_0011/WomanA_H03_BeforeLoop_Man_0011.png",
+          "WomanA_H03_BeforeLoop_Man_0012/WomanA_H03_BeforeLoop_Man_0012.png",
+          "WomanA_H03_BeforeLoop_Man_0016/WomanA_H03_BeforeLoop_Man_0016.png",
+          "…等 7 张"
+        ],
+        [
+          "WomanA_H03_BeforeLoop_Man_0001/WomanA_H03_BeforeLoop_Man_0001.png",
+          "WomanA_H03_BeforeLoop_Man_0005/WomanA_H03_BeforeLoop_Man_0005.png",
+          "WomanA_H03_BeforeLoop_Man_0009/WomanA_H03_BeforeLoop_Man_0009.png",
+          "WomanA_H03_BeforeLoop_Man_0013/WomanA_H03_BeforeLoop_Man_0013.png",
+          "WomanA_H03_BeforeLoop_Man_0017/WomanA_H03_BeforeLoop_Man_0017.png"
+        ],
+        [
+          "GirlB_H01_06AfterLoop_0001/GirlB_H01_06AfterLoop_0001.png",
+          "GirlB_H01_06AfterLoop_0009/GirlB_H01_06AfterLoop_0009.png",
+          "GirlB_H01_06AfterLoop_0013/GirlB_H01_06AfterLoop_0013.png",
+          "GirlB_H01_06AfterLoop_0017/GirlB_H01_06AfterLoop_0017.png"
+        ],
+        [
+          "WomanA_H03_AfterLoop_Liquid_0002/WomanA_H03_AfterLoop_Liquid_0002.png",
+          "WomanA_H03_AfterLoop_Liquid_0003/WomanA_H03_AfterLoop_Liquid_0003.png",
+          "WomanA_H03_AfterLoop_Liquid_0011/WomanA_H03_AfterLoop_Liquid_0011.png",
+          "WomanA_H03_AfterLoop_Liquid_0019/WomanA_H03_AfterLoop_Liquid_0019.png"
+        ],
+        [
+          "WomanA_H03_AfterLoop_Man_0006/WomanA_H03_AfterLoop_Man_0006.png",
+          "WomanA_H03_AfterLoop_Man_0010/WomanA_H03_AfterLoop_Man_0010.png",
+          "WomanA_H03_AfterLoop_Man_0014/WomanA_H03_AfterLoop_Man_0014.png",
+          "WomanA_H03_AfterLoop_Man_0018/WomanA_H03_AfterLoop_Man_0018.png"
+        ]
+      ],
+      "exact_dup_groups": 42,
+      "exact_dup_rate": 0.4433,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 195
+    },
+    {
+      "name": "ElvenNinja",
+      "dir": "D:\\UCGR_Work\\unitycg\\ElvenNinja\\cg",
+      "images": 117,
+      "small": 0,
+      "outliers": 34,
+      "blank": 0,
+      "dup_groups": 14,
+      "dup_rate": 0.188,
+      "sparse": 0,
+      "avg_kb": 733,
+      "severity": 2,
+      "severity_reasons": [
+        "尺寸离群 34/117 (29%) (+2)",
+        "重复帧 14 组，冗余率 18.8% (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "1920x1080",
+      "mode_count": 83,
+      "sampled": 117,
+      "decoded": 117,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "Recap_ChatCampEventH1/Recap_ChatCampEventH1.png (640x360)",
+        "Recap_ChatCampEventH2/Recap_ChatCampEventH2.png (640x360)",
+        "Recap_DayStart_1H/Recap_DayStart_1H.png (640x360)",
+        "Recap_DayStart_2H/Recap_DayStart_2H.png (640x360)",
+        "Recap_DayStart_AffairH/Recap_DayStart_AffairH.png (640x360)",
+        "Recap_DesireOverH/Recap_DesireOverH.png (640x360)",
+        "Recap_Entertainment0AffairH/Recap_Entertainment0AffairH.png (640x360)",
+        "Recap_Entertainment1AffairH/Recap_Entertainment1AffairH.png (640x360)",
+        "Recap_Entertainment1H/Recap_Entertainment1H.png (640x360)",
+        "Recap_Entertainment2H/Recap_Entertainment2H.png (640x360)"
+      ],
+      "outlier_sizes": [
+        "640x360 x34"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "CG05a2/CG05a2.png",
+          "CG05b2/CG05b2.png",
+          "CG05c2/CG05c2.png",
+          "CG05d2/CG05d2.png"
+        ],
+        [
+          "CG09b/CG09b.png",
+          "CG09c/CG09c.png",
+          "CG09d/CG09d.png",
+          "CG09e/CG09e.png"
+        ],
+        [
+          "CG10b/CG10b.png",
+          "CG10b2/CG10b2.png",
+          "CG10b3/CG10b3.png"
+        ],
+        [
+          "CG13b/CG13b.png",
+          "CG13c/CG13c.png",
+          "CG13d/CG13d.png"
+        ],
+        [
+          "CG17d/CG17d.png",
+          "CG17g/CG17g.png",
+          "CG17h/CG17h.png"
+        ],
+        [
+          "CG22a/CG22a.png",
+          "CG22b/CG22b.png",
+          "CG22c/CG22c.png"
+        ],
+        [
+          "CG01c/CG01c.png",
+          "CG01d/CG01d.png"
+        ],
+        [
+          "CG02a/CG02a.png",
+          "CG02b/CG02b.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 578
+    },
+    {
+      "name": "LoveConfessions",
+      "dir": "D:\\UCGR_Work\\unitycg\\LoveConfessions\\cg",
+      "images": 138,
+      "small": 11,
+      "outliers": 96,
+      "blank": 0,
+      "dup_groups": 3,
+      "dup_rate": 0.0476,
+      "sparse": 36,
+      "avg_kb": 3907.6,
+      "severity": 2,
+      "severity_reasons": [
+        "极小图 11/138 (8.0%) (+1)",
+        "尺寸离散（众数 4096x4096 仅占 7%，离群 96/138） (+1)",
+        "\u003c5KB 小文件 11/138 (8.0%) (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "4096x4096",
+      "mode_count": 9,
+      "sampled": 138,
+      "decoded": 84,
+      "skipped_big": 54,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 11,
+      "small_samples": [
+        "battle/battle_bosshp1.png",
+        "battle/battle_bosshp2.png",
+        "battle/battle_boxbar.png",
+        "battle/battle_hp.png",
+        "battle/battle_hptpbase.png",
+        "battle/battle_itemroll1.png",
+        "battle/battle_itemroll2.png",
+        "battle/battle_lvuparr.png",
+        "battle/battle_tp.png",
+        "gacha/gacha_barbase.png"
+      ],
+      "outlier_samples": [
+        "ALL10/ALL10.png (4096x2684)",
+        "BCG1/BCG1.png (4096x1144)",
+        "BCG2/BCG2.png (4096x1676)",
+        "BCG3/BCG3.png (1612x3608)",
+        "BCG4/BCG4.png (4096x2256)",
+        "BH2/BH2.png (3768x2532)",
+        "BH3/BH3.png (4096x2308)",
+        "BH4/BH4.png (4096x2296)",
+        "BMAIN_BACK/BMAIN_BACK.png (4096x2344)",
+        "BMAIN_UP/BMAIN_UP.png (3096x2672)"
+      ],
+      "outlier_sizes": [
+        "403x504 x5",
+        "526x327 x4",
+        "1024x620 x3",
+        "196x20 x3",
+        "693x74 x3"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "battle/battle_base2.png (3.4KB)",
+        "battle/battle_bosshp1.png (1.9KB)",
+        "battle/battle_bosshp2.png (1.4KB)",
+        "battle/battle_hp.png (0.7KB)",
+        "battle/battle_hptpbase.png (0.6KB)",
+        "battle/battle_itemroll1.png (0.5KB)",
+        "battle/battle_itemroll2.png (3.8KB)",
+        "battle/battle_lvuparr.png (0.3KB)",
+        "battle/battle_tp.png (0.6KB)",
+        "gacha/gacha_barbase.png (2.2KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "sewords/sewords.png",
+          "sewords/sewords_down.png",
+          "sewords/sewords_ride.png"
+        ],
+        [
+          "battle/battle_bar1.png",
+          "battle/battle_bar2.png"
+        ],
+        [
+          "battle/battle_hp.png",
+          "battle/battle_tp.png"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0238,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 196,
+      "scan_ms": 825
+    },
+    {
+      "name": "1692614",
+      "dir": "D:\\UCGR_Work\\unitycg\\1692614\\cg",
+      "images": 60,
+      "small": 0,
+      "outliers": 46,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 716.4,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 2048x1024 仅占 23%，离群 46/60） (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "2048x1024",
+      "mode_count": 14,
+      "sampled": 60,
+      "decoded": 60,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "BOSS_ feifei/BOSS_ feifei.png (2048x512)",
+        "BOSS_sanjiaotou/BOSS_sanjiaotou.png (512x1024)",
+        "Boss/Boss.png (512x1024)",
+        "Effect_kaihuo/Effect_kaihuo.png (512x512)",
+        "Girl/Girl.png (2048x256)",
+        "Guai_Dog/Guai_Dog.png (512x64)",
+        "Guai_SangShi_nan/Guai_SangShi_nan.png (512x256)",
+        "Guai_SangShi_nv/Guai_SangShi_nv.png (256x512)",
+        "Guai_benpao/Guai_benpao.png (1024x256)",
+        "Guai_changshe/Guai_changshe.png (512x256)"
+      ],
+      "outlier_sizes": [
+        "1024x512 x8",
+        "2048x512 x5",
+        "512x256 x5",
+        "512x1024 x4",
+        "1024x1024 x3"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 120,
+      "scan_ms": 259
+    },
+    {
+      "name": "BloodOfYidhra",
+      "dir": "D:\\UCGR_Work\\unitycg\\BloodOfYidhra\\cg",
+      "images": 266,
+      "small": 0,
+      "outliers": 208,
+      "blank": 0,
+      "dup_groups": 1,
+      "dup_rate": 0.0039,
+      "sparse": 7,
+      "avg_kb": 697,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 480x270 仅占 17%，离群 208/266） (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "480x270",
+      "mode_count": 45,
+      "sampled": 266,
+      "decoded": 258,
+      "skipped_big": 8,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 1,
+      "small_samples": null,
+      "outlier_samples": [
+        "Arrow/Arrow.png (174x91)",
+        "BrokenCloth_Maki/BrokenCloth_Maki.png (459x428)",
+        "BrokenCloth_School/BrokenCloth_School.png (466x428)",
+        "CG _FamaleShooter/CG _FamaleShooter.png (2048x2048)",
+        "CG_01/CG_01.png (3933x3933)",
+        "CG_Butler/CG_Butler.png (2048x2048)",
+        "CG_Chitsuru/CG_Chitsuru.png (2048x2048)",
+        "CG_ClassmateGirl/CG_ClassmateGirl.png (3976x3976)",
+        "CG_Cooker/CG_Cooker.png (2048x2048)",
+        "CG_DarkNight/CG_DarkNight.png (2048x2048)"
+      ],
+      "outlier_sizes": [
+        "2048x2048 x31",
+        "592x592 x5",
+        "553x553 x3",
+        "566x566 x3",
+        "579x579 x3"
+      ],
+      "blank_samples": null,
+      "tiny_samples": [
+        "Arrow/Arrow.png (4.9KB)"
+      ],
+      "dup_sample_groups": [
+        [
+          "CG_UndeadGeneral/CG_UndeadGeneral.png",
+          "G_UndeadGeneral/G_UndeadGeneral.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 440,
+      "scan_ms": 964
+    },
+    {
+      "name": "EroTavern",
+      "dir": "D:\\UCGR_Work\\unitycg\\EroTavern\\cg",
+      "images": 125,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 21,
+      "dup_rate": 0.168,
+      "sparse": 0,
+      "avg_kb": 260.3,
+      "severity": 1,
+      "severity_reasons": [
+        "重复帧 21 组，冗余率 16.8% (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "726x408",
+      "mode_count": 125,
+      "sampled": 125,
+      "decoded": 125,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "mt_chloe_0001/mt_chloe_0001.png",
+          "mt_chloe_0002/mt_chloe_0002.png"
+        ],
+        [
+          "mt_chloe_0005/mt_chloe_0005.png",
+          "mt_chloe_0006/mt_chloe_0006.png"
+        ],
+        [
+          "mt_chloe_0016/mt_chloe_0016.png",
+          "mt_chloe_0017/mt_chloe_0017.png"
+        ],
+        [
+          "mt_chloe_0018/mt_chloe_0018.png",
+          "mt_chloe_0019/mt_chloe_0019.png"
+        ],
+        [
+          "mt_lily_0005/mt_lily_0005.png",
+          "mt_lily_0006/mt_lily_0006.png"
+        ],
+        [
+          "mt_lily_0007/mt_lily_0007.png",
+          "mt_lily_0008/mt_lily_0008.png"
+        ],
+        [
+          "mt_lily_0010/mt_lily_0010.png",
+          "mt_lily_0011/mt_lily_0011.png"
+        ],
+        [
+          "mt_lily_0012/mt_lily_0012.png",
+          "mt_lily_0013/mt_lily_0013.png"
+        ]
+      ],
+      "exact_dup_groups": 2,
+      "exact_dup_rate": 0.016,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 197
+    },
+    {
+      "name": "GoblinSword",
+      "dir": "D:\\UCGR_Work\\unitycg\\GoblinSword\\cg",
+      "images": 50,
+      "small": 0,
+      "outliers": 30,
+      "blank": 0,
+      "dup_groups": 1,
+      "dup_rate": 0.3878,
+      "sparse": 0,
+      "avg_kb": 4153.2,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 160x120 仅占 40%，离群 30/50） (+1)",
+        "重复冗余率 38.8%（近似重复 1 组） (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "160x120",
+      "mode_count": 20,
+      "sampled": 50,
+      "decoded": 49,
+      "skipped_big": 1,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "EventCG01_Atlas0/EventCG01_Atlas0.png (4096x2112)",
+        "EventCG02_Atlas0/EventCG02_Atlas0.png (4096x2112)",
+        "EventCG03_Atlas0/EventCG03_Atlas0.png (4096x1920)",
+        "EventCG04_Atlas0/EventCG04_Atlas0.png (4096x1280)",
+        "EventCG05_Atlas0/EventCG05_Atlas0.png (4096x1408)",
+        "EventCG06_Atlas0/EventCG06_Atlas0.png (4096x1664)",
+        "EventCG07_Atlas0/EventCG07_Atlas0.png (4096x1344)",
+        "EventCG08_Atlas0/EventCG08_Atlas0.png (4096x1408)",
+        "EventCG09_Atlas0/EventCG09_Atlas0.png (4096x1536)",
+        "EventCG10_Atlas0/EventCG10_Atlas0.png (4096x1856)"
+      ],
+      "outlier_sizes": [
+        "4096x1344 x5",
+        "4096x1280 x4",
+        "4096x1408 x3",
+        "4096x2112 x3",
+        "4096x1088 x2"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "CGSample01/CGSample01.png",
+          "CGSample02/CGSample02.png",
+          "CGSample03/CGSample03.png",
+          "CGSample04/CGSample04.png",
+          "CGSample05/CGSample05.png",
+          "CGSample06/CGSample06.png",
+          "…等 20 张"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 992
+    },
+    {
+      "name": "LifeguardHolic",
+      "dir": "D:\\UCGR_Work\\unitycg\\LifeguardHolic\\cg",
+      "images": 217,
+      "small": 0,
+      "outliers": 110,
+      "blank": 0,
+      "dup_groups": 5,
+      "dup_rate": 0.023,
+      "sparse": 40,
+      "avg_kb": 904.7,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 2048x2048 仅占 49%，离群 110/217） (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "2048x2048",
+      "mode_count": 107,
+      "sampled": 217,
+      "decoded": 217,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "Ass rub(split)/Ass rub(split).png (2048x1024)",
+        "Drowning layer combined/Drowning layer combined.png (512x256)",
+        "Ending cg1_layer combined/Ending cg1_layer combined_2.png (2048x1024)",
+        "Ending cg1_layer combined/Ending cg1_layer combined_3.png (2048x1024)",
+        "SCN_01/SCN_01_2.png (2048x1024)",
+        "SCN_01/SCN_01_3.png (2048x1024)",
+        "SCN_02/SCN_02_3.png (2048x1024)",
+        "Screenshot_1/Screenshot_1.png (2048x1149)",
+        "Screenshot_2/Screenshot_2.png (2048x1149)",
+        "Screenshot_3/Screenshot_3.png (2048x1137)"
+      ],
+      "outlier_sizes": [
+        "2048x1024 x28",
+        "512x512 x19",
+        "1024x1024 x14",
+        "2048x512 x13",
+        "1024x512 x12"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "frontview_girl1_pink/frontview_girl1_pink.png",
+          "frontview_girl2_blue/frontview_girl2_blue.png"
+        ],
+        [
+          "kagura_exhibitionism_sex/kagura_exhibitionism_sex_4.png",
+          "sit-on-face-threesome/sit-on-face-threesome_5.png"
+        ],
+        [
+          "rub_ass/rub_ass.png",
+          "rub_back/rub_back.png"
+        ],
+        [
+          "sideview_girl1_pink/sideview_girl1_pink.png",
+          "sideview_girl2_blue/sideview_girl2_blue.png"
+        ],
+        [
+          "sideview_man1_pink/sideview_man1_pink.png",
+          "sideview_man2_blue/sideview_man2_blue.png"
+        ]
+      ],
+      "exact_dup_groups": 1,
+      "exact_dup_rate": 0.0046,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 200,
+      "scan_ms": 1426
+    },
+    {
+      "name": "MuniangTiaojiao",
+      "dir": "D:\\UCGR_Work\\unitycg\\MuniangTiaojiao\\cg",
+      "images": 524,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 69,
+      "dup_rate": 0.6667,
+      "sparse": 0,
+      "avg_kb": 1438.3,
+      "severity": 1,
+      "severity_reasons": [
+        "重复冗余率 66.7%（近似重复 69 组） (+2)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "1920x1080",
+      "mode_count": 524,
+      "sampled": 300,
+      "decoded": 300,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "太太-自家-側插a3-11/太太-自家-側插a3-11.png",
+          "太太-自家-側插a3-14/太太-自家-側插a3-14.png",
+          "太太-自家-側插a3-15/太太-自家-側插a3-15.png",
+          "太太-自家-側插a3-4/太太-自家-側插a3-4.png",
+          "太太-自家-側插a3-5/太太-自家-側插a3-5.png",
+          "太太-自家-側插a4-11/太太-自家-側插a4-11.png",
+          "…等 9 张"
+        ],
+        [
+          "太太-公園-遛狗-a1-13/太太-公園-遛狗-a1-13.png",
+          "太太-公園-遛狗-a1-15/太太-公園-遛狗-a1-15.png",
+          "太太-公園-遛狗-a1-2/太太-公園-遛狗-a1-2.png",
+          "太太-公園-遛狗-a1-3/太太-公園-遛狗-a1-3.png",
+          "太太-公園-遛狗-a2-11/太太-公園-遛狗-a2-11.png",
+          "太太-公園-遛狗-a3-14/太太-公園-遛狗-a3-14.png",
+          "…等 7 张"
+        ],
+        [
+          "太太-自家--柔胸a1-10/太太-自家--柔胸a1-10.png",
+          "太太-自家--柔胸a1-11/太太-自家--柔胸a1-11.png",
+          "太太-自家--柔胸a1-12/太太-自家--柔胸a1-12.png",
+          "太太-自家--柔胸a1-13/太太-自家--柔胸a1-13.png",
+          "太太-自家--柔胸a1-3/太太-自家--柔胸a1-3.png",
+          "太太-自家--柔胸a1-7/太太-自家--柔胸a1-7.png",
+          "…等 7 张"
+        ],
+        [
+          "太太-自家-口交-a2-3/太太-自家-口交-a2-3.png",
+          "太太-自家-口交-a2-5/太太-自家-口交-a2-5.png",
+          "太太-自家-口交-a3-2/太太-自家-口交-a3-2.png",
+          "太太-自家-口交-a3-4/太太-自家-口交-a3-4.png",
+          "太太-自家-口交-a4-1/太太-自家-口交-a4-1.png",
+          "太太-自家-口交-a4-4/太太-自家-口交-a4-4.png",
+          "…等 7 张"
+        ],
+        [
+          "_0000_miko-臥室-攝影師-後入a4-15/_0000_miko-臥室-攝影師-後入a4-15.png",
+          "_0003_miko-臥室-攝影師-後入a4-12/_0003_miko-臥室-攝影師-後入a4-12.png",
+          "_0004_miko-臥室-攝影師-後入a4-11/_0004_miko-臥室-攝影師-後入a4-11.png",
+          "_0008_miko-臥室-攝影師-後入a4-7/_0008_miko-臥室-攝影師-後入a4-7.png",
+          "_0009_miko-臥室-攝影師-後入a4-6/_0009_miko-臥室-攝影師-後入a4-6.png",
+          "_0012_miko-臥室-攝影師-後入a3-3/_0012_miko-臥室-攝影師-後入a3-3.png"
+        ],
+        [
+          "miko雜交-a2-11/miko雜交-a2-11.png",
+          "miko雜交-a2-12/miko雜交-a2-12.png",
+          "miko雜交-a2-13/miko雜交-a2-13.png",
+          "miko雜交-a2-14/miko雜交-a2-14.png",
+          "miko雜交-a2-15/miko雜交-a2-15.png",
+          "miko雜交-a2-6/miko雜交-a2-6.png"
+        ],
+        [
+          "miko雜交-a3-10/miko雜交-a3-10.png",
+          "miko雜交-a3-13/miko雜交-a3-13.png",
+          "miko雜交-a3-14/miko雜交-a3-14.png",
+          "miko雜交-a3-3/miko雜交-a3-3.png",
+          "miko雜交-a3-7/miko雜交-a3-7.png",
+          "miko雜交-a3-8/miko雜交-a3-8.png"
+        ],
+        [
+          "太太-公園-遛狗-a1-16/太太-公園-遛狗-a1-16.png",
+          "太太-公園-遛狗-a1-17/太太-公園-遛狗-a1-17.png",
+          "太太-公園-遛狗-a1-18/太太-公園-遛狗-a1-18.png",
+          "太太-公園-遛狗-a1-19/太太-公園-遛狗-a1-19.png",
+          "太太-公園-遛狗-a3-17/太太-公園-遛狗-a3-17.png",
+          "太太-公園-遛狗-a4-19/太太-公園-遛狗-a4-19.png"
+        ]
+      ],
+      "exact_dup_groups": 3,
+      "exact_dup_rate": 0.01,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 2682
+    },
+    {
+      "name": "MyLovableDemon",
+      "dir": "D:\\UCGR_Work\\unitycg\\MyLovableDemon\\cg",
+      "images": 135,
+      "small": 0,
+      "outliers": 102,
+      "blank": 0,
+      "dup_groups": 11,
+      "dup_rate": 0.1024,
+      "sparse": 3,
+      "avg_kb": 1818.4,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 4096x2048 仅占 22%，离群 102/135） (+1)",
+        "重复帧 11 组，冗余率 10.2% (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "4096x2048",
+      "mode_count": 30,
+      "sampled": 135,
+      "decoded": 127,
+      "skipped_big": 8,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "Del imprisoned1/Del imprisoned1.png (2040x1080)",
+        "Del imprisoned2/Del imprisoned2.png (2040x1080)",
+        "Del imprisoned3/Del imprisoned3.png (2040x1080)",
+        "Delph Gang BJ 1/Delph Gang BJ 1.png (2240x1260)",
+        "Delph Gang BJ 2/Delph Gang BJ 2.png (2240x1260)",
+        "Delph Gang BJ 3/Delph Gang BJ 3.png (2240x1260)",
+        "Delph Gang BJ 4/Delph Gang BJ 4.png (2240x1260)",
+        "Eat 1/Eat 1.png (1024x2048)",
+        "Eat floor chibi/Eat floor chibi.png (2048x512)",
+        "Fighter Girl 3/Fighter Girl 3.png (4096x1024)"
+      ],
+      "outlier_sizes": [
+        "2048x512 x11",
+        "2112x1188 x9",
+        "4096x4096 x8",
+        "2048x1152 x6",
+        "2048x2048 x6"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "Del imprisoned1/Del imprisoned1.png",
+          "Del imprisoned2/Del imprisoned2.png",
+          "Del imprisoned3/Del imprisoned3.png"
+        ],
+        [
+          "ball kick 1/ball kick 1.png",
+          "ball kick 2/ball kick 2.png",
+          "ball kick 3/ball kick 3.png"
+        ],
+        [
+          "J gold 2/J gold 2.png",
+          "J gold 3/J gold 3.png"
+        ],
+        [
+          "J gold 4/J gold 4.png",
+          "J gold 5b/J gold 5b.png"
+        ],
+        [
+          "Shayde bj1/Shayde bj1.png",
+          "Shayde bj2/Shayde bj2.png"
+        ],
+        [
+          "bj grab 2/bj grab 2.png",
+          "bj grab 4/bj grab 4.png"
+        ],
+        [
+          "delph gang 1/delph gang 1.png",
+          "delph gang 4/delph gang 4.png"
+        ],
+        [
+          "delph gang 2/delph gang 2.png",
+          "delph gang 3/delph gang 3.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 134,
+      "scan_ms": 1587
+    },
+    {
+      "name": "SuccubusSuccessor",
+      "dir": "D:\\UCGR_Work\\unitycg\\SuccubusSuccessor\\cg",
+      "images": 34,
+      "small": 0,
+      "outliers": 26,
+      "blank": 0,
+      "dup_groups": 4,
+      "dup_rate": 0.1515,
+      "sparse": 0,
+      "avg_kb": 599.7,
+      "severity": 1,
+      "severity_reasons": [
+        "尺寸离散（众数 573x465 仅占 12%，离群 26/34） (+1)",
+        "重复帧 4 组，冗余率 15.2% (+1)"
+      ],
+      "verdict": "抽检 30 张即可",
+      "mode_wh": "573x465",
+      "mode_count": 4,
+      "sampled": 34,
+      "decoded": 33,
+      "skipped_big": 1,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": [
+        "CG01/CG01.png (4096x4096)",
+        "CG02/CG02.png (2048x2048)",
+        "CG03/CG03.png (2048x2048)",
+        "HCutin_Alraune_00/HCutin_Alraune_00.png (784x280)",
+        "HCutin_Delilah_001/HCutin_Delilah_001.png (984x992)",
+        "HCutin_Delilah_003/HCutin_Delilah_003.png (984x992)",
+        "HCutin_Delilah_005/HCutin_Delilah_005.png (1296x800)",
+        "HCutin_Delilah_007/HCutin_Delilah_007.png (910x1272)",
+        "HCutin_Delilah_00_M/HCutin_Delilah_00_M.png (984x992)",
+        "HCutin_Delilah_010/HCutin_Delilah_010.png (1300x1300)"
+      ],
+      "outlier_sizes": [
+        "1120x1204 x3",
+        "910x1272 x3",
+        "984x992 x3",
+        "1300x1300 x2",
+        "2048x2048 x2"
+      ],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": [
+        [
+          "HCutin_XRay_003/HCutin_XRay_003.png",
+          "HCutin_XRay_005/HCutin_XRay_005.png",
+          "HCutin_XRay_009/HCutin_XRay_009.png"
+        ],
+        [
+          "HCutin_Delilah_010/HCutin_Delilah_010.png",
+          "HCutin_Delilah_012/HCutin_Delilah_012.png"
+        ],
+        [
+          "HCutin_Delilah_014/HCutin_Delilah_014.png",
+          "HCutin_Delilah_024/HCutin_Delilah_024.png"
+        ],
+        [
+          "HCutin_FSoldier_00/HCutin_FSoldier_00.png",
+          "HCutin_FSoldier_01/HCutin_FSoldier_01.png"
+        ]
+      ],
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 129
+    },
+    {
+      "name": "LastTownFelixia",
+      "dir": "D:\\UCGR_Work\\unitycg\\LastTownFelixia\\cg",
+      "images": 1,
+      "small": 0,
+      "outliers": 0,
+      "blank": 0,
+      "dup_groups": 0,
+      "dup_rate": 0,
+      "sparse": 0,
+      "avg_kb": 319.6,
+      "severity": 0,
+      "severity_reasons": [
+        "无明显异常"
+      ],
+      "verdict": "无需看",
+      "mode_wh": "548x433",
+      "mode_count": 1,
+      "sampled": 1,
+      "decoded": 1,
+      "skipped_big": 0,
+      "skipped_webp": 0,
+      "decode_err": 0,
+      "broken": 0,
+      "tiny_files": 0,
+      "small_samples": null,
+      "outlier_samples": null,
+      "outlier_sizes": [],
+      "blank_samples": null,
+      "tiny_samples": null,
+      "dup_sample_groups": null,
+      "exact_dup_groups": 0,
+      "exact_dup_rate": 0,
+      "seq_gaps": 0,
+      "seq_break_dirs": 0,
+      "name_conflicts": 0,
+      "spine_files": 0,
+      "scan_ms": 8
+    }
+  ]
+}
