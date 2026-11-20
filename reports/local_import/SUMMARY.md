@@ -1,39 +1,39 @@
-# 本地游戏批量导入 · 总报告（2026-11-21 00:58:37）
+# 本地游戏批量导入 v2 · 总报告（2026-11-21 01:36:05）
 
-## 流水线结果
+## 主台账（keep 57 款）
 
-| 阶段 | 数量 | 产物 |
+| 类别 | v1 | v2 |
+|---|---:|---:|
+| import_ok | 44 | **52** |
+| import_fail | 13 | **5** |
+| import_timeout | 0 | 0 |
+
+## 已解决明细（fail → ok，7 款）
+
+| 游戏 | events | 方式 |
 |---|---:|---|
-| 候选游戏盘点 | 58 | 01_inventory.md |
-| 去重后 keep | 57 | 02_dedup.md |
-| 内容重复 internal | 0 | 02_dedup.md（排除运行时噪声与 junction 后 0 组） |
-| 已入库重复跳过 | 1 | 02_dedup.md |
-| 试导入 import_ok | 44 | import_results.json |
-| 试导入 import_fail | 13 | failed.md |
-| 试导入 import_timeout | 0 | failed.md |
-| 有效性自检 suspect | 25 | suspect.md（不进 pass） |
-| 有效性自检 pass | 19 | suspect.md |
+| 共妻之村 (牛) | 38 | spike-a 解包 data.xp3 → kirikiri 重扫 |
+| 无法诉说的关系(中等) | 7 | 解包重扫 |
+| (牛)完堕ちX兄嫁 | 70 | 解包 scenario+append.xp3，兼容台本生成 |
+| （一般）姉妹X催眠 | 11 | 解包重扫 |
+| （一般）姉妹X催眠2 | 14 | 解包重扫 |
+| SOTDQ（很牢） | 461 | **Godot 4.3 pck 导出器**（新增 godot_cg_export.py，274 张压缩纹理未切如实记） |
+| Phoenixes-v17.0.1（浴火重火） | 2596 | **Godot 3.6 pck 导出器**，1700.pck 全量 413MB |
+
+## 剩余 6 款 fail 的定性
+
+| 游戏 | 引擎定性 | 卡点 |
+|---|---|---|
+| 光辉的少女们 | TyranoBuilder（SRTS/SDTS 私有容器） | 容器格式未公开，需逆向 |
+| wuxian / 绝对合格 | RPG Maker 插件驱动 | ScanRmmz 已加 Script 图片提取（本轮 D 线），以实测为准 |
+| TouchSim / 女王X / HOME | Electron portable（asar 内嵌 exe） | 无 7z；TEMP 解压试验无产物；需 exe 级提取 |
+
+## suspect 重自检
+
+- B 线：rpg_decrypt.py 解密 .rpgmvp/.png_ 到 D:\UCGR_Work\decrypt\，selfcheck_v2 用解密镜像重跑 prescreen（结果见 suspect.md v2 段）
 
 ## 红线遵守
 
-- 未执行 `archify deliver` / `archify finalize`
-- 全程只读用户原始游戏目录，未删改任何游戏文件
-- 回滚快照：`snapshot/state.txt` + catalog.db/games.json/cgreplay.conf 备份
-- 有效性自检复用 `tools/review-prescreen`，未重写空白判定逻辑
+- 全程只读游戏目录；解包/导出/解密产物全部在 D:\UCGR_Work\；未执行 archify deliver/finalize
+- 回滚快照不变：reports/local_import/snapshot/
 
-## 说明
-
-- 导入入口：`bin/ucgr.exe events <目录> --out <events.json>`（项目主入口）；包装脚本 `tools/local_import/import_batch.py`。
-- 去重口径：真资源包用主包 SHA256；rmmz/NW.js 目录型用目录内容签名（相对路径+大小排序 SHA256）。
-- suspect 判据任一命中即降级：0 图 / 空白>50% / 尺寸全一致且<=128x128 / 总<100KB。
-
-## 收尾分类表（任务要求）
-
-| 类别 | 数量 | 去向 |
-|---|---:|---|
-| 新导入且自检通过 | 19 | 已 commit 到分支 dsh-0f13c1bf-6649（events.json 在 D:\UCGR_Work\local_import\，报告入库） |
-| 疑似无效（suspect） | 25 | suspect.md，待人工翻图，不进 pass |
-| 导入失败（import_fail） | 13 | failed.md，记 stderr 末 20 行 |
-| 超时（import_timeout） | 0 | 无；可重跑 |
-| 与已入库重复 | 1 | 跳过，未动 |
-| 候选内部重复 | 0 | 无（排除 junction 与运行时噪声后 0 组），无需合并 |

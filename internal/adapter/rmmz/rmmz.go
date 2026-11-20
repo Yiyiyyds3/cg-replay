@@ -5,6 +5,10 @@
 // CG 演出常见写法就是「显示图片(231) + 台词(401)」循环，所以这里按
 // 「一段连续的显示图片」切演出段落，把 231/232/235/401 翻成 IR 台本。
 //
+// 另有游戏不写 231，图片名直接写在脚本指令（355/655）的实参里
+// （$gameScreen.showPicture(10,'CG07_01',…)），这类名字由 script_picture.go
+// 静态提取并展开成等价 231，走同一条切段/渲染路径。
+//
 // 素材侧只读不写：图片按 img/pictures/<name>.<ext> 找，
 // MV 的 .rpgmvp / MZ 的 .png_ 由 decode.DecodeImage 在解码时还原。
 package rmmz
@@ -189,6 +193,11 @@ type ScanResult struct {
 	ShowPictureCommands int
 	// ScriptFunctions = code 355 脚本里的高频函数名（top 5），用于诊断插件驱动型游戏。
 	ScriptFunctions []string
+	// ScriptPictures = 从 code 355/655 脚本里静态提取到的图片名次数。
+	// 一些游戏不写 231，直接把图片名当实参交给引擎/插件函数
+	// （showPicture(10,"CG07_01")、picsChange2('立绘_02') …）；这类名字
+	// 是字面量，静态可读，提取到就说明图片并没有「不可解析」。
+	ScriptPictures int `json:"scriptPictures,omitempty"`
 
 	sizes   map[string]picInfo
 	cleaner textCleaner
@@ -363,6 +372,7 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 	// 根本没有图片名。这时 Segments 切不出任何演出段，需要给出可行动的诊断，
 	// 而不是笼统地报「没有识别到图片演出」。
 	showPictures := 0
+	scriptPictures := 0
 	scriptCounts := map[string]int{}
 	countCommands := func(cmds []Command) {
 		for _, c := range cmds {
@@ -370,6 +380,7 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 			case 231:
 				showPictures++
 			case 355:
+				scriptPictures += len(scriptPictureShows(c))
 				if s := c.str(0); s != "" {
 					if i := strings.IndexByte(s, '('); i > 0 {
 						s = s[:i]
@@ -378,6 +389,9 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 						scriptCounts[s]++
 					}
 				}
+			case 655:
+				// 续行：图片名常写在下一行（$gameScreen.showPicture(...) 跨行）。
+				scriptPictures += len(scriptPictureShows(c))
 			}
 		}
 	}
@@ -462,12 +476,20 @@ func Scan(root, dataDir string) (*ScanResult, error) {
 		}
 	}
 	res.ShowPictureCommands = showPictures
+	res.ScriptPictures = scriptPictures
 	res.ScriptFunctions = topScripts(scriptCounts, 5)
+	// 只有「一个图片名都提不出来」时才是真的读不了：名字都写在脚本实参里的
+	// 游戏已经由 expandScriptPictures 翻成演出段，不该再报插件级诊断。
 	if len(res.Refs) == 0 && len(res.ScriptFunctions) > 0 {
-		return nil, fmt.Errorf(
-			"图片由插件/脚本驱动：Show Picture 命令仅 %d 条、检测到脚本函数 %s；"+
-				"静态事件命令提取不到 CG，需插件级解析器（暂不纳入回放库）",
-			showPictures, strings.Join(res.ScriptFunctions, ", "))
+		if scriptPictures == 0 {
+			return nil, fmt.Errorf(
+				"图片由插件/脚本驱动：Show Picture 命令仅 %d 条、检测到脚本函数 %s；"+
+					"静态事件命令提取不到 CG，需插件级解析器（暂不纳入回放库）",
+				showPictures, strings.Join(res.ScriptFunctions, ", "))
+		}
+		res.Warnings = append(res.Warnings, fmt.Sprintf(
+			"脚本里静态提取到 %d 个图片名，但没凑出「图片 + 台词」的演出段"+
+				"（素材没找到，或该段只有图片没有台词）", scriptPictures))
 	}
 	return res, nil
 }
@@ -647,6 +669,9 @@ func locateCGSet(root string, imageDirs []string, name string) (string, bool) {
 // Segments 把 page 的指令切成演出段落：
 // 一段 = 从第一次「显示图片」起，到「全部消除图片」或列表结束。
 func Segments(cmds []Command) [][]Command {
+	// 先把脚本里的图片调用（showPicture(10,'CG07_01') 之类）展开成 231 指令，
+	// 之后切段/渲染就与「显示图片」事件走同一条逻辑。
+	cmds = expandScriptPictures(cmds)
 	var out [][]Command
 	var cur []Command
 	visible := map[int]bool{}

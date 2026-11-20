@@ -350,3 +350,132 @@ func TestScanShowPictureUnaffected(t *testing.T) {
 		t.Fatalf("Refs = %d, want 1", len(res.Refs))
 	}
 }
+
+// TestScriptPictureNames 脚本实参里的图片名提取：认出图片函数里的字符串字面量，
+// 放过变量、表达式拼接、本地化占位与普通台词。
+func TestScriptPictureNames(t *testing.T) {
+	cases := []struct {
+		code int
+		str  string
+		want []string
+	}{
+		{355, `$gameScreen.showPicture(10, "CG07_01", 0, 0, 0, 100, 100, 255, 0);`, []string{"CG07_01"}},
+		{355, `$gameScreen.showPicture(20, 'CG07_02', 0, 0, 0, 100, 100, 0, 0);`, []string{"CG07_02"}},
+		{655, `  $gameScreen.showPicture(5, '差分_1', 1, 400, 300, 100, 100, 255, 0);`, []string{"差分_1"}},
+		{355, `this.picsChange2('立绘 02');`, []string{"立绘 02"}},
+		{355, `this.loadPicture('CG/03');`, []string{"CG/03"}},
+		// 下面这些都不是「静态可读的图片名」。
+		{355, `$gameScreen.showPicture(picId, picName, 0, 0, 0, 100, 100, 255, 0);`, nil},
+		{355, `  $gameScreen.showPicture(FRONT, 'stands/' + raw, 1, x, y, sx, 100, 0, 0);`, nil},
+		{355, `$utils.playHint('#{hintClothes}');`, nil},
+		{355, `$gameTemp._sysMsgQ.push(['体力が' + gained + '上昇しました']);`, nil},
+		{401, `$gameScreen.showPicture(1, '不算', 0);`, nil}, // 不是脚本指令
+	}
+	for _, tc := range cases {
+		got := ScriptPictureNames(Command{Code: tc.code, Params: []any{tc.str}})
+		if strings.Join(got, "\x00") != strings.Join(tc.want, "\x00") {
+			t.Errorf("ScriptPictureNames(code=%d, %q) = %v, want %v", tc.code, tc.str, got, tc.want)
+		}
+	}
+}
+
+// TestScriptPictureShowsKeepArgs 展开出来的 231 要沿用 showPicture 的位置参数
+// （编号、原点、坐标、缩放、透明度），否则回放里图片会摆错位置。
+func TestScriptPictureShowsKeepArgs(t *testing.T) {
+	c := Command{Code: 355, Params: []any{`$gameScreen.showPicture(10, "CG07_01", 1, 400, 300, 50, 50, 128, 0);`}}
+	shows := scriptPictureShows(c)
+	if len(shows) != 1 {
+		t.Fatalf("scriptPictureShows = %d 条, want 1", len(shows))
+	}
+	s := shows[0]
+	if s.Code != 231 || s.str(1) != "CG07_01" {
+		t.Fatalf("展开结果 code=%d name=%q", s.Code, s.str(1))
+	}
+	if int(s.num(0)) != 10 || int(s.num(2)) != 1 || s.num(4) != 400 || s.num(5) != 300 ||
+		s.num(6) != 50 || s.num(8) != 128 {
+		t.Fatalf("参数没带过来：%v", s.Params)
+	}
+}
+
+// TestExpandScriptPicturesIDs 调用里不带编号时，展开出来的 231 要拿到唯一编号，
+// 免得同一段里多张图互相覆盖。
+func TestExpandScriptPicturesIDs(t *testing.T) {
+	cmds := []Command{
+		{Code: 355, Params: []any{`this.picsChange2('a_01');`}},
+		{Code: 355, Params: []any{`this.picsChange2('a_02');`}},
+	}
+	out := expandScriptPictures(cmds)
+	if len(out) != 2 {
+		t.Fatalf("expandScriptPictures = %d 条, want 2", len(out))
+	}
+	if int(out[0].num(0)) == int(out[1].num(0)) || int(out[0].num(0)) < 900 {
+		t.Fatalf("编号应唯一且从 900 起：%v / %v", out[0].Params[0], out[1].Params[0])
+	}
+}
+
+// TestScanScriptPicturesBecomeEvents 图片名写在脚本实参里的游戏要能扫出演出段，
+// 而不是被判成「插件驱动」直接出局；BuildShow 也要能生成同一段落的表现。
+func TestScanScriptPicturesBecomeEvents(t *testing.T) {
+	root := t.TempDir()
+	picDir := filepath.Join(root, "img", "pictures")
+	if err := os.MkdirAll(picDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, 300, 300))
+	for y := 0; y < 300; y++ {
+		for x := 0; x < 300; x++ {
+			img.SetRGBA(x, y, color.RGBA{10, 120, 200, 255})
+		}
+	}
+	f, err := os.Create(filepath.Join(picDir, "cg01.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+	dataDir := filepath.Join(root, "data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mf := `{"displayName":"脚本图地图","events":[{"id":1,"name":"事件","pages":[{"list":[` +
+		`{"code":355,"indent":0,"parameters":["$gameScreen.showPicture(10, \"cg01\", 0, 0, 0, 100, 100, 255, 0);"]},` +
+		`{"code":401,"indent":0,"parameters":["台词"]},` +
+		`{"code":355,"indent":0,"parameters":["$gameScreen.erasePicture(10);"]}` +
+		`]}]}]}`
+	if err := os.WriteFile(filepath.Join(dataDir, "Map001.json"), []byte(mf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Scan(root, "data")
+	if err != nil {
+		t.Fatalf("脚本图片名可读，不该报插件级诊断: %v", err)
+	}
+	if res.ScriptPictures != 1 {
+		t.Fatalf("ScriptPictures = %d, want 1", res.ScriptPictures)
+	}
+	if len(res.Refs) != 1 {
+		t.Fatalf("Refs = %d, want 1", len(res.Refs))
+	}
+	if res.Refs[0].Pictures != 1 {
+		t.Fatalf("段落图片数 = %d, want 1", res.Refs[0].Pictures)
+	}
+	ev, err := BuildShow(root, "data", res.Refs[0].Key)
+	if err != nil {
+		t.Fatalf("BuildShow: %v", err)
+	}
+	shown := false
+	for _, op := range ev.Show {
+		if op.Kind == ir.ShowLayerShow && op.Ref == "img/pictures/cg01.png" {
+			shown = true
+			if op.Layer != "layer10" {
+				t.Errorf("层名 = %q, want layer10（沿用 showPicture 的第一个实参）", op.Layer)
+			}
+		}
+	}
+	if !shown {
+		t.Errorf("BuildShow 没生成 cg01 的图层显示：%+v", ev.Show)
+	}
+}
+
