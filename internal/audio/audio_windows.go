@@ -226,11 +226,15 @@ func (s *System) load(ref, role string) *PCM {
 func (s *System) resolve(ref, role string) string {
 	var dirs []string
 	if role == "se" {
-		dirs = []string{"raw/data/sound", "sound", "raw/data/voice", "voice", "raw/data/bgm", "bgm"}
+		dirs = []string{"raw/data/sound", "sound", "raw/data/voice", "voice", "raw/data/bgm", "bgm",
+			"www/audio/se", "www/audio/voice", "www/audio/bgs", "www/audio/me", "www/audio/bgm"}
 	} else {
-		dirs = []string{"raw/data/bgm", "bgm", "raw/data/sound", "sound"}
+		dirs = []string{"raw/data/bgm", "bgm", "raw/data/sound", "sound",
+			"www/audio/bgm", "www/audio/bgs", "www/audio/me", "www/audio/voice", "www/audio/se"}
 	}
-	exts := []string{"", ".wav", ".ogg", ".tcw", ".mp3"}
+	// .rpgmvo/.ogg_/.rpgmvm 是 RPG Maker MV/MZ 的加密语音——还原 Ogg 头后
+	// 走纯 Go Vorbis 解码（同包 DecodeFile），扩展名必须在探测表里。
+	exts := []string{"", ".wav", ".ogg", ".tcw", ".mp3", ".rpgmvo", ".ogg_", ".rpgmvm"}
 	if filepath.Ext(ref) != "" {
 		exts = []string{""}
 	}
