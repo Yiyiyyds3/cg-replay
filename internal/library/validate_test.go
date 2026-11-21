@@ -60,11 +60,12 @@ func TestValidateRMMSpecialScenes(t *testing.T) {
 		},
 	}
 	rep := lib.Validate(root)
-	// 标题里的 EV00x 命中特殊特征，所以都保留。
+	// rmmz 的 map: 场景由扫描器 pictureLarge 把关，validate 全保留（名字特征
+	// 二次筛会误杀「CG演出」这类命名）。
 	if rep.SceneKept != 2 || rep.SceneDropped != 0 {
 		t.Fatalf("kept=%d dropped=%d，want 2/0", rep.SceneKept, rep.SceneDropped)
 	}
-	// 纯常规事件（无特殊特征）应被剔除。
+	// 纯常规命名事件同样保留（扫描器已筛过）。
 	lib2 := &Library{
 		EngineID: "rmmz",
 		Scenes: []SceneEvent{
@@ -72,8 +73,8 @@ func TestValidateRMMSpecialScenes(t *testing.T) {
 		},
 	}
 	rep2 := lib2.Validate(root)
-	if rep2.SceneKept != 0 || rep2.SceneDropped != 1 {
-		t.Fatalf("常规事件 kept=%d dropped=%d，want 0/1", rep2.SceneKept, rep2.SceneDropped)
+	if rep2.SceneKept != 1 || rep2.SceneDropped != 0 {
+		t.Fatalf("map场景 kept=%d dropped=%d，want 1/0", rep2.SceneKept, rep2.SceneDropped)
 	}
 }
 
@@ -103,20 +104,20 @@ func TestValidateSkipWhenIndexEmpty(t *testing.T) {
 	}
 }
 
-// 用例 ④：章节跟随场景——被删场景的章节连带删除。
+// 用例 ④：rmmz map 场景与其章节在新口径下全保留（扫描器 pictureLarge 已把关）。
 func TestValidateChaptersFollowScenes(t *testing.T) {
 	root := writeTree(t, map[string]string{"img/x.png": "x"})
 	lib := &Library{
 		EngineID: "rmmz",
 		Scenes: []SceneEvent{
-			{ID: "map:Map001.json:2:0#0", Title: "普通走路事件"},
+			{ID: "map:Map001.json:2:0#0", Title: "普通名字的CG演出事件"},
 		},
 		Chapters: []ChapterEvent{
 			{ID: "map:Map001.json:2:0#0#0", Scene: "map:Map001.json:2:0#0", Title: "章"},
 		},
 	}
 	rep := lib.Validate(root)
-	if rep.SceneDropped != 1 || len(lib.Chapters) != 0 {
-		t.Fatalf("章节未跟随场景删除：scene_dropped=%d chapters=%d", rep.SceneDropped, len(lib.Chapters))
+	if rep.SceneKept != 1 || rep.SceneDropped != 0 || len(lib.Chapters) != 1 {
+		t.Fatalf("map 场景应保留：kept=%d dropped=%d chapters=%d", rep.SceneKept, rep.SceneDropped, len(lib.Chapters))
 	}
 }

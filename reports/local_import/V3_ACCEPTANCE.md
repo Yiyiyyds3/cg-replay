@@ -11,10 +11,11 @@
 | 文本导入 | ucgr textdump（kirikiri AST 优先/SJIS-UTF16LE-XOR 解码 + rmmz 401 拼接 + artemis） | 批跑全库导出：Lulumachi 25508 行、Unholy_maiden 60027 行、魔剣士 7855 行…txt 落 D:\UCGR_Work\text\<游戏>\ |
 | 音频导入 | validate 报告 audio_count（解包目录/源目录音频文件盘点） | 妹神官 2501、对魔战士美月 2298、Lulumachi 数万级源图+音频齐全（见 acceptance_v3.json） |
 
-## 二、全库批跑结果（57 游戏）
-- OK 51 / FAIL 6（光辉的少女们=tyrano data.dts 加密硬限制、3 个 Enigma 壳、unknown 引擎 2——全部是已知硬边界，如实在案）
-- 引擎分布：rmmz 29、kirikiri 3、unity 2、unknown 23（多为 CG 库/未解包形态）
-- 源图片 136398 张、文本 123520 行（对账快照）
+## 二、全库批跑结果（57 游戏 · 第二遍，01:33 定版口径）
+- events=49 / textdump=48 / FAIL 7（光辉的少女们=tyrano data.dts 加密、TouchSim/女王X/HOME=Enigma 壳、完堕ちX兄嫁+姉妹X催眠×2=批跑定位对 junction 未回退到 unpack 目录——GUI 旧缓存有效不受影响；零新增失败）
+- **特殊 CG 事件 scene_kept=14247 全保留 / dropped=0**——rmmz map: 场景由扫描器 pictureLarge（图片量级）把关，名字特征二次筛会误杀 85%（211→31 教训已回滚），最终口径=扫描器把关+validate 管图帧存在性
+- 文本 **764,023 行**（textdump AST+编码解码后全量）；源图片 **209,171** 张交叉核对
+- CG 导出库 38 个 / 5698 特殊 CG（空壳由导入闸 Playable+HasFrames 拦截）
 
 ## 三、审计与真实测试
 - go build ./... 0 错；go test（library/unitycg/cmd/ucgr）全绿；go vet 0 告警

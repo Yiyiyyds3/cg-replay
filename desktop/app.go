@@ -420,6 +420,9 @@ func (a *App) AddGame(root string) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	// V3：导入即过滤——无空壳 CG 事件、只留特殊事件（与 CLI --validate 同口径），
+	// GUI 里点开就是能播的事件，主人验收不再见到无有效帧的条目。
+	lib.Validate(clean)
 	if len(lib.CGs)+len(lib.Scenes)+len(lib.Chapters) == 0 {
 		return nil, fmt.Errorf("没有识别到可回放事件（已按 %s 约定扫描 %s）", conv.EngineID, conv.ScenarioDir)
 	}
@@ -528,6 +531,8 @@ func (a *App) Rescan() (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	// V3：重扫/打开时同样按有效性口径过滤（导入即净库）。
+	lib.Validate(g.Root)
 	if g.Library == "" {
 		g.Library = registry.LibraryPath(dataDir(), g.ID)
 	}
@@ -647,6 +652,8 @@ func (a *App) loadOrScanLib(g *registry.Game) (*library.Library, error) {
 	if err != nil {
 		return nil, err
 	}
+	// V3：重扫/打开时同样按有效性口径过滤（导入即净库）。
+	lib.Validate(g.Root)
 	if g.Library != "" {
 		if err := lib.Save(g.Library); err != nil {
 			return nil, err

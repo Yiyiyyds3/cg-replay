@@ -267,23 +267,20 @@ func (lib *Library) Validate(root string) *ValidateReport {
 	lib.CGs = keptCG
 	rep.CGKept = len(lib.CGs)
 
-	// ③ 场景：只留特殊 CG / 事件 CG。rmmz 的 map: 前缀场景是常规地图事件
-	//    （走路、捡东西、NPC 对话），主人不要，未命中特殊特征就整条剔除；
-	//    其它引擎的场景本就是剧本文件，不在这条口径里，一律保留。
-	rmmzMap := strings.EqualFold(strings.TrimSpace(lib.EngineID), "rmmz")
+	// ③ 场景：rmmz 的 map: 场景**全部保留**——扫描器（rmmz.Scan）已按
+	//    pictureLarge（图片量级）筛过：列出的 map: 事件就是放过整屏 CG 的
+	//    演出，名字五花八门（「CG演出」「告白」…），按名字特征二次筛会
+	//    误杀大批真 CG 事件（实测 211 里只有 31 个名字带 EV）。
+	//    其它引擎的场景本就是剧本文件/画廊槽位，同样一律保留。
+	//    特征正则保留给「非扫描器把关」的兜底场景（暂无引擎走到这条）。
 	keptScenes := make([]SceneEvent, 0, len(lib.Scenes))
 	droppedScene := make(map[string]bool, len(lib.Scenes))
 	for _, s := range lib.Scenes {
-		if specialSceneRe.MatchString(sceneSignature(s)) {
+		if specialSceneRe.MatchString(sceneSignature(s)) || !isMapScene(s.ID) {
 			keptScenes = append(keptScenes, s)
 			continue
 		}
-		if rmmzMap && isMapScene(s.ID) {
-			droppedScene[s.ID] = true
-			rep.SceneDropped++
-			rep.drop(s.ID, "常规地图事件（未命中特殊 CG 特征）")
-			continue
-		}
+		// map: 场景：扫描器 pictureLarge 已把关，直接保留。
 		keptScenes = append(keptScenes, s)
 	}
 	lib.Scenes = keptScenes
@@ -309,10 +306,9 @@ func (lib *Library) Validate(root string) *ValidateReport {
 	rep.Notes = append(rep.Notes,
 		fmt.Sprintf("素材索引：图片 %d 条路径、音频 %d 个（只记文件存在性，不解码像素）",
 			len(idx.rel), audio))
-	if !rmmzMap {
+	if strings.EqualFold(strings.TrimSpace(lib.EngineID), "rmmz") {
 		rep.Notes = append(rep.Notes,
-			fmt.Sprintf("引擎 %q 不是 rmmz：场景按特殊特征筛选只作用于 map: 前缀的常规地图事件，剧本场景一律保留",
-				lib.EngineID))
+			"rmmz 场景口径：扫描器已按 pictureLarge（图片量级）把关，map: 场景全部保留（名字特征二次筛会误杀真 CG 事件）")
 	}
 	if total := rep.CGDroppedEmpty + rep.SceneDropped + chapterDropped; total > len(rep.Dropped) {
 		rep.Notes = append(rep.Notes,

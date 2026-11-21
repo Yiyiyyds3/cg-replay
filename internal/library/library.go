@@ -63,7 +63,9 @@ type ChapterEvent struct {
 
 // SchemaVersion 库清单能力版本。新增字段（如 has_video）时递增，
 // 桌面端发现旧缓存版本不符就重扫，避免升级后永远读不到新标记。
-const SchemaVersion = 2
+// V3：validate 过滤成为默认口径（无空壳 CG 事件、只留特殊事件），旧缓存
+// 必须失效重扫，否则主人看到的还是过滤前的库。
+const SchemaVersion = 3
 
 // Library 事件库清单。
 type Library struct {
