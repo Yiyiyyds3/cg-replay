@@ -14,10 +14,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -234,6 +236,12 @@ func cmdTextDump(args []string) error {
 		var probe string
 		probe, conv, err = library.DetectConvention(root)
 		if err != nil {
+			// 无剧本但可能是 JS bundle 游戏（Electron/React）：提取日文字符串字面量。
+			if n, derr := jsBundleDump(root, out); derr == nil && n > 0 {
+				fmt.Printf("文本导出 %s（引擎 js-bundle）\n", root)
+				fmt.Printf("  日文字符串 %d 条（无事件结构映射，bundle 直提）\n", n)
+				return nil
+			}
 			// 空目录 / 还没解包 / 认不出引擎，对 textdump 都不是错误：
 			// 这是验收工具，如实说没东西可导就够，退出码给 0。
 			fmt.Printf("未发现剧本：%s\n", err)
@@ -471,4 +479,56 @@ func kirikiriLines(path string, content []byte) []string {
 		return ksPlainLines(string(content))
 	}
 	return ksPlainLines(text)
+}
+
+
+// jsBundleDump 从 JS bundle（Electron/React 游戏的 dist/assets）提取日文
+// 字符串字面量：无 .ks 剧本的引擎用。返回提取的字符串条数。
+// 只做文本转储——bundle 里没有事件/CG 结构映射，不产 events。
+func jsBundleDump(root, out string) (int, error) {
+	const minJP = 6      // 至少 6 个连续日文字符算一条
+	const minFile = 50 * 1024
+	var jpRe = regexp.MustCompile(`[\p{Han}\p{Hiragana}\p{Katakana}ー]{` + strconv.Itoa(minJP) + `,}`)
+	type res struct{ rel string; lines []string }
+	var all []res
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() { return nil }
+		if !strings.HasSuffix(strings.ToLower(p), ".js") { return nil }
+		if strings.Contains(p, "node_modules") { return nil }
+		st, serr := d.Info()
+		if serr != nil || st.Size() < minFile { return nil }
+		data, rerr := os.ReadFile(p)
+		if rerr != nil { return nil }
+		matches := jpRe.FindAllString(string(data), -1)
+		if len(matches) == 0 { return nil }
+		seen := map[string]bool{}
+		var lines []string
+		for _, m := range matches {
+			m = strings.TrimSpace(m)
+			if len(m) < minJP || seen[m] { continue }
+			seen[m] = true
+			lines = append(lines, m)
+		}
+		if len(lines) > 0 {
+			rel, _ := filepath.Rel(root, p)
+			all = append(all, res{rel, lines})
+		}
+		return nil
+	})
+	if len(all) == 0 { return 0, fmt.Errorf("无日文 bundle") }
+	total := 0
+	for _, r := range all {
+		name := strings.NewReplacer("/", "_", "\\", "_").Replace(r.rel) + ".txt"
+		if werr := os.WriteFile(filepath.Join(out, name), []byte(strings.Join(r.lines, "\n")), 0o644); werr == nil {
+			total += len(r.lines)
+		}
+	}
+	meta := map[string]interface{}{
+		"schema": 1, "engine_id": "js-bundle", "root": root,
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
+		"total_strings": total, "note": "bundle 直提文本，无事件结构映射（P2 适配器产出 events）",
+	}
+	mb, _ := json.MarshalIndent(meta, "", "  ")
+	os.WriteFile(filepath.Join(out, "_textdump.json"), mb, 0o644)
+	return total, nil
 }
