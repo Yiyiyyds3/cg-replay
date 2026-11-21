@@ -16,6 +16,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -1802,6 +1803,34 @@ func cmdDecode(args []string) error {
 	data, err := os.ReadFile(in)
 	if err != nil {
 		return err
+	}
+	// RPGMV/PNG/WebP 走 DecodeImage：MV/MZ 的加密素材（.rpgmvp/.png_）只有
+	// 它认得（32 字节头还原）；TLG/HG3/JPEG-XOR 仍走下面 Decode（要裸像素与掩码）。
+	isRPGMV := len(data) > 32 && bytes.HasPrefix(data, []byte("RPGMV"))
+	isPNG := len(data) > 8 && bytes.Equal(data[1:4], []byte("PNG"))
+	isWebP := len(data) > 16 && bytes.Equal(data[:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP"))
+	if isRPGMV || isPNG || isWebP {
+		img, err := decode.DecodeImage(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", in, err)
+		}
+		if out == "" {
+			out = strings.TrimSuffix(in, filepath.Ext(in)) + ".png"
+		}
+		f, err := os.Create(out)
+		if err != nil {
+			return err
+		}
+		if err := png.Encode(f, img); err != nil {
+			f.Close()
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return err
+		}
+		b := img.Bounds()
+		fmt.Printf("解码 %s → %dx%d（DecodeImage）\n已写出 PNG: %s\n", in, b.Dx(), b.Dy(), out)
+		return nil
 	}
 	img, err := decode.Decode(data)
 	if err != nil {
