@@ -489,6 +489,7 @@ func jsBundleDump(root, out string) (int, error) {
 	const minJP = 6      // 至少 6 个连续日文字符算一条
 	const minFile = 50 * 1024
 	var jpRe = regexp.MustCompile(`[\p{Han}\p{Hiragana}\p{Katakana}ー]{` + strconv.Itoa(minJP) + `,}`)
+	var jpShort = regexp.MustCompile(`[\p{Han}\p{Hiragana}\p{Katakana}ー]{2,}`)
 	type res struct{ rel string; lines []string }
 	var all []res
 	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -499,7 +500,14 @@ func jsBundleDump(root, out string) (int, error) {
 		if serr != nil || st.Size() < minFile { return nil }
 		data, rerr := os.ReadFile(p)
 		if rerr != nil { return nil }
-		matches := jpRe.FindAllString(decodeUEscape(string(data)), -1)
+		dec := decodeUEscape(string(data))
+		matches := jpRe.FindAllString(dec, -1)
+		qRe := regexp.MustCompile(`"([^"\\\n]{2,120})"|'([^'\\\n]{2,120})'`)
+		for _, qm := range qRe.FindAllStringSubmatch(dec, -1) {
+			s := qm[1]
+			if s == "" { s = qm[2] }
+			if jpShort.MatchString(s) { matches = append(matches, s) }
+		}
 		if len(matches) == 0 { return nil }
 		seen := map[string]bool{}
 		var lines []string
