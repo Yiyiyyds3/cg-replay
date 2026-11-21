@@ -10,7 +10,7 @@
 | 只留有效特殊 CG、数量对得上 | 特殊事件特征正则（ev/hscene/gallery/cgrai/egz）+ 空索引安全阀 | acceptance_v3.md：scene_kept=1926 / dropped=818（过滤前 2744）；CG 库 38 个索引 5698 特殊 CG 全有效（空壳由导入闸拦） |
 | 文本导入 | ucgr textdump（kirikiri AST 优先/SJIS-UTF16LE-XOR 解码 + rmmz 401 拼接 + artemis） | 批跑全库导出：Lulumachi 25508 行、Unholy_maiden 60027 行、魔剣士 7855 行…txt 落 D:\UCGR_Work\text\<游戏>\ |
 | 音频导入 | validate 报告 audio_count + RPGMV 语音逐页还原解码 | 妹神官 2501、对魔战士美月 2298；.rpgmvo 直读解码 72 秒 PCM 实证 ✓ |
-| CG 库总量 | 全盘盘点 43 库 | **9,232 特殊 CG 全有效**（20 空壳 spine 缺贴图被导入闸拦截） |（含 JS 游戏新库 女王X_scenes 522+TouchSim_gallery 9）
+| CG 库总量 | 全盘盘点 44 库 | **10,651 特殊 CG 全有效**（20 空壳 spine 缺贴图被导入闸拦截） |（含 JS 游戏两库+光辉 carved 1419——57 处理对象无一全放弃）
 
 ## 二、全库批跑结果（57 游戏 · 终版 03:30 口径）
 - **54 全支持**（events+validate+textdump+对账四件齐，含 junction 三款手动补齐）——**HOME 凌晨救回**：app.asar 标准 Electron 资源，asar_extract 提取 data/（665 ks 剧本）→ tyrano 解析 180 特殊事件（validate 剔除 0）+ 文本 12,587 行 32.7 万字
