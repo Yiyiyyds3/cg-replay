@@ -75,6 +75,8 @@ func main() {
 		err = cmdPlay(args)
 	case "events":
 		err = cmdEvents(args)
+	case "textdump":
+		err = cmdTextDump(args)
 	case "decode":
 		err = cmdDecode(args)
 	case "unpack":
@@ -117,6 +119,9 @@ func usage() {
   ucgr events <解包目录> [--out 库.json]      扫出「原作自己的事件表」：
                              每个 CG 一个独立事件（cgrai 画廊槽位 + cgrai00.ks 的 *cgNN），
                              每个编号剧本一个场景事件；--out 落盘给 GUI 用
+                             --validate 只保留有效事件（CG 要有画面页、场景取特殊 CG），
+                             过滤报告写 <out>.validate.json
+  ucgr textdump <解包目录> [--out 报告.json]  统计台词量（台本数 / 台词行数）
   ucgr decode <图片文件> [--out out.png] [--raw out.bin]  按需解码（TLG5/JPEG→PNG，自动还原 XOR 掩码）
   ucgr unpack <归档> [--out 目录] [--key 口令] [--limit N]  解包归档（CatSystem2 KIF）
   ucgr engines                 列出已注册引擎
@@ -203,6 +208,7 @@ func cmdAudio(args []string) error {
 // cmdEvents 扫出「原作自己的事件表」：每个 CG 一个独立事件 + 每个编号剧本一个场景事件。
 func cmdEvents(args []string) error {
 	var root, out string
+	validate := false
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
 		case "--out":
@@ -211,6 +217,9 @@ func cmdEvents(args []string) error {
 			}
 			i++
 			out = args[i]
+		case "--validate":
+			// 只保留有效事件：CG 要有能命中素材的画面页，场景按特殊 CG 口径筛。
+			validate = true
 		default:
 			if root == "" {
 				root = a
@@ -220,7 +229,7 @@ func cmdEvents(args []string) error {
 		}
 	}
 	if root == "" {
-		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json]")
+		return fmt.Errorf("用法: ucgr events <解包目录> [--out 库.json] [--validate]")
 	}
 	// --engine <id>（全局参数）指定引擎时按其默认约定扫（如 renpy 的
 	// game 目录探测）；否则按根目录自动探测约定。
@@ -243,6 +252,13 @@ func cmdEvents(args []string) error {
 	if err != nil {
 		return err
 	}
+	// --validate：扫完先过滤再打印/落盘。空壳 CG（画面页一页都命中不了素材）
+	// 与常规地图事件不进清单，也不会写进库文件——下游读库的一方默认拿到的是
+	// 「打开就能播」的那份，不用再自己筛一遍。
+	var vrep *library.ValidateReport
+	if validate {
+		vrep = lib.Validate(root)
+	}
 	stage := "舞台未推断"
 	switch {
 	case conv.StageW > 0 && conv.StageH > 0:
@@ -252,6 +268,13 @@ func cmdEvents(args []string) error {
 	}
 	fmt.Printf("事件库 %s（%s，引擎 %s，%s）\n  CG 事件 %d 个 · 场景事件 %d 个 · 演出段落 %d 个\n",
 		lib.Game, lib.Root, engineID, stage, len(lib.CGs), len(lib.Scenes), len(lib.Chapters))
+	if vrep != nil {
+		fmt.Printf("过滤：CG 保留 %d 剔除 %d · 场景保留 %d 剔除 %d\n",
+			vrep.CGKept, vrep.CGDroppedEmpty, vrep.SceneKept, vrep.SceneDropped)
+		for _, n := range vrep.Notes {
+			fmt.Printf("  · %s\n", n)
+		}
+	}
 	const showMax = 24
 	for i, c := range lib.CGs {
 		if i >= showMax {
@@ -289,8 +312,43 @@ func cmdEvents(args []string) error {
 			return err
 		}
 		fmt.Printf("已写入 %s\n", out)
+		if vrep != nil {
+			// 报告与库并排放：路径就是 <out> 取值后面直拼 ".validate.json"
+			// （不是改扩展名，别按 strings.TrimSuffix(".json") 那一套理解）。
+			path := out + ".validate.json"
+			if err := saveValidateReport(path, vrep); err != nil {
+				return err
+			}
+			fmt.Printf("过滤报告 %s（剔除明细 %d 条）\n", path, len(vrep.Dropped))
+		}
+		return nil
+	}
+	if vrep != nil {
+		// 没给 --out：报告只在 stdout 出摘要（前 10 条明细），要看全量就落盘。
+		fmt.Println("过滤明细（最多列 10 条）：")
+		for i, d := range vrep.Dropped {
+			if i >= 10 {
+				fmt.Printf("  …另 %d 条未列（--out 落盘可拿全量）\n", len(vrep.Dropped)-i)
+				break
+			}
+			fmt.Printf("  - %s\n", d)
+		}
 	}
 	return nil
+}
+
+// saveValidateReport 把过滤报告写成 JSON（缩进 2 格，与库清单同一个风格）。
+func saveValidateReport(path string, rep *library.ValidateReport) error {
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	b, err := json.MarshalIndent(rep, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o644)
 }
 
 func cmdScan(args []string) error {

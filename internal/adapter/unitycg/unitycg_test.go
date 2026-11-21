@@ -161,3 +161,30 @@ func TestBuildShowFPSOverride(t *testing.T) {
 		t.Fatalf("24fps 应为 41ms/帧，实际 %v", waits)
 	}
 }
+
+// TestHasFrames 空帧条目必须被识别：frames/still 无任何帧 = false。
+func TestHasFrames(t *testing.T) {
+	mk := func(kind string, png, text, frames []string) CG {
+		c := CG{Kind: kind, Frames: frames}
+		c.Files.PNG = png
+		c.Files.Text = text
+		return c
+	}
+	cases := []struct {
+		name string
+		cg   CG
+		want bool
+	}{
+		{"still 有帧", mk("still", []string{"a.png"}, nil, nil), true},
+		{"still 空帧", mk("still", nil, nil, nil), false},
+		{"frames 有序列", mk("frames", nil, nil, []string{"f1.png"}), true},
+		{"frames 空壳", mk("frames", nil, nil, nil), false},
+		{"spine 骨架贴图齐", mk("spine", []string{"p.png"}, []string{"s.json"}, nil), true},
+		{"spine 缺贴图", mk("spine", nil, []string{"s.json"}, nil), false},
+	}
+	for _, c := range cases {
+		if got := HasFrames(c.cg); got != c.want {
+			t.Errorf("%s: HasFrames=%v want %v", c.name, got, c.want)
+		}
+	}
+}

@@ -135,6 +135,18 @@ func validSegment(s string) bool {
 // 导出器从 .skel 原样导出）。两者都由前端 WebGL 组件渲染，加载分支不同。
 func IsSpine(kind string) bool { return kind == "spine" || kind == "binary-skel" }
 
+// HasFrames 这部 CG 至少有一帧画面。
+//
+// frames/still 的有效性 = PNG 帧列表或 Frames 序列非空——导出器没抽到任何
+// 帧的空壳条目列出来点开必然一片空白（主人说的「无有效帧 CG 事件」），
+// 导入侧用本函数剔除。spine 的判定与 Playable 相同（骨架+贴图都要有）。
+func HasFrames(cg CG) bool {
+	if IsSpine(cg.Kind) {
+		return len(cg.Files.Text) > 0 && len(cg.Files.PNG) > 0
+	}
+	return len(cg.Files.PNG) > 0 || len(cg.Frames) > 0
+}
+
 // Playable 这部 CG 现在能不能放（spine 由前端 WebGL 组件渲染）。
 // spine 必须同时有 skeleton/atlas 文本和贴图，否则列出来点开只会报错。
 func Playable(cg CG) bool {

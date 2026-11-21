@@ -32,9 +32,11 @@ func ScanUnity(root string) (*Library, error) {
 	pending := 0
 	kinds := map[string]int{}
 	for _, cg := range idx.CGs {
-		if !unitycg.Playable(cg) {
+		// Playable 管类型可播性；HasFrames 管「至少有一帧画面」——空壳条目
+		//（导出器没抽到帧）在这里就剔除，不进事件库，GUI 里点开不会再是一片空。
+		if !unitycg.Playable(cg) || !unitycg.HasFrames(cg) {
 			pending++
-			kinds[cg.Kind]++ // 如实记下是什么类型：binary-skel / unknown / 缺文件的不完整 spine
+			kinds[cg.Kind]++ // 如实记下是什么类型：binary-skel / unknown / 不完整 spine / 空帧
 			continue
 		}
 		lib.Scenes = append(lib.Scenes, SceneEvent{
