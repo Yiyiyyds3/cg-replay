@@ -499,7 +499,7 @@ func jsBundleDump(root, out string) (int, error) {
 		if serr != nil || st.Size() < minFile { return nil }
 		data, rerr := os.ReadFile(p)
 		if rerr != nil { return nil }
-		matches := jpRe.FindAllString(string(data), -1)
+		matches := jpRe.FindAllString(decodeUEscape(string(data)), -1)
 		if len(matches) == 0 { return nil }
 		seen := map[string]bool{}
 		var lines []string
@@ -531,4 +531,29 @@ func jsBundleDump(root, out string) (int, error) {
 	mb, _ := json.MarshalIndent(meta, "", "  ")
 	os.WriteFile(filepath.Join(out, "_textdump.json"), mb, 0o644)
 	return total, nil
+}
+
+// decodeUEscape 把 JS 源里的 \uXXXX 转义还原成 UTF-8 字符，供正则匹配日文。
+// 只处理 BMP（\uXXXX 四位十六进制），surrogate pair 组合由 utf16.Decode 处理。
+func decodeUEscape(s string) string {
+	if !strings.Contains(s, "\\u") { return s }
+	return unescapeULiterals(s)
+}
+
+// unescapeULiterals 把 \uXXXX 序列替换为对应 rune（含代理对原样保留）。
+func unescapeULiterals(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] == '\\' && i+5 < len(s) && s[i+1] == 'u' {
+			if v, err := strconv.ParseUint(s[i+2:i+6], 16, 32); err == nil {
+				b.WriteRune(rune(v))
+				i += 6
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }
