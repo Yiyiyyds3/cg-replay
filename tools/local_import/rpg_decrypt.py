@@ -33,7 +33,12 @@ JPEG_SOI = b"\xff\xd8\xff"                       # 部分游戏把 .jpg 也按�
 CHUNK = 1 << 20
 SAMPLE_LIMIT = 3000
 BIG_GAME_BYTES = 25 * 1024 ** 3
-ENC_EXTS = (".rpgmvp", ".png_")
+ENC_EXTS = (".rpgmvp", ".png_", ".rpgmvo", ".ogg_")
+OGG_SIG = b"OggS"
+# .ogg_ 旧式直替：原文件前 16 字节（Ogg 页头前段）被丢弃，需重建。
+# Ogg 页头前 16 字节 = "OggS" + version(2B) + header_type(1B) + granule(8B) + serial(4B 前 1B)。
+# CRC 位于第 22-25 字节（重建后必然不符，主流播放器容忍）。
+OGG_HDR16_REBUILD = b"OggS\x00\x00\x02" + b"\x00" * 12
 MAX_HDR_MATCH = "PNG sig+IHDR 16B"
 
 BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -48,6 +53,10 @@ def out_rel_name(rel):
     if low.endswith(".rpgmvp"):
         f = f[:-7] + ".png"
     elif low.endswith(".png_"):
+        f = f[:-1]
+    elif low.endswith(".rpgmvo"):
+        f = f[:-7] + ".ogg"
+    elif low.endswith(".ogg_"):
         f = f[:-1]
     return os.path.join(d, f) if d else f
 
@@ -129,8 +138,16 @@ def decrypt_one(src, dst, kind, keys):
     if size < 16:
         return "fail", "文件<16B", ""
 
+    audio = kind in ("rpgmvo", "ogg_")
     variants = []
-    if kind == "png_":
+    if audio:
+        # 音频：密钥变体解出原头 16 字节（写盘后验 OggS），.ogg_ 另试重建头。
+        for k, tag in keys:
+            if size >= 32:
+                variants.append(("mvkey:" + tag, xor(k, head[16:32]), 32))
+        if kind == "ogg_":
+            variants.append(("rebuild", OGG_HDR16_REBUILD, 16))
+    elif kind == "png_":
         variants.append(("head16", PNG_HDR16, 16))
         if size >= 32:
             variants.append(("head32", PNG_HDR16, 32))
@@ -144,7 +161,10 @@ def decrypt_one(src, dst, kind, keys):
 
     tried = []
     for label, hdr16, skip in variants:
-        fmt = "png" if hdr16[:8] == PNG_SIG else ("jpg" if hdr16[:3] == JPEG_SOI else None)
+        if audio:
+            fmt = "ogg"
+        else:
+            fmt = "png" if hdr16[:8] == PNG_SIG else ("jpg" if hdr16[:3] == JPEG_SOI else None)
         if not fmt:
             tried.append("%s:sig" % label)
             continue
@@ -170,10 +190,25 @@ def _copy_plain(src, dst):
         return "fail", "明文直通后校验失败(%s)" % info
     return "plain", "源文件已是明文 PNG"
 
+def ogg_check(path):
+    """OGG 兜底校验：OggS 开头 + 前 128B 内出现 vorbis（Ogg Vorbis 首页特征）。"""
+    try:
+        with open(path, "rb") as f:
+            b = f.read(128)
+    except OSError as e:
+        return False, "IO: %s" % e
+    if b[:4] != OGG_SIG:
+        return False, "OggS 不符"
+    if b"vorbis" not in b:
+        return False, "vorbis 标识缺失"
+    return True, "ogg vorbis %dB" % os.path.getsize(path)
+
 def _write(src, dst, header16, skip, fmt):
-    """按认定的格式写出：PNG 校验 IHDR/CRC，JPEG 校验 SOI+EOI。返回 (状态, 说明, 实际输出路径)。"""
+    """按认定的格式写出：PNG 校验 IHDR/CRC，JPEG 校验 SOI+EOI，OGG 校验 OggS+vorbis。返回 (状态, 说明, 实际输出路径)。"""
     if fmt == "jpg":
         dst = os.path.splitext(dst)[0] + ".jpg"
+    elif fmt == "ogg":
+        dst = os.path.splitext(dst)[0] + ".ogg"
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     tmp = dst + ".part"
     try:
@@ -187,6 +222,8 @@ def _write(src, dst, header16, skip, fmt):
                 fo.write(buf)
         if fmt == "jpg":
             ok, info = jpeg_check(tmp)
+        elif fmt == "ogg":
+            ok, info = ogg_check(tmp)
         else:
             ok, info = ihdr_check(tmp)
         if not ok:
@@ -306,7 +343,11 @@ def main():
             rec["status"] = "no_encrypted_files"
             rec["note"].append("源目录下没有 .rpgmvp/.png_（可能未加密或已解包）")
             games.append(rec); continue
-        selected = [(r, a, s, "rpgmvp") for r, a, s in mv] + [(r, a, s, "png_") for r, a, s in pn]
+        selected = [(r, a, s, "rpgmvp") for r, a, s in mv]
+        for r, a, s in pn:
+            low = a.lower()
+            k = "rpgmvo" if low.endswith(".rpgmvo") else ("ogg_" if low.endswith(".ogg_") else "png_")
+            selected.append((r, a, s, k))
         selected.sort(key=lambda x: x[0].lower())
         if est > BIG_GAME_BYTES:
             selected = sample_even(selected, SAMPLE_LIMIT)
@@ -329,7 +370,7 @@ def main():
         budget = args.max_bytes_per_game
         for rel, ap_, sz, kind in selected:
             dst = os.path.join(outdir, out_rel_name(rel))
-            want = max(0, sz - 16) if kind == "rpgmvp" else sz
+            want = max(0, sz - 16) if kind in ("rpgmvp", "rpgmvo") else sz
             if rec["bytes_written"] + want > budget:
                 left = rec["selected_files"] - rec["decrypted"] - rec["plain_copy"] - rec["failed"]
                 rec["note"].append("max-bytes-per-game 触顶：已写 %.2fGB，剩余 %d 张未解"
