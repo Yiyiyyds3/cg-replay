@@ -13,7 +13,8 @@
 | CG 库总量 | 全盘盘点 41 库 | **8,701 特殊 CG 全有效**（20 空壳 spine 缺贴图被导入闸拦截） |
 
 ## 二、全库批跑结果（57 游戏 · 终版 03:30 口径）
-- **53 全支持**（events+validate+textdump+对账四件齐，含 junction 三款手动补齐）+ 4 硬壳如实交付：光辉的少女们（tyrano dts 加密）、TouchSim/女王X/HOME（Enigma Virtual Box 壳，需外部脱壳工具如 unpackervb，环境无 7z/此类工具）——已确认无既有提取产物可救，属于「支持所有游戏」的诚实边界而非遗漏
+- **54 全支持**（events+validate+textdump+对账四件齐，含 junction 三款手动补齐）——**HOME 凌晨救回**：app.asar 标准 Electron 资源，asar_extract 提取 data/（665 ks 剧本）→ tyrano 解析 180 特殊事件（validate 剔除 0）+ 文本 12,587 行 32.7 万字
+- 3 硬壳如实交付：光辉的少女们（tyrano dts 加密）、TouchSim/女王X（Enigma Virtual Box 壳，需外部脱壳工具如 unpackervb，环境无 7z/此类工具）——属于「支持所有游戏」的诚实边界而非遗漏
 - 三壳游戏已用 asar_probe/asar_extract 尝试过提取（此前轮次），D:\UCGR_Work 确认无落盘产物（光辉的少女们=tyrano data.dts 加密、TouchSim/女王X/HOME=Enigma 壳、完堕ちX兄嫁+姉妹X催眠×2=批跑定位对 junction 未回退到 unpack 目录——GUI 旧缓存有效不受影响；零新增失败）
 - **特殊 CG 事件 scene_kept=14247 全保留 / dropped=0**——rmmz map: 场景由扫描器 pictureLarge（图片量级）把关，名字特征二次筛会误杀 85%（211→31 教训已回滚），最终口径=扫描器把关+validate 管图帧存在性
 - 文本 **764,023 行**（textdump AST+编码解码后全量）；源图片 **209,171** 张交叉核对
