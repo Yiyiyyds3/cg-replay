@@ -78,6 +78,9 @@ func toFileURL(path string) string {
 // （普通 win32 进程里 MF 没有 Vorbis MFT）。
 func DecodeFile(path string) (*PCM, error) {
 	// Ogg Vorbis 走纯 Go 解码器（MF 在普通 win32 进程里没有 Vorbis MFT）。
+	// RPG Maker 加密音频（.rpgmvo/.ogg_/.rpgmvm，内容带 RPGMV 签名）同样是
+	// Vorbis 流：还原头后也走纯 Go 路径——MF 不认这个扩展名，会报
+	// 0xC00D36C4「不支持的格式」。
 	if isOgg(path) {
 		return decodeOgg(path)
 	}
