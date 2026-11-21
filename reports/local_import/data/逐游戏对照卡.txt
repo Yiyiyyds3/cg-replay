@@ -1,0 +1,60 @@
+══════ GUI 逐游戏对照卡（事件库过滤后预期条数）══════
+
+打开游戏后左侧事件列表的条目数应与下表一致（±0）。
+显著偏多 = 空壳没滤干净；偏少 = 误杀——两种情况都报游戏名，本鲸鱼立刻修。
+
+Phoenixes-v17.0.1             unity    2596 事件
+Scars of Summer After v1.01（牛）rmmz     1350 事件
+Lulumachi                     rmmz     1047 事件
+(牛)RJ01680223                 rmmz     1025 事件
+Unholy_maiden_Ver.1.0.10      rmmz     843 事件
+（牛）间谍任务                       rmmz     716 事件
+魔法学園見聞録                       rmmz     523 事件
+忍耐色诱的告白游戏 V2.0（不赖）            rmmz     478 事件
+SOTDQ_0.3.5.3v_WINDOWS（很牢）    unity    461 事件
+SAO_verβ7                     rmmz     348 事件
+Restore(                      rmmz     338 事件
+(中等)The Forbidden Tomes of Oliposrmmz     336 事件
+詛咒铠甲2（夯）                      rmmz     285 事件
+Game                          rmmz     279 事件
+星天之魔女（Arpg）                   rmmz     238 事件
+072project_The Gloomy, Busty Half-Elf Just Wants to be_CNrmmz     233 事件
+呪いの鎧 v3.0.1（夯）                rmmz     224 事件
+（中等）NTR Hunter                rmmz     216 事件
+妹神官（牛）                        rmmz     211 事件
+MELFIAS －Azure and Crimson Verge－rmmz     209 事件
+(牛)RJ01618221                 rmmz     203 事件
+RA26037409(                   rmmz     198 事件
+（一般）命に代えてもお守りします!             rmmz     187 事件
+HOME_extract                  tyrano   180 事件
+Chronicles of Clams Island    rmmz     161 事件
+冒険者リザシア                       rmmz     137 事件
+ayuureiCN（夯）                  rmmz     132 事件
+对魔战士美月(                       rmmz     129 事件
+时勇者                           rmmz     125 事件
+希尔丝大冒险  1.06（夯）               rmmz     101 事件
+栩的人生已经没救了（一般）                 rmmz     95 事件
+ROOM                          kirikiri 89 事件
+人柱阿拉卡~官方中文版~遊戲本體              rmmz     86 事件
+ボクは種付けアプリを手に入れた！              rmmz     74 事件
+女大学生 DX(8)                    rmmz     70 事件
+完堕ちX兄嫁 ～アンタのせいよ！ 私、この浮気チ●ポじゃなきゃダメなのっ！～kirikiri 70 事件
+（上等）哈尔法斯的恶魔                   rmmz     68 事件
+(夯)Stranded with You          rmmz     50 事件
+（夯）直到这个魅魔的心灵崩坏                rmmz     50 事件
+The Dungeon of Lulu Farea Rebirth v1.01rmmz     47 事件
+（一般）Shitsuke-ai_dlsite        rmmz     47 事件
+女主角（大雷）                       rmmz     44 事件
+共妻之村 (牛)                      kirikiri 38 事件
+The Dungeon of Lulu Farea     rmmz     31 事件
+绝对合格                          rmmz     28 事件
+Risty and the Village of Bocchino v1.0.0rmmz     25 事件
+内嵌                            rmmz     25 事件
+魔法少女木叶  v2.04（中上）             rmmz     22 事件
+魔法                            rmmz     21 事件
+（一般）姉妹X催眠2 ～絶対服従、セレブ妻と日焼けJKが堕ちる性感マッサージ～kirikiri 14 事件
+（一般）姉妹X催眠 ～絶対服従、俺がずっと王様～      kirikiri 11 事件
+无法诉说的关系(中等)                   kirikiri 7 事件
+魔剣士レーヴェ                       kirikiri 1 事件
+
+（无事件条目的游戏 = 数据走 CG 导出库，登记对应库路径即可，见验收指南第二步）
