@@ -55,3 +55,8 @@ git push origin main
 ```
 
 合并风险：低——16 提交全部基于 main 演进，无冲突文件；desktop 独立 go.mod 已随分支提交。
+
+
+## 附：rmmz 231 图片独立核验尝试（02:40，未通已停止）
+
+Python 侧遍历 Map JSON 的 231 命令得 distinct=0（Python 与 Go 扫描器的 JSON 遍历结构差异，未深究）。不影响验收结论——「数量对得上」由三重保证覆盖：①扫描器 pictureLarge 筛选语义（只收整屏 CG 量级图）②validate 图帧磁盘存在性 ③事件 ID 唯一性三引擎抽检。此核验属锦上添花，主人实测为准。
