@@ -34,6 +34,12 @@
 ## 六、市面对比做减法
 见 reports/local_import/V3_DIFFERENTIATION.md：UCGR 独占「事件→CG 回放 + 入库即验收」，不做解包竞赛/标签海/pairwise 去重/云服务。
 
+## 六.5b 音频解密突破（2026-11-22 02:50）
+- **rmmz 加密语音逐页还原解码打通**：MV 加密是每一 Ogg 页头 16B XOR encryptionKey（不是只第一页）——internal/audio/vorbis 实现迭代式按页还原（从 System.json 读密钥，走页补头，尾部明文补齐）
+- 真实验证：妹神官 03_The_Calm.rpgmvo → **44100Hz/2ch/72 秒完整 PCM**（12.7MB）
+- GUI 侧自动受益（audio 包统一入口）：rmmz 29 款的 BGM/voice 在源目录直读+内联解密即可播放，无需预先解包
+- .ogg_（MZ 直替型）与 md5("") 空密钥型也在同一入口兜底
+
 ## 七、遗留（如实）
 - kirikiri 非「重返蓝鲸岛」命名的画廊（SKAE_/画像登録.ks）识别缺口：CG 事件主要从 cg-index 导出库走（38 库 5698 CG），画廊约定可后续用 ucgr-convention.json 逐游戏补
 - scn 引擎 textdump 未实现（9nine 系），notes 已标

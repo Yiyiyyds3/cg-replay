@@ -1,8 +1,13 @@
 package vorbis
 
 import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Stream 是解码后的音频。
@@ -28,17 +33,69 @@ func (s *Stream) DurationMs() int64 {
 	return int64(s.Frames()) * 1000 / int64(s.SampleRate)
 }
 
-// DecodeFile 解码一个 Ogg Vorbis 文件。
+// DecodeFile 解码一个 Ogg Vorbis 文件（RPG Maker 加密语音自动识别并
+// 从相邻的 System.json 取密钥还原）。
 func DecodeFile(path string) (*Stream, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return Decode(data)
+	if bytes.HasPrefix(data, []byte("RPGMV")) {
+		return decode(data, decodePathKey(path))
+	}
+	return decode(data, nil)
 }
 
 // Decode 解码 Ogg Vorbis 字节流。
 func Decode(data []byte) (*Stream, error) {
+	return decode(data, nil)
+}
+
+// decodePathKey 从音频路径向上找 www/data/System.json（或 data/System.json）
+// 读 encryptionKey——RPG Maker 的音频密钥就存在那里（32 个 hex 字符 = 16 字节）。
+func decodePathKey(path string) []byte {
+	dir := filepath.Dir(path)
+	for i := 0; i < 4; i++ {
+		if strings.EqualFold(filepath.Base(dir), "audio") {
+			sj := filepath.Join(filepath.Dir(dir), "data", "System.json")
+			if data, err := os.ReadFile(sj); err == nil {
+				var m struct {
+					EncryptionKey string `json:"encryptionKey"`
+				}
+				if json.Unmarshal(data, &m) == nil && len(m.EncryptionKey) == 32 {
+					if k, err := hex.DecodeString(m.EncryptionKey); err == nil {
+						return k
+					}
+				}
+				return nil
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return nil
+}
+
+func decode(data, key []byte) (*Stream, error) {
+	if candidates := rpgmvVariants(data, key); len(candidates) > 0 {
+		var lastErr error
+		for _, cand := range candidates {
+			s, err := decodeStream(cand)
+			if err == nil {
+				return s, nil
+			}
+			lastErr = err
+		}
+		return nil, lastErr
+	}
+	return decodeStream(data)
+}
+
+// decodeStream 原解码路径（页解析 → 流选择 → 采样还原）。
+func decodeStream(data []byte) (*Stream, error) {
 	pages, err := parsePages(data)
 	if err != nil {
 		return nil, err

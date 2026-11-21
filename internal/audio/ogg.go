@@ -10,7 +10,15 @@ import (
 
 // isOgg 判断路径是否为 Ogg Vorbis（按扩展名）。
 func isOgg(path string) bool {
-	return strings.EqualFold(filepath.Ext(path), ".ogg")
+	ext := strings.ToLower(filepath.Ext(path))
+	// .ogg 明文之外，RPG Maker 的加密语音（.rpgmvo/.ogg_/.rpgmvm）同样是
+	// Vorbis 流（还原头后走纯 Go 解码），不能落到 Media Foundation——
+	// MF 不认这些扩展名，直接报不支持的格式。
+	switch ext {
+	case ".ogg", ".rpgmvo", ".ogg_", ".rpgmvm":
+		return true
+	}
+	return false
 }
 
 // decodeOgg 用纯 Go 解码器解 Ogg Vorbis，并转成 16bit 交错 PCM。
