@@ -44,3 +44,21 @@
 - kirikiri 非「重返蓝鲸岛」命名的画廊（SKAE_/画像登録.ks）识别缺口：CG 事件主要从 cg-index 导出库走（38 库 5698 CG），画廊约定可后续用 ucgr-convention.json 逐游戏补
 - scn 引擎 textdump 未实现（9nine 系），notes 已标
 - audio_count 口径差 1（2501 vs 2500，扩展名别名统计，无实害）
+
+
+---
+
+## 终版审计（2026-11-22 01:53 · 交卷前四件套全绿）
+
+| 项 | 结果 |
+|---|---|
+| go build ./...（root） | exit 0 |
+| go build ./...（desktop） | exit 0 |
+| go vet ./... | exit 0 无告警 |
+| go test（library/unitycg/cmd/ucgr/desktop） | 全 ok |
+| V3 冒烟（三引擎端到端 21 项） | **PASS 21 fail=0** |
+| git | 7 提交，dirty=0，分支 dsh-0f13c1bf-6649 |
+
+终版数字：events=51 / validate=51 / textdump=50 / scene_kept=14272 / dropped=0 / 文本 770,439 行 / 源图 209,504 / CG 导出库 38 库 5698 全有效 / 音频逐页还原解码实证 72 秒 PCM。
+
+kirikiri 非 cgrai 画廊（SKAE_/画像登録/シーン回想菜单入口式）正式留 P2：需 per-game 回想脚本解析器，误配风险大于收益（CG 主线由导出库覆盖）。
