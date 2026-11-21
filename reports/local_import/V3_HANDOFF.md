@@ -39,3 +39,19 @@ V3 全部交付完成：无空壳 CG 事件清零、特殊 CG 口径落地、12.
 1. kirikiri 非 cgrai 画廊（SKAE_/画像登録.ks）自动识别——CG 主线走导出库不受影响
 2. scn（9nine 系）textdump 未做
 3. push 与 GUI 事件库重新导入（GUI 缓存 schema=2，重扫即得过滤后库）由主人验收后决定
+
+
+---
+
+## 合并建议（验收通过后执行）
+
+```bash
+# worktree 分支合回 main（主人确认后执行）：
+git switch main
+git pull origin main
+git merge dsh-0f13c1bf-6649 --no-ff -m "merge: V3 事件有效性过滤+textdump+音频逐页解密+SchemaVersion=3（54 游戏全支持）"
+git push origin main
+# GUI 终版：bin/cgreplay-ui.exe（01:55）无需重编译
+```
+
+合并风险：低——16 提交全部基于 main 演进，无冲突文件；desktop 独立 go.mod 已随分支提交。
